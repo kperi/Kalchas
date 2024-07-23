@@ -21,10 +21,10 @@ import numpy as np
 from PIL import Image
 from kraken import binarization
 
-from kalchas.ocr import lists_models, load_ocr_model
+from kalchas.ocr import list_available_models, load_ocr_model
 
 
-models = lists_models() # get all available models 
+models = list_available_models() # get all available models 
 
 
 model = load_ocr_model('model1') 

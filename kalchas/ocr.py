@@ -11,7 +11,7 @@ _models = {
 }
 
 
-def lists_models():
+def list_available_models():
     return [m for m in _models.keys()]
 
 
