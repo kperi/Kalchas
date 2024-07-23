@@ -19,7 +19,6 @@ TODO
 
 import numpy as np
 from PIL import Image
-from kraken import binarization
 
 from kalchas.ocr import list_available_models, load_ocr_model
 
