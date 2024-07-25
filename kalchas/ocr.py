@@ -4,25 +4,32 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from .model import CRNN
 from .ctc_decoder import ctc_decode
-
+from .factory import download_model
 
 _models = {
-    "model1": "kalchas/artifacts/88_model_best_loss_0.7971",
+    "model1": {
+        "url": "kalchas/checkpoints/model1/model_best_loss_0.7971",
+        "name": "model_best_loss_0.7971",
+    },
+    # "model3" : {
+    #    "url": "kalchas/checkpoints/model3/82_model_best_loss_1.015",
+    #    "name": "82_model_best_loss_1.015",
+    # },
 }
 
 
 def list_available_models():
-    return [m for m in _models.keys()]
+    return list(_models.keys())
 
 
 def load_ocr_model(model_name: str, device: str = "cpu"):
     if model_name not in _models:
         raise ValueError(
-            f"Model {model_name} not found. Available models: {lists_models()}"
+            f"Model {model_name} not found. Available models: {list_available_models()}"
         )
 
-    MODEL_PATH = _models[model_name] + ".pt"
-    ARTIFACT_PATH = _models[model_name] + "_artifacts.pt"
+    MODEL_PATH = _models[model_name]["url"] + ".pt"
+    ARTIFACT_PATH = _models[model_name]["url"] + "_artifacts.pt"
 
     char2idx, idx2char, width, height, MAX_TEXT_LENGTH = torch.load(ARTIFACT_PATH)
     model = TextRegognizer(
@@ -46,9 +53,6 @@ def predict(
 ):
     model.eval()
 
-    # if verbose:
-    #    pbar = tqdm.tqdm(total=len(dataloader), desc="Predict")
-
     all_preds = []
     with torch.no_grad():
         for data in dataloader:
@@ -65,12 +69,6 @@ def predict(
                 label2char=label2char,
             )
             all_preds.append(preds)
-
-            #if verbose:
-            #    pbar.update(1)
-
-        # if verbose:
-        #    pbar.close()
 
     return all_preds
 
@@ -100,14 +98,19 @@ class TextRegognizer:
         self.height = height
 
     def ocr(
-        self, images: str, search_strategy: str = "beam_search", beam_size: int = 5
+        self, images: str, search_strategy: str = "beam_search", beam_size: int = 10
     ):
 
         if not isinstance(images, list):
             images = [images]
 
         predict_dataset = ImageDataset(
-            images, transform=transform, width=self.width, height=self.height, has_text=False, char2idx=self.char2idx
+            images,
+            transform=transform,
+            width=self.width,
+            height=self.height,
+            has_text=False,
+            char2idx=self.char2idx,
         )
         predict_dataloader = DataLoader(
             predict_dataset, batch_size=1, shuffle=False, drop_last=False
