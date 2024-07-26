@@ -52,3 +52,6 @@ image  = Image.open(image_path).convert('L')
 text = model.ocr([image]) #  ['ἡμέραν ἐς τὸ συγκείμενον. τρίτος δέ ποτε ἐν']
 
 ``` 
+
+
+A more detailed full page OCR using Kalhas and Kraken can be found [here](demo.ipynb)
