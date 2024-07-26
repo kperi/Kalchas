@@ -39,17 +39,14 @@ from kalchas.ocr import list_available_models, load_ocr_model
 
 
 models = list_available_models() # get all available models 
-
-
 model = load_ocr_model('model1') 
 
 
-# load image and binarize it using the [kraken](https://kraken.re/main/index.html).ocr libray
+# load image 
 image_path = "images/010000.bin.png" 
 image  = Image.open(image_path).convert('L')
  
-
-text = model.ocr([image]) #  ['ἡμέραν ἐς τὸ συγκείμενον. τρίτος δέ ποτε ἐν']
+text = model.ocr([image]) #  output: ['ἡμέραν ἐς τὸ συγκείμενον. τρίτος δέ ποτε ἐν']
 
 ``` 
 
