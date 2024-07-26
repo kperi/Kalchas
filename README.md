@@ -31,14 +31,11 @@ For basic segmentation the [Kraken](https://github.com/mittagessen/kraken) OCR l
 ![Test image](./images/010000.bin.png "Test image")
 
 ```python
-
-import numpy as np
 from PIL import Image
-
 from kalchas.ocr import list_available_models, load_ocr_model
 
 
-models = list_available_models() # get all available models 
+models = list_available_models() # get all available models: ['model1']
 model = load_ocr_model('model1') 
 
 
