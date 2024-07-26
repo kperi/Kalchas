@@ -18,7 +18,7 @@ TODO
 
 ### Limitations 
 
-This initial release only support OCR in segmented horizontal lines. Page layout analysis and end-to-end recognition is not supported in this version.
+This initial release only supports OCR in segmented horizontal lines. Page layout analysis and end-to-end recognition is not supported in this version.
 
 For basic segmentation the Kraken OCR library can be used. For image deskewing, also refer to the [wand-py](https://docs.wand-py.org/) (ImageMagick  bindings) library 
 
