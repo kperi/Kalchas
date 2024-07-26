@@ -9,8 +9,6 @@ where the LSTM architecture has been replaced by a modified version of the Convo
  
 
 
-
-
 ### Installation 
 
 TODO

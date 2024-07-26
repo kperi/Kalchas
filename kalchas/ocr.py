@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from .model import CRNN
 from .ctc_decoder import ctc_decode
-from .factory import download_model
+#from .factory import download_model
 
 _models = {
     "model1": {
@@ -51,6 +51,22 @@ transform = transforms.Compose([transforms.ToTensor()])
 def predict(
     model, device, dataloader, label2char, decode_method, beam_size, verbose=False
 ):
+    """
+    Predicts the output for a given model using the specified decoding method.
+
+    Args:
+        model (torch.nn.Module): The trained model to use for prediction.
+        device (torch.device): The device to perform the prediction on (e.g., CPU or GPU).
+        dataloader (torch.utils.data.DataLoader): The data loader containing the input images.
+        label2char (dict): A dictionary mapping label indices to characters.
+        decode_method (str): The decoding method to use for converting logits to predictions.
+        beam_size (int): The beam size for beam search decoding.
+        verbose (bool, optional): Whether to print additional information during prediction. Defaults to False.
+
+    Returns:
+        list: A list of predicted outputs for each input image.
+
+    """
     model.eval()
 
     all_preds = []
@@ -74,6 +90,31 @@ def predict(
 
 
 class TextRegognizer:
+    """
+    A class that represents a text recognizer.
+
+    Args:
+        width (int): The width of the input image.
+        height (int): The height of the input image.
+        num_class (int): The number of classes for text recognition.
+        model_path (str): The path to the pre-trained model.
+        char2idx (dict): A dictionary mapping characters to their corresponding indices.
+        idx2char (dict): A dictionary mapping indices to their corresponding characters.
+        device (optional): The device to run the model on. Defaults to None.
+
+    Attributes:
+        model: The CRNN model for text recognition.
+        device: The device to run the model on.
+        idx2char (dict): A dictionary mapping indices to their corresponding characters.
+        char2idx (dict): A dictionary mapping characters to their corresponding indices.
+        width (int): The width of the input image.
+        height (int): The height of the input image.
+
+    Methods:
+        ocr(images, search_strategy="beam_search", beam_size=10):
+            Performs optical character recognition on the given images.
+
+    """
 
     def __init__(
         self,
@@ -85,6 +126,18 @@ class TextRegognizer:
         idx2char: dict,
         device=None,
     ) -> None:
+        """
+        Initializes a TextRegognizer object.
+
+        Args:
+            width (int): The width of the input image.
+            height (int): The height of the input image.
+            num_class (int): The number of classes for text recognition.
+            model_path (str): The path to the pre-trained model.
+            char2idx (dict): A dictionary mapping characters to their corresponding indices.
+            idx2char (dict): A dictionary mapping indices to their corresponding characters.
+            device (optional): The device to run the model on. Defaults to None.
+        """
 
         self.model = CRNN(
             1, img_height=height, img_width=width, num_class=num_class, leaky_relu=True
@@ -99,7 +152,7 @@ class TextRegognizer:
 
     def ocr(
         self, images: str, search_strategy: str = "beam_search", beam_size: int = 10
-    ):
+    ) -> list[str]:
 
         if not isinstance(images, list):
             images = [images]
