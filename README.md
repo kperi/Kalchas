@@ -52,3 +52,10 @@ text = model.ocr([image]) #  output: ['ἡμέραν ἐς τὸ συγκείμ�
 
 
 A more detailed full page OCR using Kalhas and Kraken can be found [here](demo.ipynb)
+
+
+### Citing
+
+
+TODO: Citing
+
