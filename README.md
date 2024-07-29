@@ -6,7 +6,9 @@ Kalchas is a greek polytonic OCR library impemented in pytorch.
 This inital release is largely based on the work of Simistira et al. [Recognition of historical Greek polytonic scripts using LSTM networks](https://ieeexplore.ieee.org/abstract/document/7333865/), 
 where the LSTM architecture has been replaced by a modified version of the Convolutional Recurrent Neural Network (CRNN) impemented in [crnn-pytorch](https://github.com/GitYCC/crnn-pytorch) . 
 
- 
+The Character Error Rate (CER) in the test set from the original dataset is near 1% and the model(s) generally perform very well in out of sample, reasonably segmented documents with similar fonts. 
+
+New models trained on additonal datasets are scheduled to be released in the following weeks/months. 
 
 
 ### Installation 
