@@ -11,13 +11,13 @@ from PIL import Image
 
 
 _models = {
-    "model1": {
-        "url": "kalchas/checkpoints/model1/model_best_loss_0.7971",
-        "name": "model_best_loss_0.7971",
+    "Kalchas": {
+        "url": "kalchas/checkpoints/Kalchas/model9_best_loss_1.35",
+        "name": "Kalchas-loss_1.35",
     },
-    "model2": {
-        "url": "kalchas/checkpoints/model2/99_model_best_loss_1.184",
-        "name": "99_model_best_loss_1.184",
+    "Polyton-DB": {
+        "url": "kalchas/checkpoints/Polyton-DB/99_model_best_loss_1.184",
+        "name": "Polyton-DB_loss_1.184",
     },
 }
 

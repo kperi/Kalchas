@@ -35,8 +35,8 @@ from PIL import Image
 from kalchas.ocr import list_available_models, load_ocr_model
 
 
-models = list_available_models() # get all available models: ['model1']
-model = load_ocr_model('model1') 
+models = list_available_models() # get all available models: ['Kalchas', 'Polyton-DB']
+model = load_ocr_model('Kalchas') 
 
 
 # load image 
