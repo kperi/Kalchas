@@ -1,0 +1,40 @@
+credentials:
+  usernames:
+    kperifanos:
+      email: kostas.perifanos@gmail.com
+      failed_login_attempts: 0 # Will be managed automatically
+      logged_in: False # Will be managed automatically
+      name: Kostas
+      workspace: KP
+      password: abc # Will be hashed automatically
+    nikoleta:
+      email: nikoleta.gatzoli@gmail.com
+      failed_login_attempts: 0 # Will be managed automatically
+      logged_in: False # Will be managed automatically
+      name: Nikoleta
+      workspace: NG
+      password: def # Will be hashed automatically
+    aglaia:
+      email: aggistriotiaglaia@yahoo.com
+      failed_login_attempts: 0 # Will be managed automatically
+      logged_in: False # Will be managed automatically
+      name: Aglaia 
+      workspace: AA 
+      password: def # Will be hashed automatically
+    demo:
+      email: some@yahoo1.com
+      failed_login_attempts: 0 # Will be managed automatically
+      logged_in: False # Will be managed automatically
+      name: Demo 
+      workspace: demo
+      password: def # Will be hashed automatically
+
+cookie:
+  expiry_days: 30
+  key: some_signature_key # Must be string
+  name: some_cookie_name
+pre-authorized:
+  emails:
+  - melsby@gmail.com
+system_workspace:
+  path: /app/data/pages/TODO/

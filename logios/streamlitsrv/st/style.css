@@ -1,0 +1,6 @@
+html, body, [class*="css"] {
+    font-family: 'monospace', sans-serif; 
+    font-size: 20px;
+    font-weight: 500;
+    color: #091747;
+}

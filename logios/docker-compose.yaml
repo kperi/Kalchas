@@ -1,0 +1,30 @@
+#version: '3.8'
+
+services:
+  streamlitsrv:
+    build: ./streamlitsrv
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app
+      - ./streamlitsrv:/app         
+      - upload_data:/app/data
+    working_dir: /app
+    depends_on:
+      - ocr
+  doclayout:
+    build: ./dlayout 
+    volumes:
+      - .:/app
+      - upload_data:/app/data
+  ocr:
+    build: ./ocr
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - upload_data:/app/data
+
+volumes:
+  upload_data:
+  app:

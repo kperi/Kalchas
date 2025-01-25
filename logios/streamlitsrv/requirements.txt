@@ -1,0 +1,13 @@
+streamlit==1.27.0
+streamlit_authenticator==0.3.2
+PyMuPDF==1.24.0
+streamlit_cropper==0.2.2
+loguru==0.7.2
+requests==2.32.3
+opencv-python-headless==4.11.0.86
+#doclayout-yolo
+#matplotlib
+#numpy
+#pillow==7.1.0
+#torchvision==0.19.1
+#deskew==1.5.1
