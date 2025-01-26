@@ -14,9 +14,15 @@ services:
       - ocr
   doclayout:
     build: ./dlayout 
+    restart: on-failure
+    ports:
+      - "8001:8001"
     volumes:
       - .:/app
       - upload_data:/app/data
+    environment:
+      - WATCHFILES_FORCE_POLLING=true
+      - DEBUG=1
   ocr:
     build: ./ocr
     ports:
