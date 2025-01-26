@@ -1,2 +1,5 @@
 doclayout-yolo
-#kraken==4.3.13
+python-multipart
+fastapi==0.115.7
+uvicorn==0.34.0
+loguru
