@@ -22,7 +22,7 @@ services:
       - upload_data:/app/data
     environment:
       - WATCHFILES_FORCE_POLLING=true
-      - DEBUG=1
+      - DEBUG:1
   ocr:
     build: ./ocr
     ports:
