@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     #ffmpeg \ 
     libsm6 \
     libxext6 \  
+    libfontconfig1-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt /app
