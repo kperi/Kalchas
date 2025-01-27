@@ -7,6 +7,65 @@ import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 
+class_colors = {
+    "plain text": "#FF5722",  # Blue
+    "title": "#009688",  # Red
+    "figure": "#4CAF50",  # Green
+    "table": "#9C27B0",  # Purple
+    "list": "#2196F3",  # Orange
+    "header": "#795548",  # Brown
+    "footer": "#607D8B",  # Blue Grey
+    "page_number": "#FF9800",  # Deep Orange
+    "caption": "#009688",  # Teal
+    "footnote": "#795548",  # Brown
+}
+default_color = "#9E9E9E"  # Grey for unknown classes
+
+
+def draw_block_rectangle(
+    draw, x1, y1, x2, y2, cls_name, class_colors, default_color, font
+):
+    """Draw a rectangle around a detected block with its class label."""
+    # Get color for this class
+    border_color = class_colors.get(cls_name.lower(), default_color)
+
+    # Draw the bounding box
+    draw.rectangle([x1, y1, x2, y2], outline=border_color, width=5)
+
+    # Calculate text dimensions for the class label
+    text_size = draw.textlength(cls_name, font=font)
+    padding = 10
+
+    # Draw background rectangle for class label
+    label_x1, label_y1 = x1, y1 - font.size - (padding * 2)
+    label_x2 = x1 + text_size + (padding * 2)
+    label_y2 = y1
+    draw.rectangle([label_x1, label_y1, label_x2, label_y2], fill=border_color)
+
+    # Draw class name text
+    text_x = x1 + padding
+    text_y = y1 - font.size - padding
+    draw.text((text_x, text_y), cls_name, fill="white", font=font)
+
+
+def draw_block_index(draw, x1, x2, y1, idx, font):
+    """Draw the block index number in the top right corner."""
+    padding = 10
+    index_text = str(idx)
+    index_text_size = draw.textlength(index_text, font=font)
+
+    # Draw background rectangle for index
+    index_x1 = x2 - index_text_size - (padding * 2)
+    index_y1 = y1 - font.size - (padding * 2)
+    index_x2 = x2
+    index_y2 = y1
+    draw.rectangle([index_x1, index_y1, index_x2, index_y2], fill="blue")
+
+    # Draw index number
+    draw.text(
+        (index_x1 + padding, index_y1 + padding), index_text, fill="white", font=font
+    )
+
 
 def ocr_image_segment(path_to_file: str, x1: int, y1: int, x2: int, y2: int):
     url = "http://ocr:8000/ocr_image_segment"
@@ -96,110 +155,116 @@ if book is not None:
     segments_files_path = books_path + "/" + book + "/" + page_no + "/*.png"
     files = sorted(glob.glob(segments_files_path))
 
-    with st.container() as p:
+    tabs = st.tabs(["Layout Detection", "OCR Results"])
+
+    with tabs[0]:
         if page_path_selected is not None:
-            col1, col2 = st.columns(spec=[0.5, 0.5])
-            with col1:
+            with st.spinner(f"Layout detection in progress... "):
+                # Define color scheme for different block types
 
-                st.image([])  # Clear all images before processing
-                with st.spinner(f"Layout detection in progress... "):
+                ret = process_image(page_path_selected, threshold=confidence)
+                if ret.status_code != 200:
+                    error_message = ret.text
+                    st.error(f"Error : {ret} - {error_message}")
+                else:
+                    j_resp = ret.json()
+                    coords = j_resp["block_coords"]
+                    df = pd.DataFrame(
+                        data=coords, columns=["y1", "x1", "y2", "x2", "cls_name"]
+                    )
 
-                    ret = process_image(page_path_selected, threshold=confidence)
-                    if ret.status_code != 200:
-                        error_message = ret.text  # .get("detail", "Unknown error")
-                        st.error(f"Error : {ret} - {error_message}")
-                    else:
-                        j_resp = ret.json()
-                        coords = j_resp["block_coords"]
-                        df = pd.DataFrame(
-                            data=coords, columns=["y1", "x1", "y2", "x2", "cls_name"]
-                        )  # .sort_values(by=["y1", "x1"], ascending=True)
+                    df = filter_overlapping_rectangles(df)
 
-                        df = filter_overlapping_rectangles(df)
-                        df = df.sort_values(by=["x1", "y1"], ascending=True)
+                    # Sort blocks by reading order:
+                    # First divide the page into rows by grouping blocks with overlapping y-coordinates
+                    # Then sort within each row by x-coordinate
 
-                        np_image = np.array(Image.open(page_path_selected))
-                        image_with_rectangle = Image.fromarray(np_image)
-                        image_with_rectangle = image_with_rectangle.convert("RGB")
+                    # Calculate the center point of each block
+                    df["center_y"] = (df["y1"] + df["y2"]) / 2
+                    df["center_x"] = (df["x1"] + df["x2"]) / 2
 
-                        abs_file_path = os.path.dirname(__file__)
+                    # Define a threshold for considering blocks to be in the same row
+                    # (adjust this value based on your specific needs)
+                    row_threshold = (df["y2"] - df["y1"]).mean() * 0.5
 
-                        font_name = f"{abs_file_path}/verdana.ttf"
-                        font = ImageFont.truetype(font_name, size=24)
-                        draw = ImageDraw.Draw(image_with_rectangle)
+                    # Assign row numbers to blocks
+                    current_row = 0
+                    row_assignments = []
+                    sorted_by_y = df.sort_values("center_y")
 
-                        for idx, row in df.iterrows():
+                    current_row_y = float("-inf")
+                    for _, block in sorted_by_y.iterrows():
+                        if block["center_y"] > current_row_y + row_threshold:
+                            current_row += 1
+                            current_row_y = block["center_y"]
+                        row_assignments.append(current_row)
 
-                            y1, x1, y2, x2, cls_name = row
+                    df["row"] = row_assignments
 
-                            draw.rectangle([x1, y1, x2, y2], outline="red", width=5)
+                    # Sort first by row number, then by x position within each row
+                    df = df.sort_values(["row", "center_y"]).reset_index(drop=True)
 
-                            text_size = draw.textlength(cls_name, font=font)
-                            text_size = text_size - 30
+                    # Drop the temporary columns
+                    df = df.drop(["center_y", "center_x", "row"], axis=1)
 
-                            text_x1, text_y1 = x1, y1 - text_size
-                            text_x2, text_y2 = x1 + text_size, y1
+                    # Display the annotated image
+                    np_image = np.array(Image.open(page_path_selected))
+                    image_with_rectangle = Image.fromarray(np_image)
+                    image_with_rectangle = image_with_rectangle.convert("RGB")
 
-                            draw.rectangle(
-                                [text_x1, text_y1, text_x2, text_y2], fill="red"
-                            )
-                            draw.text(
-                                (x1, y1 - text_size), cls_name, fill="green", font=font
-                            )
+                    abs_file_path = os.path.dirname(__file__)
+                    font_name = f"{abs_file_path}/verdana.ttf"
+                    font = ImageFont.truetype(font_name, size=24)
+                    draw = ImageDraw.Draw(image_with_rectangle)
 
-                            index_text = str(idx)
-                            index_text_size = draw.textlength(index_text, font=font)
-                            index_text_x1, index_text_y1 = (
-                                x2 - index_text_size,
-                                y1 - index_text_size,
-                            )
-                            index_text_x2, index_text_y2 = x2, y1
+                    idx = df.shape[0]
+                    for _, row in df.iterrows():
+                        y1, x1, y2, x2, cls_name = row
 
-                            draw.rectangle(
-                                [
-                                    index_text_x1,
-                                    index_text_y1,
-                                    index_text_x2,
-                                    index_text_y2,
-                                ],
-                                fill="blue",
-                                width=15,
-                            )
-                            draw.text(
-                                (index_text_x1, index_text_y1),
-                                index_text,
-                                fill="cyan",
-                                font=font,
-                            )
+                        # Draw the block rectangle and its class label
+                        draw_block_rectangle(
+                            draw,
+                            x1,
+                            y1,
+                            x2,
+                            y2,
+                            cls_name,
+                            class_colors,
+                            default_color,
+                            font,
+                        )
 
-                        st.image(image_with_rectangle, width=800)
+                        # Draw the block index
+                        draw_block_index(draw, x1, x2, y1, idx, font)
+                        idx -= 1
 
-                #    with col2:
-                #        pass
+                    st.image(image_with_rectangle, use_container_width=True)
 
-                with col2:
-                    with st.spinner("Performing OCR") as spinner:
+    with tabs[1]:
+        if page_path_selected is not None:
+            with st.spinner("Performing OCR"):
+                # Create an expander for each text block
+                for idx, row in df.iterrows():
+                    y1, x1, y2, x2, cls_name = row
+                    with st.expander(f"Block {idx} ({cls_name})"):
+                        ret = ocr_image_segment(
+                            path_to_file=page_path_selected,
+                            x1=x1,
+                            y1=y1,
+                            x2=x2,
+                            y2=y2,
+                        )
+                        ocred_text = ret.json()["ret"]["recognized_text"]
+                        st.text_area(
+                            label=f"Block {idx}",
+                            value=ocred_text,
+                            height=100,
+                            key=f"text_{idx}",
+                        )
 
-                        all_text = ""
-                        for idx, row in df.iterrows():
-
-                            y1, x1, y2, x2, cls_name = row
-                            ret = ocr_image_segment(
-                                path_to_file=page_path_selected,
-                                x1=x1,
-                                y1=y1,
-                                x2=x2,
-                                y2=y2,
-                            )
-                            ocred_text = ret.json()["ret"]["recognized_text"]
-                            all_text += ocred_text
-                            # st.write(f"Block text : {ocred_text}")
-                        st.text_area(value=all_text, label=f"textarea_{idx}")
-                # st.image(page_path_selected, width=100, use_column_width=True)
-                # st.image(crop)
-
-                # selected_images = st.multiselect("Select segments to display", select_pages)
-                # for selected_image in selected_images:
-                #    segment_path = os.path.join(books_path, book, selected_image)
-                #    segment_image = Image.open(segment_path)
-                #    st.image(segment_image, width=100, use_column_width=True)
+                # Add a full text view
+                with st.expander("View All Text"):
+                    all_text = "\n\n".join(
+                        [st.session_state[f"text_{idx}"] for idx in range(len(df))]
+                    )
+                    st.text_area(label="Complete Text", value=all_text, height=300)

@@ -2,17 +2,23 @@ import streamlit as st
 import streamlit_authenticator as stauth
 from yaml.loader import SafeLoader
 import yaml
-import os 
+from auth_utils import do_login
+import os
 import requests
-    
 
-#def get_file_directory():
+st.set_page_config(
+    page_title="Logios - Greek Polytonic OCR",
+    page_icon="👋",
+)
+
+
+# def get_file_directory():
 #    return os.path.dirname(os.path.abspath(__file__))
 
-#directory = get_file_directory()
-#st.write(f"Current file directory: {directory}")
+# directory = get_file_directory()
+# st.write(f"Current file directory: {directory}")
 
-hide_bar= """
+hide_bar = """
     <style>
     [data-testid="stSidebar"][aria-expanded="true"] > div:first-child {
         visibility:hidden;
@@ -25,28 +31,26 @@ hide_bar= """
 """
 
 with open("./config.yaml") as file:
-    config = yaml.load(file, Loader=SafeLoader) 
+    config = yaml.load(file, Loader=SafeLoader)
 
-st.set_page_config(
-    page_title="Logios - Greek Polytonic OCR",
-    page_icon="👋",
-)
 
 authenticator = stauth.Authenticate(
     config["credentials"],
     config["cookie"]["name"],
     config["cookie"]["key"],
     config["cookie"]["expiry_days"],
-    config["pre-authorized"],
+    # config["pre-authorized"],
 )
 
 
-name, auth_status, username =  authenticator.login()
-if auth_status == False:
+authenticator.login()
+login_status, user_todo, user_uploads, user_workspace = do_login()
+active_user = st.session_state["name"]
+if login_status == False:
     st.error("Username/password is incorrect")
     st.markdown(hide_bar, unsafe_allow_html=True)
 
-if auth_status == None:
+if login_status == None:
     st.warning("Please enter your username and password")
     st.markdown(hide_bar, unsafe_allow_html=True)
 
@@ -60,10 +64,11 @@ def render_main():
         """
     )
 
-if auth_status:
+
+if login_status:
     # # ---- SIDEBAR ----
+    name = st.session_state["name"]
     st.sidebar.title(f"Welcome {name}")
-    
 
     hide_st_style = """
                 <style>
@@ -79,9 +84,8 @@ if auth_status:
 
 
 #    render_main()
-#if st.session_state["authentication_status"]:
-#if st.session_state["authentication_status"] is False:
-#elif st.session_state["authentication_status"] is None:
+# if st.session_state["authentication_status"]:
+# if st.session_state["authentication_status"] is False:
+# elif st.session_state["authentication_status"] is None:
 ##    st.error("Username/password is incorrect")
 #    st.warning("Please enter your username and password")
-

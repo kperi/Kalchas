@@ -17,10 +17,10 @@ def do_login():
         config = yaml.load(file, Loader=SafeLoader)
 
     # st.write(config)
-    st.set_page_config(
-        page_title="Hello",
-        page_icon="👋",
-    )
+    # st.set_page_config(
+    #    page_title="Hello",
+    #    page_icon="👋",
+    # )
 
     authenticator = stauth.Authenticate(
         config["credentials"],
