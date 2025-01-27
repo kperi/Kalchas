@@ -81,7 +81,7 @@ def render_app():
         book_pages = sorted(glob.glob(os.path.join(books_path, book, "*.png")))
 
         select_pages = [os.path.basename(page) for page in book_pages]
-        pages = st.selectbox("Σελίδα: ", select_pages, on_change=set_state)
+        pages = st.selectbox("Page: ", select_pages, on_change=set_state)
 
         page_no = pages.split("/")[-1].replace(".png", "")
 
@@ -209,19 +209,15 @@ def render_app():
                         on_click=lambda: navigate(1),
                     )
 
-                st.markdown(
-                    """
-                            #### Character table
-                    """
-                )
+                # Move character table into an expander
+                with st.expander("Character Table"):
+                    document = VOWELS_TABLE.replace(" ", "  ")
+                    st.markdown(
+                        f'<div style="color:#FF9B9B; font-family: Courier New;font-size: small">{document}</div>',
+                        unsafe_allow_html=True,
+                    )
 
-                document = VOWELS_TABLE.replace(" ", "  ")
-
-                st.markdown(
-                    f'<div style="color:#FF9B9B; font-family: Courier New;font-size: small">{document}</div>',
-                    unsafe_allow_html=True,
-                )
-                # st.markdown("```" + VOWELS_TABLE + "```")
+                # Full text info remains outside the expander
                 st.info("Full text: ")
                 st.code(get_all_texts(book_page_path), language="markdown")
 
