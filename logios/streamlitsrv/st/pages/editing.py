@@ -16,7 +16,8 @@ def get_cropped(page_path):
     return sorted(cropped_files)
 
 
-login_status, workspace_dir, upload_dir = do_login()
+login_status, workspace_dir, upload_dir, user_workspace = do_login()
+# login_status, workspace_dir, upload_dir = do_login()
 if login_status:
 
     # user workspace folders
@@ -40,9 +41,10 @@ if login_status:
             dest_path = os.path.join(workspace_dir, folder_name)
             os.rename(selected_folder, dest_path)
 
-        st.button("Μετακίνηση στον φάκελο επεξεργασίας ", on_click=move_folder_to_TODO)
+        st.button("Μετακίνηση στον φάκελο επεξεργασίας:", on_click=move_folder_to_TODO)
 
         box_color = st.sidebar.color_picker(label="Box Color", value="#0000FF")
+        box_color_2 = st.sidebar.color_picker(label="Box Color 2", value="#FF00FF")
 
         files = glob.glob(selected_folder + "/*.png")
         files = [f for f in files if "_cropped" not in f]
@@ -78,7 +80,7 @@ if login_status:
 
                 for file in cropped_files:
                     new_name = file.replace("_cropped", "")
-                    logger.info( f"Cropping new name: {new_name}")
+                    logger.info(f"Cropping new name: {new_name}")
                     os.rename(file, new_name)
 
                 # st.write( f"Delete this: {selected_page}")
@@ -93,7 +95,7 @@ if login_status:
             # cropped_files["Delete"] = False
             def delete_row():
                 os.remove(cropped_files[-1])
-               
+
             st.button(
                 "Διαγραφή τελευταίας εικόνας", key="btn_delete", on_click=delete_row
             )
@@ -111,6 +113,7 @@ if login_status:
                     aspect_ratio=None,
                     stroke_width=3,
                 )
+
             with col2:
                 # Manipulate cropped image at will
                 st.write("Προεπισκόπηση")

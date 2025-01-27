@@ -8,6 +8,14 @@ from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 
 
+def ocr_image_segment(path_to_file: str, x1: int, y1: int, x2: int, y2: int):
+    url = "http://ocr:8000/ocr_image_segment"
+
+    payload = {"path": path_to_file, "x1": x1, "y1": y1, "x2": x2, "y2": y2}
+    response = requests.post(url, json=payload)
+    return response
+
+
 def get_overlap_area(rect1, rect2):
     x1 = max(rect1[1], rect2[1])
     y1 = max(rect1[0], rect2[0])
@@ -51,12 +59,13 @@ def process_image(path_to_file, threshold=0.5):
     return response
 
 
-login_status, user_workspace, _ = do_login()
+login_status, user_todo, user_uploads, user_workspace = do_login()
 active_user = st.session_state["name"]
+
 st.sidebar.markdown(f"User: {active_user}")
 
-books_path = user_workspace
-# st.write(f"Workspace: {books_path }")
+books_path = user_workspace + "/TODO/"
+st.write(f"books Workspace: {books_path }")
 
 book_folders = sorted(glob.glob(os.path.join(books_path, "*")))
 book_folders = [
@@ -78,30 +87,35 @@ book_pages = sorted(glob.glob(os.path.join(books_path, book, "*.png")))
 select_pages = [os.path.basename(page) for page in book_pages]
 
 page_selector = st.selectbox("Σελίδα: ", select_pages, on_change=set_state)
+
 page_no = page_selector.split("/")[-1].replace(".png", "")
 page_path_selected = books_path + "/" + book + "/" + page_no + ".png"
+page_path_selected = page_path_selected.replace("/*", "")
 
 segments_files_path = books_path + "/" + book + "/" + page_no + "/*.png"
 files = sorted(glob.glob(segments_files_path))
+
 with st.container() as p:
     if page_path_selected is not None:
         col1, col2 = st.columns(spec=[0.5, 0.5])
         with col1:
+
             st.image([])  # Clear all images before processing
-            with st.spinner("Layout detection in progress..."):
+            with st.spinner(f"Layout detection in progress... "):
+
                 ret = process_image(page_path_selected, threshold=confidence)
                 if ret.status_code != 200:
-                    error_message = ret.json().get("detail", "Unknown error")
-                    st.error(f"Error : {error_message}")
+                    error_message = ret.text  # .get("detail", "Unknown error")
+                    st.error(f"Error : {ret} - {error_message}")
                 else:
                     j_resp = ret.json()
                     coords = j_resp["block_coords"]
                     df = pd.DataFrame(
                         data=coords, columns=["y1", "x1", "y2", "x2", "cls_name"]
-                    ).sort_values(by=["y1", "x1"])
+                    )  # .sort_values(by=["y1", "x1"], ascending=True)
 
                     df = filter_overlapping_rectangles(df)
-                    df = df.sort_values(by=["x1"])
+                    df = df.sort_values(by=["x1", "y1"], ascending=True)
 
                     np_image = np.array(Image.open(page_path_selected))
                     image_with_rectangle = Image.fromarray(np_image)
@@ -110,7 +124,7 @@ with st.container() as p:
                     abs_file_path = os.path.dirname(__file__)
 
                     font_name = f"{abs_file_path}/verdana.ttf"
-                    font = ImageFont.truetype(font_name, size=30)
+                    font = ImageFont.truetype(font_name, size=24)
                     draw = ImageDraw.Draw(image_with_rectangle)
 
                     for idx, row in df.iterrows():
@@ -119,20 +133,22 @@ with st.container() as p:
 
                         draw.rectangle([x1, y1, x2, y2], outline="red", width=5)
 
-                        text_size = draw.textsize(cls_name, font=font)
-                        text_x1, text_y1 = x1, y1 - text_size[1]
-                        text_x2, text_y2 = x1 + text_size[0], y1
+                        text_size = draw.textlength(cls_name, font=font)
+                        text_size = text_size - 30
+
+                        text_x1, text_y1 = x1, y1 - text_size
+                        text_x2, text_y2 = x1 + text_size, y1
 
                         draw.rectangle([text_x1, text_y1, text_x2, text_y2], fill="red")
                         draw.text(
-                            (x1, y1 - text_size[1]), cls_name, fill="green", font=font
+                            (x1, y1 - text_size), cls_name, fill="green", font=font
                         )
 
                         index_text = str(idx)
-                        index_text_size = draw.textsize(index_text, font=font)
+                        index_text_size = draw.textlength(index_text, font=font)
                         index_text_x1, index_text_y1 = (
-                            x2 - index_text_size[0],
-                            y1 - index_text_size[1],
+                            x2 - index_text_size,
+                            y1 - index_text_size,
                         )
                         index_text_x2, index_text_y2 = x2, y1
 
@@ -144,6 +160,7 @@ with st.container() as p:
                                 index_text_y2,
                             ],
                             fill="blue",
+                            width=15,
                         )
                         draw.text(
                             (index_text_x1, index_text_y1),
@@ -152,9 +169,25 @@ with st.container() as p:
                             font=font,
                         )
 
-                    st.image(image_with_rectangle)
-                with col2:
-                    pass
+                    st.image(image_with_rectangle, width=800)
+
+            #    with col2:
+            #        pass
+
+            with col2:
+                with st.spinner("Performing OCR") as spinner:
+
+                    all_text = ""
+                    for idx, row in df.iterrows():
+
+                        y1, x1, y2, x2, cls_name = row
+                        ret = ocr_image_segment(
+                            path_to_file=page_path_selected, x1=x1, y1=y1, x2=x2, y2=y2
+                        )
+                        ocred_text = ret.json()["ret"]["recognized_text"]
+                        all_text += ocred_text
+                        # st.write(f"Block text : {ocred_text}")
+                    st.text_area(value=all_text, label=f"textarea_{idx}")
             # st.image(page_path_selected, width=100, use_column_width=True)
             # st.image(crop)
 
@@ -163,5 +196,3 @@ with st.container() as p:
             #    segment_path = os.path.join(books_path, book, selected_image)
             #    segment_image = Image.open(segment_path)
             #    st.image(segment_image, width=100, use_column_width=True)
-
-    # st.button("hello", key="match_width")

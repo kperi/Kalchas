@@ -8,8 +8,9 @@ from PIL import Image
 import io
 
 # st.set_option('deprecation.showfileUploaderEncoding', False)
+login_status, user_todo, user_uploads_dir, user_workspace = do_login()
 
-login_status, workspace_dir, user_uploads_dir = do_login()
+# login_status, workspace_dir, user_uploads_dir = do_login()
 
 
 def render_app():

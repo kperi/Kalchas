@@ -14,7 +14,7 @@ from auth_utils import do_login, system_loop
 # st.set_page_config(layout="wide")
 from auth_utils import do_login, system_loop
 
-login_status, user_workspace, _ = do_login()
+login_status, user_workspace, _, _ = do_login()
 
 with open("./config.yaml") as file:
     config = yaml.load(file, Loader=SafeLoader)
@@ -74,7 +74,6 @@ def get_all_lines(book_page_path):
     return all_lines
 
 
-
 def process_image(path_to_file, url):
     """
     Send a POST request to the /submit/ endpoint of a FastAPI server.
@@ -86,6 +85,7 @@ def process_image(path_to_file, url):
     payload = {"value": path_to_file}
     response = requests.post(url, json=payload)
     return response
+
 
 def post_image_to_fastapi(image_path, url):
     """
@@ -157,12 +157,12 @@ def render_app():
         segments_files_path = books_path + "/" + book + "/" + page_no + "/*.png"
         files = sorted(glob.glob(segments_files_path))
 
-        def do_ocr():            
+        def do_ocr():
             ret = process_image(page_path_selected, "http://ocr:8000/process_image")
             st.write(ret)
-            
-            #ret = segmentation_and_recognition(page_path_selected)
-            #st.write(ret)
+
+            # ret = segmentation_and_recognition(page_path_selected)
+            # st.write(ret)
 
         if len(files) == 0:
             st.write("Δε βρέθηκαν γραμμές - πρέπει να γίνει OCR στη σελίδα")
@@ -233,7 +233,7 @@ def render_app():
                 #    progress_percent, f"Εχουν ολοκληρωθεί οι γραμμές {finalized_lines}"
                 # )
                 pass
-            st.image(files[index], caption="Image", width=700, use_column_width=True)
+            st.image(files[index], caption="Image", width=700, use_container_width=True)
 
             is_finalized = has_final(files[index])
             if is_finalized:
