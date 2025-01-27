@@ -141,7 +141,7 @@ def render_app():
         def set_state():
             st.session_state.index = 0
 
-        book = st.selectbox("Κείμενο: ", book_folders, on_change=set_state)
+        book = st.selectbox("Book: ", book_folders, on_change=set_state, index=None)
         if not book:
             return
 

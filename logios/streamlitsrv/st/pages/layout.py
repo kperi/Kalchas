@@ -65,7 +65,7 @@ active_user = st.session_state["name"]
 st.sidebar.markdown(f"User: {active_user}")
 
 books_path = user_workspace + "/TODO/"
-st.write(f"books Workspace: {books_path }")
+# st.write(f"books Workspace: {books_path }")
 
 book_folders = sorted(glob.glob(os.path.join(books_path, "*")))
 book_folders = [
@@ -81,118 +81,125 @@ def set_state():
 
 confidence = st.sidebar.slider("Detection confidence", 0.0, 1.0, step=0.1, value=0.5)
 
-book = st.selectbox("Κείμενο: ", book_folders, on_change=set_state)
-book_pages = sorted(glob.glob(os.path.join(books_path, book, "*.png")))
+book = st.selectbox("Κείμενο: ", book_folders, on_change=set_state, index=None)
+if book is not None:
+    book_pages = sorted(glob.glob(os.path.join(books_path, book, "*.png")))
 
-select_pages = [os.path.basename(page) for page in book_pages]
+    select_pages = [os.path.basename(page) for page in book_pages]
 
-page_selector = st.selectbox("Σελίδα: ", select_pages, on_change=set_state)
+    page_selector = st.selectbox("Σελίδα: ", select_pages, on_change=set_state)
 
-page_no = page_selector.split("/")[-1].replace(".png", "")
-page_path_selected = books_path + "/" + book + "/" + page_no + ".png"
-page_path_selected = page_path_selected.replace("/*", "")
+    page_no = page_selector.split("/")[-1].replace(".png", "")
+    page_path_selected = books_path + "/" + book + "/" + page_no + ".png"
+    page_path_selected = page_path_selected.replace("/*", "")
 
-segments_files_path = books_path + "/" + book + "/" + page_no + "/*.png"
-files = sorted(glob.glob(segments_files_path))
+    segments_files_path = books_path + "/" + book + "/" + page_no + "/*.png"
+    files = sorted(glob.glob(segments_files_path))
 
-with st.container() as p:
-    if page_path_selected is not None:
-        col1, col2 = st.columns(spec=[0.5, 0.5])
-        with col1:
+    with st.container() as p:
+        if page_path_selected is not None:
+            col1, col2 = st.columns(spec=[0.5, 0.5])
+            with col1:
 
-            st.image([])  # Clear all images before processing
-            with st.spinner(f"Layout detection in progress... "):
+                st.image([])  # Clear all images before processing
+                with st.spinner(f"Layout detection in progress... "):
 
-                ret = process_image(page_path_selected, threshold=confidence)
-                if ret.status_code != 200:
-                    error_message = ret.text  # .get("detail", "Unknown error")
-                    st.error(f"Error : {ret} - {error_message}")
-                else:
-                    j_resp = ret.json()
-                    coords = j_resp["block_coords"]
-                    df = pd.DataFrame(
-                        data=coords, columns=["y1", "x1", "y2", "x2", "cls_name"]
-                    )  # .sort_values(by=["y1", "x1"], ascending=True)
+                    ret = process_image(page_path_selected, threshold=confidence)
+                    if ret.status_code != 200:
+                        error_message = ret.text  # .get("detail", "Unknown error")
+                        st.error(f"Error : {ret} - {error_message}")
+                    else:
+                        j_resp = ret.json()
+                        coords = j_resp["block_coords"]
+                        df = pd.DataFrame(
+                            data=coords, columns=["y1", "x1", "y2", "x2", "cls_name"]
+                        )  # .sort_values(by=["y1", "x1"], ascending=True)
 
-                    df = filter_overlapping_rectangles(df)
-                    df = df.sort_values(by=["x1", "y1"], ascending=True)
+                        df = filter_overlapping_rectangles(df)
+                        df = df.sort_values(by=["x1", "y1"], ascending=True)
 
-                    np_image = np.array(Image.open(page_path_selected))
-                    image_with_rectangle = Image.fromarray(np_image)
-                    image_with_rectangle = image_with_rectangle.convert("RGB")
+                        np_image = np.array(Image.open(page_path_selected))
+                        image_with_rectangle = Image.fromarray(np_image)
+                        image_with_rectangle = image_with_rectangle.convert("RGB")
 
-                    abs_file_path = os.path.dirname(__file__)
+                        abs_file_path = os.path.dirname(__file__)
 
-                    font_name = f"{abs_file_path}/verdana.ttf"
-                    font = ImageFont.truetype(font_name, size=24)
-                    draw = ImageDraw.Draw(image_with_rectangle)
+                        font_name = f"{abs_file_path}/verdana.ttf"
+                        font = ImageFont.truetype(font_name, size=24)
+                        draw = ImageDraw.Draw(image_with_rectangle)
 
-                    for idx, row in df.iterrows():
+                        for idx, row in df.iterrows():
 
-                        y1, x1, y2, x2, cls_name = row
+                            y1, x1, y2, x2, cls_name = row
 
-                        draw.rectangle([x1, y1, x2, y2], outline="red", width=5)
+                            draw.rectangle([x1, y1, x2, y2], outline="red", width=5)
 
-                        text_size = draw.textlength(cls_name, font=font)
-                        text_size = text_size - 30
+                            text_size = draw.textlength(cls_name, font=font)
+                            text_size = text_size - 30
 
-                        text_x1, text_y1 = x1, y1 - text_size
-                        text_x2, text_y2 = x1 + text_size, y1
+                            text_x1, text_y1 = x1, y1 - text_size
+                            text_x2, text_y2 = x1 + text_size, y1
 
-                        draw.rectangle([text_x1, text_y1, text_x2, text_y2], fill="red")
-                        draw.text(
-                            (x1, y1 - text_size), cls_name, fill="green", font=font
-                        )
+                            draw.rectangle(
+                                [text_x1, text_y1, text_x2, text_y2], fill="red"
+                            )
+                            draw.text(
+                                (x1, y1 - text_size), cls_name, fill="green", font=font
+                            )
 
-                        index_text = str(idx)
-                        index_text_size = draw.textlength(index_text, font=font)
-                        index_text_x1, index_text_y1 = (
-                            x2 - index_text_size,
-                            y1 - index_text_size,
-                        )
-                        index_text_x2, index_text_y2 = x2, y1
+                            index_text = str(idx)
+                            index_text_size = draw.textlength(index_text, font=font)
+                            index_text_x1, index_text_y1 = (
+                                x2 - index_text_size,
+                                y1 - index_text_size,
+                            )
+                            index_text_x2, index_text_y2 = x2, y1
 
-                        draw.rectangle(
-                            [
-                                index_text_x1,
-                                index_text_y1,
-                                index_text_x2,
-                                index_text_y2,
-                            ],
-                            fill="blue",
-                            width=15,
-                        )
-                        draw.text(
-                            (index_text_x1, index_text_y1),
-                            index_text,
-                            fill="cyan",
-                            font=font,
-                        )
+                            draw.rectangle(
+                                [
+                                    index_text_x1,
+                                    index_text_y1,
+                                    index_text_x2,
+                                    index_text_y2,
+                                ],
+                                fill="blue",
+                                width=15,
+                            )
+                            draw.text(
+                                (index_text_x1, index_text_y1),
+                                index_text,
+                                fill="cyan",
+                                font=font,
+                            )
 
-                    st.image(image_with_rectangle, width=800)
+                        st.image(image_with_rectangle, width=800)
 
-            #    with col2:
-            #        pass
+                #    with col2:
+                #        pass
 
-            with col2:
-                with st.spinner("Performing OCR") as spinner:
+                with col2:
+                    with st.spinner("Performing OCR") as spinner:
 
-                    all_text = ""
-                    for idx, row in df.iterrows():
+                        all_text = ""
+                        for idx, row in df.iterrows():
 
-                        y1, x1, y2, x2, cls_name = row
-                        ret = ocr_image_segment(
-                            path_to_file=page_path_selected, x1=x1, y1=y1, x2=x2, y2=y2
-                        )
-                        ocred_text = ret.json()["ret"]["recognized_text"]
-                        all_text += ocred_text
-                        # st.write(f"Block text : {ocred_text}")
-                    st.text_area(value=all_text, label=f"textarea_{idx}")
-            # st.image(page_path_selected, width=100, use_column_width=True)
-            # st.image(crop)
+                            y1, x1, y2, x2, cls_name = row
+                            ret = ocr_image_segment(
+                                path_to_file=page_path_selected,
+                                x1=x1,
+                                y1=y1,
+                                x2=x2,
+                                y2=y2,
+                            )
+                            ocred_text = ret.json()["ret"]["recognized_text"]
+                            all_text += ocred_text
+                            # st.write(f"Block text : {ocred_text}")
+                        st.text_area(value=all_text, label=f"textarea_{idx}")
+                # st.image(page_path_selected, width=100, use_column_width=True)
+                # st.image(crop)
 
-            # selected_images = st.multiselect("Select segments to display", select_pages)
-            # for selected_image in selected_images:
-            #    segment_path = os.path.join(books_path, book, selected_image)
-            #    segment_image = Image.open(segment_path)
-            #    st.image(segment_image, width=100, use_column_width=True)
+                # selected_images = st.multiselect("Select segments to display", select_pages)
+                # for selected_image in selected_images:
+                #    segment_path = os.path.join(books_path, book, selected_image)
+                #    segment_image = Image.open(segment_path)
+                #    st.image(segment_image, width=100, use_column_width=True)
