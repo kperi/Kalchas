@@ -17,11 +17,11 @@ from skimage import io
 from skimage.transform import rotate
 from skimage.color import rgb2gray
 
-# from deskew import determine_skew
+from deskew import determine_skew
 
 
 def deskew(grayscale):
-    return grayscale
+    # return grayscale
     # image = io.imread(_img)
     # grayscale = rgb2gray(image)
     angle = determine_skew(grayscale)
