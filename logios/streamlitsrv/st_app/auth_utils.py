@@ -33,12 +33,13 @@ def do_login():
 
     # if st.session_state.get("authentication_status") is  None:
     authenticator.login(
-        location="sidebar",
+        # location="sidebar",
     )
 
     name = st.session_state["name"]
     login_status = st.session_state["authentication_status"]
     username = st.session_state["username"]
+    st.write(f"Authentication status: {login_status}")
 
     user_todo = None
     user_uploads = None
@@ -58,13 +59,17 @@ def do_login():
         user_todo = os.path.join(user_workspace, "TODO")
         user_uploads = os.path.join(user_workspace, "uploads")
 
+        st.session_state.user_workspace = user_workspace
+        st.session_state.user_todo = user_todo
+        st.session_state.user_uploads = user_uploads
+
         os.makedirs(user_todo, exist_ok=True)
         os.makedirs(user_uploads, exist_ok=True)
 
         logger.info(user_todo)
         logger.info(user_uploads)
 
-    return login_status, user_todo, user_uploads, user_workspace
+    return login_status, user_todo, user_uploads, user_workspace, authenticator
 
 
 def system_loop(render_function):
