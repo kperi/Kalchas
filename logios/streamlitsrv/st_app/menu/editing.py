@@ -16,10 +16,11 @@ def get_cropped(page_path):
     return sorted(cropped_files)
 
 
-login_status, workspace_dir, upload_dir, user_workspace = do_login()
-# login_status, workspace_dir, upload_dir = do_login()
+login_status = st.session_state["authentication_status"]
 if login_status:
 
+    upload_dir = st.session_state["user_uploads"]
+    workspace_dir = st.session_state["user_workspace"]
     # user workspace folders
     folders = glob.glob(upload_dir + "/*")
     folders = [f for f in folders if os.path.isdir(f)]

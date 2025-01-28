@@ -7,14 +7,19 @@ from streamlit_cropper import st_cropper
 from PIL import Image
 import io
 
-# st.set_option('deprecation.showfileUploaderEncoding', False)
-login_status, user_todo, user_uploads_dir, user_workspace = do_login()
-
-# login_status, workspace_dir, user_uploads_dir = do_login()
-
 
 def render_app():
+
+    login_status = st.session_state["authentication_status"]
+    if not login_status:
+        st.warning("Πρέπει να είστε συνδεδεμένος για να μπορέσετε να ανεβάσετε ένα pdf")
+        st.stop()
+
     uploaded_file = st.file_uploader("Choose a file", type="pdf")
+
+    user_uploads_dir = st.session_state["user_uploads"]
+    user_uploads_dir = st.session_state["user_uploads"]
+    # workspace_dir = st.session_state["user_workspace"]
 
     if uploaded_file is not None:
         # To read file as bytes:

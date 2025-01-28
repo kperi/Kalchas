@@ -17,12 +17,11 @@ from st_app.page_management import (
 
 from yaml.loader import SafeLoader
 from auth_utils import do_login, system_loop
-from auth_utils import do_login, system_loop
 
+# st.set_page_config(layout="wide")
 
-st.set_page_config(layout="wide")
-
-login_status, user_workspace, _, _ = do_login()
+# if "authentication_status" not in st.session_state:
+#    login_status, user_workspace, _, _, _ = do_login()
 
 with open("./config.yaml") as file:
     config = yaml.load(file, Loader=SafeLoader)
@@ -31,9 +30,8 @@ with open("./config.yaml") as file:
 with open("/app/st_app/vowel_table.txt") as f:
     VOWELS_TABLE = f.read()
 
-
-with open("/app/st_app/style.css") as css:
-    st.markdown(f"<style>{css.read()}</style>", unsafe_allow_html=True)
+# with open("/app/st_app/style.css") as css:
+#    st.markdown(f"<style>{css.read()}</style>", unsafe_allow_html=True)
 
 
 def navigate(step):
@@ -42,6 +40,8 @@ def navigate(step):
 
 
 def render_app():
+
+    user_workspace = st.session_state["user_todo"]
 
     active_user = st.session_state["name"]
     st.sidebar.markdown(f"User: {active_user}")
