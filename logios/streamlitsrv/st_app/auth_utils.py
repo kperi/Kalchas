@@ -39,7 +39,6 @@ def do_login():
     name = st.session_state["name"]
     login_status = st.session_state["authentication_status"]
     username = st.session_state["username"]
-    st.write(f"Authentication status: {login_status}")
 
     user_todo = None
     user_uploads = None

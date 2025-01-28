@@ -31,8 +31,6 @@ if login_status == None:
 
 
 def render_main(login_status):
-    name = st.session_state["name"]
-    st.sidebar.title(f"Welcome {name}")
 
     hide_st_style = """
                 <style>
@@ -41,17 +39,25 @@ def render_main(login_status):
                 header {visibility: hidden;}
                 </style>
                 """
-    st.markdown(hide_st_style, unsafe_allow_html=True)
-    st.write("## Logios : A Greek Polytonic OCR Platform")
-    # st.image("./st_app/images/scholar.png")
 
-    st.markdown(
-        """
-           ##### `Logios` is an an OCR engine developed by University of Athens. 
-        """
-    )
+    if not login_status:
+        st.markdown(
+            """
+            ## Logios : A Greek Polytonic OCR Platform
+            """,
+            unsafe_allow_html=True,
+        )
 
-    if login_status:
+        st.markdown(
+            """
+            ##### `Logios` is an an OCR engine developed by University of Athens. 
+            """
+        )
+
+    else:
+        name = st.session_state["name"]
+        st.sidebar.markdown(f"## Welcome {name}")
+
         layout_detection = st.Page(
             "menu/layout.py",
             title="Page layout detection",
@@ -73,6 +79,7 @@ def render_main(login_status):
             title="File upload",
             icon=":material/upload:",
         )
+
         pg = st.navigation(
             {
                 # "Account": [logout_page],
@@ -84,6 +91,7 @@ def render_main(login_status):
                 ],
             }
         )
+        # st.sidebar.image("./st_app/images/scholar.png", width=200)
         pg.run()
         # pg.title("Logios")
 

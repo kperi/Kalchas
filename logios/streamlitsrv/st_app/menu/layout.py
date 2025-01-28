@@ -122,7 +122,7 @@ login_status = st.session_state["authentication_status"]
 active_user = st.session_state["name"]
 
 if login_status:
-    st.sidebar.markdown(f"User: {active_user}")
+    # st.sidebar.markdown(f"User: {active_user}")
 
     books_path = st.session_state["user_todo"]
 

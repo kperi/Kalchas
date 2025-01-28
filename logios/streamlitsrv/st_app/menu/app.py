@@ -44,7 +44,7 @@ def render_app():
     user_workspace = st.session_state["user_todo"]
 
     active_user = st.session_state["name"]
-    st.sidebar.markdown(f"User: {active_user}")
+    # st.sidebar.markdown(f"User: {active_user}")
 
     books_path = user_workspace
     # st.write(f"Workspace: {books_path }")
