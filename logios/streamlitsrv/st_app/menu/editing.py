@@ -44,8 +44,7 @@ if login_status:
         st.button("Μετακίνηση στον φάκελο επεξεργασίας:", on_click=move_folder_to_TODO)
 
         box_color = st.sidebar.color_picker(label="Box Color", value="#0000FF")
-        box_color_2 = st.sidebar.color_picker(label="Box Color 2", value="#FF00FF")
-
+        
         files = glob.glob(selected_folder + "/*.png")
         files = [f for f in files if "_cropped" not in f]
         files = sorted(files)
@@ -57,7 +56,7 @@ if login_status:
         if selected_page:
             # st.image(selected_page)
             selected_page = os.path.join(base_file_path, selected_page)
-
+            st.image(selected_page, caption="Επιλεγμένη εικόνα", use_column_width=True)
             image = Image.open(selected_page)
             im_w, im_h = image.size
 
