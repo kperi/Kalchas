@@ -14,6 +14,8 @@ RUN apt-get update && apt-get install -y \
     libxext6 \  
     && rm -rf /var/lib/apt/lists/*
 
+RUN pip install torch==2.5.0 torchvision==0.20.0 torchaudio==2.5.0 --index-url https://download.pytorch.org/whl/cpu
+
 COPY requirements.txt /src
 RUN python -m pip install -r requirements.txt 
 
