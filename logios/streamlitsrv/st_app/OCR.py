@@ -13,6 +13,23 @@ st.set_page_config(
     # initial_sidebar_state="collapsed",
 )
 
+# Remove streamlit deploy button
+
+
+st.markdown(
+    """
+    <style>
+        .reportview-container {
+            margin-top: -2em;
+        }
+        #MainMenu {visibility: hidden;}
+        .stDeployButton {display:none;}
+        footer {visibility: hidden;}
+        #stDecoration {display:none;}
+    </style>
+""",
+    unsafe_allow_html=True,
+)
 
 with open("./config.yaml") as file:
     config = yaml.load(file, Loader=SafeLoader)
@@ -80,15 +97,20 @@ def render_main(login_status):
             icon=":material/upload:",
         )
 
+        admin = st.Page(
+            "menu/admin.py",
+            title="Admin",
+            icon=":material/admin_panel_settings:",
+        )
+
+        if name == "Kostas":
+            menu = [ocr, pdf_upload, page_editing, layout_detection, admin]
+        else:
+            menu = [ocr, pdf_upload, page_editing, layout_detection]
+
         pg = st.navigation(
             {
-                # "Account": [logout_page],
-                "Menu": [
-                    ocr,
-                    pdf_upload,
-                    page_editing,
-                    layout_detection,
-                ],
+                "Menu": menu,
             }
         )
         # st.sidebar.image("./st_app/images/scholar.png", width=200)
