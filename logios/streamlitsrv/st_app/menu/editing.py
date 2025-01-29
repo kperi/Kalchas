@@ -7,6 +7,32 @@ import os
 from loguru import logger
 
 
+def get_workspace_folders():
+    base_folder = None
+    upload_dir = st.session_state["user_uploads"]
+    workspace_dir = st.session_state["user_workspace"]
+    # user workspace folders
+    folders = glob.glob(upload_dir + "/*")
+    folders = [f for f in folders if os.path.isdir(f)]
+    folders = sorted(folders)
+    if len(folders) > 0:
+        base_folder = "/".join(folders[0].split("/")[:-1])
+
+    folders = [f.split("/")[-1] for f in folders]
+    return workspace_dir, upload_dir, folders, base_folder
+
+def get_folder_files(selected_folder):
+    base_file_path = None
+    files = glob.glob(selected_folder + "/*.png")
+    files = [f for f in files if "_cropped" not in f]
+    files = sorted(files)
+    if len(files) > 0:
+        base_file_path = os.path.dirname(files[0])
+        files = [os.path.basename(f) for f in files]
+
+    return base_file_path, files
+
+
 def get_cropped(page_path):
     page_path = page_path.replace(".png", "")
     cropped_files = glob.glob(f"{page_path}*_cropped.png")
@@ -18,19 +44,8 @@ def get_cropped(page_path):
 login_status = st.session_state["authentication_status"]
 if login_status:
 
-    upload_dir = st.session_state["user_uploads"]
-    workspace_dir = st.session_state["user_workspace"]
-    # user workspace folders
-    folders = glob.glob(upload_dir + "/*")
-    folders = [f for f in folders if os.path.isdir(f)]
-    folders = sorted(folders)
-    if len(folders) > 0:
-        base_folder = "/".join(folders[0].split("/")[:-1])
-
-    folders = [f.split("/")[-1] for f in folders]
-
-    selected_folder = st.selectbox("Επιλέξτε φάκελο", folders, index=None)
-
+    workspace_dir, upload_dir, folders, base_folder = get_workspace_folders()
+    selected_folder = st.selectbox("Select a folder", folders, index=None)
     if selected_folder:
         selected_folder = base_folder + "/" + selected_folder
 
@@ -44,19 +59,13 @@ if login_status:
         st.button("Μετακίνηση στον φάκελο επεξεργασίας:", on_click=move_folder_to_TODO)
 
         box_color = st.sidebar.color_picker(label="Box Color", value="#0000FF")
-        
-        files = glob.glob(selected_folder + "/*.png")
-        files = [f for f in files if "_cropped" not in f]
-        files = sorted(files)
-        if len(files) > 0:
-            base_file_path = os.path.dirname(files[0])
-            files = [os.path.basename(f) for f in files]
 
+        base_file_path, files = get_folder_files(selected_folder)
+            
         selected_page = st.selectbox("Επιλέξτε εικόνα", files, index=None)
         if selected_page:
-            # st.image(selected_page)
-            selected_page = os.path.join(base_file_path, selected_page)
-            st.image(selected_page, caption="Επιλεγμένη εικόνα", use_column_width=True)
+            selected_page = os.path.join(base_file_path, selected_page)   
+
             image = Image.open(selected_page)
             im_w, im_h = image.size
 
@@ -84,20 +93,21 @@ if login_status:
 
                 # st.write( f"Delete this: {selected_page}")
 
-            st.button("## Διαγραφή αρχικής εικόνας", on_click=on_delete)
-
-            # st.write( f"### Cropped images: {num_cropped}")
-            st.markdown("#### αποκομμένα αρχεία ####")
-            st.table(cropped_files)
-
-            # cropped_files = pd.DataFrame( cropped_files, columns = ["Αποκομμένες εικόνες"])
-            # cropped_files["Delete"] = False
-            def delete_row():
-                os.remove(cropped_files[-1])
-
             st.button(
-                "Διαγραφή τελευταίας εικόνας", key="btn_delete", on_click=delete_row
+                "## Διαγραφή τρέχουσας μη επεξεργασμένης σελίδας", on_click=on_delete
             )
+ 
+            with st.expander("Cropped images"):
+
+                def delete_row():
+                    os.remove(cropped_files[-1])
+
+                st.table(cropped_files)
+                st.button(
+                    "Delete last cropped image", key="btn_delete", on_click=delete_row
+                )
+
+        
 
             st.markdown("""-----------------""")
 
@@ -126,7 +136,8 @@ if login_status:
                 )
 
                 def crop_and_save():
-                    cropped_img.save(f"{cropped_img_name}")
+                    with  st.spinner("Saving..."):
+                        cropped_img.save(f"{cropped_img_name}")
 
                 filename = os.path.basename(selected_page)
 
