@@ -1,6 +1,5 @@
 import streamlit as st
 from PIL import Image
-from auth_utils import do_login
 from streamlit_cropper import st_cropper
 from PIL import Image
 import glob
