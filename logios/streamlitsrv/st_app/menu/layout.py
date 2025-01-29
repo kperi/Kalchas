@@ -193,7 +193,7 @@ if login_status:
                         # Assign row numbers to blocks
                         current_row = 0
                         row_assignments = []
-                        sorted_by_y = df.sort_values("center_y")
+                        sorted_by_y = df.sort_values("center_x")
 
                         current_row_y = float("-inf")
                         for _, block in sorted_by_y.iterrows():
