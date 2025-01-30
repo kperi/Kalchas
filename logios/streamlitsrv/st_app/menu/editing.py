@@ -8,6 +8,22 @@ from loguru import logger
 import shutil
 
 
+def initialize_session_state():
+    if "current_file_index" not in st.session_state:
+        st.session_state.current_file_index = 0
+    if "current_segment_index" not in st.session_state:
+        st.session_state.current_segment_index = 0
+    if "last_action" not in st.session_state:
+        st.session_state.last_action = None
+    if "shortcuts_enabled" not in st.session_state:
+        st.session_state.shortcuts_enabled = True
+
+
+def reset_indexes():
+    st.session_state.current_file_index = 0
+    st.session_state.current_segment_index = 0
+
+
 def get_workspace_folders():
     base_folder = None
     upload_dir = st.session_state["user_uploads"]
@@ -99,10 +115,7 @@ def on_delete():
 login_status = st.session_state["authentication_status"]
 if login_status:
     # Initialize session state for keyboard shortcuts
-    if "shortcuts_enabled" not in st.session_state:
-        st.session_state.shortcuts_enabled = True
-    if "last_action" not in st.session_state:
-        st.session_state.last_action = None
+    initialize_session_state()
 
     # Sidebar organization
     with st.sidebar:
@@ -121,16 +134,23 @@ if login_status:
         )
 
         if selected_folder:
+            if (
+                "previous_folder" not in st.session_state
+                or st.session_state.previous_folder != selected_folder
+            ):
+                reset_indexes()
+                st.session_state.previous_folder = selected_folder
+
+            selected_folder = base_folder + "/" + selected_folder
+            st.session_state.selected_folder = selected_folder
 
             st.checkbox("Remove Original Pages", value=True)
-            selected_folder = base_folder + "/" + selected_folder
             st.button(
                 "📥 Move to Workspace",
                 help="Move folder to editing workspace (Shortcut: Ctrl+M)",
                 on_click=move_folder_to_workspace,
                 use_container_width=True,
             )
-            st.session_state.selected_folder = selected_folder
 
         # Settings section
         with st.expander("⚙️ Settings", expanded=False):
@@ -155,15 +175,16 @@ if login_status:
             # File navigation
             col1, col2, col3 = st.columns([1, 4, 1])
             with col1:
-                prev_disabled = st.session_state.get("current_file_index", 0) == 0
+                prev_disabled = st.session_state.current_file_index == 0
                 if st.button("⬅️", disabled=prev_disabled, use_container_width=True):
                     st.session_state.current_file_index = max(
-                        0, st.session_state.get("current_file_index", 0) - 1
+                        0, st.session_state.current_file_index - 1
                     )
+                    st.session_state.current_segment_index = 0
                     st.session_state.last_action = "navigation"
 
             with col2:
-                current_index = st.session_state.get("current_file_index", 0)
+                current_index = st.session_state.current_file_index
                 selected_page = st.selectbox(
                     "Current Image",
                     files,
@@ -173,14 +194,12 @@ if login_status:
                 )
 
             with col3:
-                next_disabled = (
-                    st.session_state.get("current_file_index", 0) == len(files) - 1
-                )
+                next_disabled = st.session_state.current_file_index == len(files) - 1
                 if st.button("➡️", disabled=next_disabled, use_container_width=True):
                     st.session_state.current_file_index = min(
-                        len(files) - 1,
-                        st.session_state.get("current_file_index", 0) + 1,
+                        len(files) - 1, st.session_state.current_file_index + 1
                     )
+                    st.session_state.current_segment_index = 0
                     st.session_state.last_action = "navigation"
 
             if selected_page:
@@ -191,7 +210,7 @@ if login_status:
 
                 # Progress indicator
                 total_files = len(files)
-                current_file = st.session_state.get("current_file_index", 0) + 1
+                current_file = st.session_state.current_file_index + 1
                 st.progress(
                     current_file / total_files,
                     f"Processing image {current_file} of {total_files}",
@@ -224,6 +243,10 @@ if login_status:
                         def save_crop():
                             with st.spinner("Saving crop..."):
                                 cropped_img.save(cropped_img_name)
+                                # Update segment index after saving
+                                st.session_state.current_segment_index = len(
+                                    cropped_files
+                                )
                             st.success("Crop saved!", icon="✅")
                             st.session_state.last_action = "save"
 
@@ -246,7 +269,10 @@ if login_status:
                                     st.caption(f"Region {idx}")
                                     if st.button("🗑️", key=f"delete_{idx}"):
                                         os.remove(crop)
-                                        # st.rerun()
+                                        st.session_state.current_segment_index = max(
+                                            0, len(cropped_files) - 1
+                                        )
+                                        st.session_state.last_action = "delete"
                     else:
                         st.info("No cropped regions available for this image")
 
