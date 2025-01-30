@@ -5,6 +5,7 @@ from PIL import Image
 import glob
 import os
 from loguru import logger
+import shutil
 
 
 def get_workspace_folders():
@@ -20,6 +21,7 @@ def get_workspace_folders():
 
     folders = [f.split("/")[-1] for f in folders]
     return workspace_dir, upload_dir, folders, base_folder
+
 
 def get_folder_files(selected_folder):
     base_file_path = None
@@ -41,112 +43,235 @@ def get_cropped(page_path):
     return sorted(cropped_files)
 
 
+def move_folder_to_workspace():
+    """
+    Moves the selected folder from uploads directory to workspace directory
+    """
+    if "selected_folder" not in st.session_state:
+        st.error("No folder selected")
+        return
+
+    try:
+        source_path = st.session_state["selected_folder"]
+        folder_name = os.path.basename(source_path)
+        dest_path = os.path.join(st.session_state["user_todo"], folder_name)
+
+        # Create todo workspace directory if it doesn't exist
+        os.makedirs(st.session_state["user_todo"], exist_ok=True)
+
+        # Move the folder
+        shutil.move(source_path, dest_path)
+
+        st.success(f"Moved {folder_name} to workspace")
+        st.session_state.last_action = "move"
+
+    except Exception as e:
+        logger.error(f"Error moving folder: {str(e)}")
+        st.error("Failed to move folder to workspace")
+
+
+def on_delete():
+    """
+    Handles deletion of original image:
+    1. Creates a backup of the original image
+    2. Moves the original to a backup folder
+    3. Keeps the cropped regions in place
+    """
+    try:
+        dirname = os.path.dirname(selected_page)
+        filename = os.path.basename(selected_page)
+
+        dest = os.path.join(dirname, "backup")
+        os.makedirs(dest, exist_ok=True)
+        dest_file = os.path.join(dest, filename)
+        os.rename(selected_page, dest_file)
+
+        for file in cropped_files:
+            new_name = file.replace("_cropped", "")
+            logger.info(f"Cropping new name: {new_name}")
+            os.rename(file, new_name)
+
+    except Exception as e:
+        logger.error(f"Error during deletion: {str(e)}")
+        st.error("Failed to delete original image")
+
+
 login_status = st.session_state["authentication_status"]
 if login_status:
+    # Initialize session state for keyboard shortcuts
+    if "shortcuts_enabled" not in st.session_state:
+        st.session_state.shortcuts_enabled = True
+    if "last_action" not in st.session_state:
+        st.session_state.last_action = None
 
-    workspace_dir, upload_dir, folders, base_folder = get_workspace_folders()
-    selected_folder = st.selectbox("Select a folder", folders, index=None)
-    if selected_folder:
-        selected_folder = base_folder + "/" + selected_folder
+    # Sidebar organization
+    with st.sidebar:
+        st.header("🛠️ Controls")
 
-        def move_folder_to_TODO():
+        # Folder selection section
+        st.subheader("📁 Project Folders")
+        workspace_dir, upload_dir, folders, base_folder = get_workspace_folders()
 
-            ## move the selected folder to the editing workspace [also, do OCR]
-            folder_name = os.path.basename(selected_folder)
-            dest_path = os.path.join(workspace_dir, folder_name)
-            os.rename(selected_folder, dest_path)
+        selected_folder = st.selectbox(
+            "Select Folder",
+            folders,
+            index=None,
+            placeholder="Choose a folder...",
+            help="Select a folder containing images to process",
+        )
 
-        st.button("Μετακίνηση στον φάκελο επεξεργασίας:", on_click=move_folder_to_TODO)
-
-        box_color = st.sidebar.color_picker(label="Box Color", value="#0000FF")
-
-        base_file_path, files = get_folder_files(selected_folder)
-            
-        selected_page = st.selectbox("Επιλέξτε εικόνα", files, index=None)
-        if selected_page:
-            selected_page = os.path.join(base_file_path, selected_page)   
-
-            image = Image.open(selected_page)
-            im_w, im_h = image.size
-
-            page_num = selected_page.split("/")[-1].split(".")[0]
-            page_num = int(page_num)
-
-            cropped_files = get_cropped(selected_page)
-            num_cropped = len(cropped_files)
-
-            st.write(f"#### `Επιλεγμένη σελίδα: {page_num}`")
-
-            def on_delete():
-                dirname = os.path.dirname(selected_page)
-                filename = os.path.basename(selected_page)
-
-                dest = os.path.join(dirname, "backup")
-                os.makedirs(dest, exist_ok=True)
-                dest_file = os.path.join(dest, filename)
-                os.rename(selected_page, dest_file)
-
-                for file in cropped_files:
-                    new_name = file.replace("_cropped", "")
-                    logger.info(f"Cropping new name: {new_name}")
-                    os.rename(file, new_name)
-
-                # st.write( f"Delete this: {selected_page}")
-
+        if selected_folder:
+            selected_folder = base_folder + "/" + selected_folder
             st.button(
-                "## Διαγραφή τρέχουσας μη επεξεργασμένης σελίδας", on_click=on_delete
+                "📥 Move to Workspace",
+                help="Move folder to editing workspace (Shortcut: Ctrl+M)",
+                on_click=move_folder_to_workspace,
+                use_container_width=True,
             )
- 
-            with st.expander("Cropped images"):
+            st.session_state.selected_folder = selected_folder
 
-                def delete_row():
-                    os.remove(cropped_files[-1])
+        # Settings section
+        with st.expander("⚙️ Settings", expanded=False):
+            box_color = st.color_picker("Box Color", value="#0000FF")
+            st.toggle("Enable Keyboard Shortcuts", value=True, key="shortcuts_enabled")
+            st.caption(
+                """
+            Keyboard Shortcuts:
+            - Save crop: Ctrl+S
+            - Next image: →
+            - Previous image: ←
+            - Delete crop: Del
+            - Move to workspace: Ctrl+M
+            """
+            )
 
-                st.table(cropped_files)
-                st.button(
-                    "Delete last cropped image", key="btn_delete", on_click=delete_row
-                )
+    # Main content area
+    if selected_folder:
+        base_file_path, files = get_folder_files(selected_folder)
 
-        
-
-            st.markdown("""-----------------""")
-
-            col1, col2 = st.columns((0.7, 0.3))
-            realtime_update = True
+        if files:
+            # File navigation
+            col1, col2, col3 = st.columns([1, 4, 1])
             with col1:
-                cropped_img = st_cropper(
-                    image,
-                    # default_coords=( int(im_w/2)-50, int(im_h/2)-50, int(im_w/2)+100, int(im_h/2)+50),
-                    realtime_update=realtime_update,
-                    box_color=box_color,
-                    aspect_ratio=None,
-                    stroke_width=3,
-                )
+                prev_disabled = st.session_state.get("current_file_index", 0) == 0
+                if st.button("⬅️", disabled=prev_disabled, use_container_width=True):
+                    st.session_state.current_file_index = max(
+                        0, st.session_state.get("current_file_index", 0) - 1
+                    )
+                    st.session_state.last_action = "navigation"
 
             with col2:
-                # Manipulate cropped image at will
-                st.write("Προεπισκόπηση")
-                # _ = cropped_img.thumbnail((150, 150))
-                st.image(cropped_img)
-
-                next_crop_index = num_cropped + 1
-
-                cropped_img_name = selected_page.replace(
-                    ".png", f"_{next_crop_index}_cropped.png"
+                current_index = st.session_state.get("current_file_index", 0)
+                selected_page = st.selectbox(
+                    "Current Image",
+                    files,
+                    index=current_index,
+                    key="file_selector",
+                    label_visibility="collapsed",
                 )
 
-                def crop_and_save():
-                    with  st.spinner("Saving..."):
-                        cropped_img.save(f"{cropped_img_name}")
+            with col3:
+                next_disabled = (
+                    st.session_state.get("current_file_index", 0) == len(files) - 1
+                )
+                if st.button("➡️", disabled=next_disabled, use_container_width=True):
+                    st.session_state.current_file_index = min(
+                        len(files) - 1,
+                        st.session_state.get("current_file_index", 0) + 1,
+                    )
+                    st.session_state.last_action = "navigation"
 
-                filename = os.path.basename(selected_page)
+            if selected_page:
+                selected_page = os.path.join(base_file_path, selected_page)
+                image = Image.open(selected_page)
+                page_num = int(selected_page.split("/")[-1].split(".")[0])
+                cropped_files = get_cropped(selected_page)
 
-                st.markdown(
-                    f"""- Ονομα αρχείου:  
-                    `-- {cropped_img_name}`"""
+                # Progress indicator
+                total_files = len(files)
+                current_file = st.session_state.get("current_file_index", 0) + 1
+                st.progress(
+                    current_file / total_files,
+                    f"Processing image {current_file} of {total_files}",
                 )
 
-                st.button(
-                    "Αποκοπή και αποθήκευση", key=f"{page_num}", on_click=crop_and_save
-                )
-    st.markdown("-------------")
+                # Main workspace tabs
+                tab1, tab2 = st.tabs(["🔍 Image Editor", "📋 Cropped Regions"])
+
+                with tab1:
+                    editor_col1, editor_col2 = st.columns([0.7, 0.3])
+                    with editor_col1:
+                        cropped_img = st_cropper(
+                            image,
+                            realtime_update=True,
+                            box_color=box_color,
+                            aspect_ratio=None,
+                            stroke_width=3,
+                            return_type="image",
+                        )
+
+                    with editor_col2:
+                        st.subheader("Preview")
+                        st.image(cropped_img)
+
+                        next_crop_index = len(cropped_files) + 1
+                        cropped_img_name = selected_page.replace(
+                            ".png", f"_{next_crop_index}_cropped.png"
+                        )
+
+                        def save_crop():
+                            with st.spinner("Saving crop..."):
+                                cropped_img.save(cropped_img_name)
+                            st.success("Crop saved!", icon="✅")
+                            st.session_state.last_action = "save"
+
+                        st.button(
+                            "💾 Save Region (Ctrl+S)",
+                            key=f"save_{page_num}",
+                            on_click=save_crop,
+                            use_container_width=True,
+                        )
+
+                with tab2:
+                    if cropped_files:
+                        st.caption(f"{len(cropped_files)} cropped regions found")
+                        for idx, crop in enumerate(cropped_files, 1):
+                            with st.container():
+                                crop_col1, crop_col2 = st.columns([4, 1])
+                                with crop_col1:
+                                    st.image(crop, use_container_width=True)
+                                with crop_col2:
+                                    st.caption(f"Region {idx}")
+                                    if st.button("🗑️", key=f"delete_{idx}"):
+                                        os.remove(crop)
+                                        # st.rerun()
+                    else:
+                        st.info("No cropped regions available for this image")
+
+                # Danger zone
+                with st.expander("⚠️ Advanced Options", expanded=False):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button(
+                            "🗑️ Delete Original",
+                            type="primary",
+                            help="Move original image to backup and promote crops",
+                            use_container_width=True,
+                        ):
+                            on_delete()
+                            st.success("Original image moved to backup")
+                    with col2:
+                        if st.button(
+                            "↩️ Reset All",
+                            type="secondary",
+                            help="Clear all crops for this image",
+                            use_container_width=True,
+                        ):
+                            for crop in cropped_files:
+                                os.remove(crop)
+                            # st.rerun()
+
+        else:
+            st.info("No images found in the selected folder")
+    else:
+        st.info("👈 Please select a folder from the sidebar to begin")

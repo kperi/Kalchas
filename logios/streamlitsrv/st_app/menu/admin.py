@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 from pathlib import Path
+import shutil
 
 
 def get_disk_space(path):
@@ -55,27 +56,29 @@ def render_admin():
     else:
         st.error("No workspace found. Please log in first.")
 
+
 def dfs(root):
     import glob
-    stack  = [root] 
+
+    stack = [root]
 
     all_nodes = []
     while stack:
         node = stack.pop()
         all_nodes.append(node)
-        files =  [x[0] for x in os.walk(node)]
+        files = [x[0] for x in os.walk(node)]
         for file in files:
             stack.append(node + file)
-        #return all_nodes
+        # return all_nodes
     return all_nodes
 
 
 def render_tree():
-    from streamlit_tree_select import tree_select
+    # from streamlit_tree_select import tree_select
 
-    st.spinner( "Scanning data dir...")
-    all_nodes  = dfs( "/app/data")
-    st.write( all_nodes)
+    st.spinner("Scanning data dir...")
+    all_nodes = dfs("/app/data")
+    st.write(all_nodes)
 
     st.title("🐙 Streamlit-tree-select")
     st.subheader("A simple and elegant checkbox tree for Streamlit.")
@@ -114,15 +117,33 @@ def render_tree():
     st.write(return_select)
 
 
+def render_cleanup():
+    st.title("Cleanup")
 
+    def delete_all_files():
+        st.write(f"Deleting all files in workspace for user {st.session_state['name']}")
+        # st.write(st.session_state["user_workspace"])
 
+        # Use shutil to recursively remove directory contents
+        for item in os.listdir(st.session_state["user_workspace"]):
+            item_path = os.path.join(st.session_state["user_workspace"], item)
+            if os.path.isfile(item_path):
+                os.remove(item_path)
+            elif os.path.isdir(item_path):
+                shutil.rmtree(item_path)
+
+        st.success("All files and folders deleted")
+
+    st.button("Delete all files in workspace for user", on_click=delete_all_files)
 
 
 if st.session_state.get("authentication_status"):
-    tab1, tab2 = st.tabs( ["Disk Usage", "File System"] )
+    tab1, tab2, tab3 = st.tabs(["Disk Usage", "File System", "Cleanup"])
     with tab1:
         render_admin()
     with tab2:
         render_tree()
+    with tab3:
+        render_cleanup()
 else:
     st.warning("Please log in to view admin panel")
