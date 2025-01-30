@@ -121,6 +121,8 @@ if login_status:
         )
 
         if selected_folder:
+
+            st.checkbox("Remove Original Pages", value=True)
             selected_folder = base_folder + "/" + selected_folder
             st.button(
                 "📥 Move to Workspace",
