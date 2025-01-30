@@ -264,7 +264,12 @@ def render_app():
 
                 # Full text info remains outside the expander
                 st.info("Full text: ")
-                st.code(get_all_texts(segments_files_path), language="markdown")
+
+                # st.write(segments_files_path.replace("*.png", ""))
+                st.code(
+                    get_all_texts(segments_files_path.replace("*.png", "")),
+                    language="markdown",
+                )
 
 
 system_loop(render_app)
