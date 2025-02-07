@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from typing import List
 from pydantic import BaseModel
@@ -14,7 +14,7 @@ app = FastAPI()
 # /app/data/pages/TODO/Kostas/TODO/2/000_1_cropped.png
 
 
-model = YOLOv10("model/doclayout_yolo_docstructbench_imgsz1024.pt")
+model = YOLOv10("src/model/doclayout_yolo_docstructbench_imgsz1024.pt")
 
 
 class StringRequest(BaseModel):
@@ -66,4 +66,4 @@ async def process_image_string(
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8001, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8001)

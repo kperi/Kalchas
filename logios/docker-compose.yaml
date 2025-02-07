@@ -1,4 +1,3 @@
-#version: '3.8'
 
 services:
   streamlitsrv:
@@ -12,25 +11,39 @@ services:
     working_dir: /app
     depends_on:
       - ocr
+      - doclayout
+    networks:
+      - logios-network
+
   doclayout:
     build: ./dlayout 
     restart: on-failure
     ports:
-      - "8001:8001"
+      - "8601:8601"
     volumes:
       - .:/app
+      - ./dlayout:/app
       - upload_data:/app/data
-    environment:
-      - WATCHFILES_FORCE_POLLING=true
-      - DEBUG:1
+    working_dir: /app
+    depends_on:
+      - ocr
+    networks:
+      - logios-network
+
   ocr:
     build: ./ocr
-    ports:
-      - "8000:8000"
     volumes:
       - .:/app
-      - upload_data:/app/data
+      - ./ocr:/app
+    working_dir: /app
+    networks:
+      - logios-network
 
 volumes:
   upload_data:
   app:
+
+networks:
+  logios-network:
+    driver: bridge
+    name: logios-network
