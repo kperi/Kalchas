@@ -300,9 +300,9 @@ def render_app() -> None:
             else:
                 st.session_state.index = None
 
-            st.write(
-                f"Selected segment:  {selected_segment}, index = {segments.index(selected_segment)}"
-            )
+            # st.write(
+            #    f"Selected segment:  {selected_segment}, index = {segments.index(selected_segment)}"
+            # )
 
             finalized_lines = get_finalized_lines(segments_files_path)
             # st.info(
