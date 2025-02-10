@@ -4,7 +4,7 @@ import json
 import yaml
 import os
 import cv2
-import requests
+from typing import List, Optional, Tuple
 
 # from st_app.page import segmentation_and_recognition
 from st_app.utils import process_image, post_image_to_fastapi
@@ -34,32 +34,70 @@ with open("/app/st_app/vowel_table.txt") as f:
 #    st.markdown(f"<style>{css.read()}</style>", unsafe_allow_html=True)
 
 
-def set_state():
+def set_state() -> None:
+    """Reset the index in session state to 0."""
     st.session_state.index = 0
 
 
-def navigate(step):
-    # st.warning('Βεβαιωθείτε ότι αποθηκεύσατε τυχόν αλλαγές στο προηγούμενο βήμα', icon="⚠️")
+def navigate(step: int) -> None:
+    """
+    Update the current index in session state by the given step.
+
+    Args:
+        step (int): The number of steps to move (positive or negative)
+    """
     st.session_state.index += step
+    st.session_state.segment_select = segments[st.session_state.index]
 
 
-def get_finals(book_page_path):
+def get_finals(book_page_path: str) -> int:
+    """
+    Count the number of finalized files in the given directory.
+
+    Args:
+        book_page_path (str): Path to the directory containing the files
+
+    Returns:
+        int: Number of files with .final extension
+    """
     finals = glob.glob(os.path.join(book_page_path, "*.final"))
     return len(finals)
 
 
-def get_ocred_text(file):
+def get_ocred_text(file: str) -> str:
+    """
+    Extract OCR text from the corresponding JSON file.
+
+    Args:
+        file (str): Path to the image file
+
+    Returns:
+        str: OCRed text from the corresponding JSON file
+    """
     jfile = file.replace(".png", ".json")
     jcontent = json.load(open(jfile))
     ocred_text = jcontent["text"][0]
     return ocred_text
 
 
-def has_final(file):
+def has_final(file: str) -> bool:
+    """
+    Check if a finalized version exists for the given file.
+
+    Args:
+        file (str): Path to the image file
+
+    Returns:
+        bool: True if a .final file exists, False otherwise
+    """
     return os.path.exists(file.replace(".png", ".final"))
 
 
-def do_ocr():
+def do_ocr() -> None:
+    """
+    Process the current page through the OCR service.
+    Displays a spinner during processing and writes the result.
+    """
     with st.spinner("Running OCR on the page..."):
         ret = process_image(
             st.session_state.page_path_selected, "http://ocr:8000/process_image"
@@ -67,8 +105,12 @@ def do_ocr():
     st.write(ret)
 
 
-def init_session_state():
-    """Initialize Streamlit session state variables"""
+def init_session_state() -> None:
+    """
+    Initialize all required Streamlit session state variables if they don't exist.
+    Sets default values for index, authentication_status, name, user_todo,
+    segment_select, and text_area.
+    """
     if "index" not in st.session_state:
         st.session_state.index = 0
     if "authentication_status" not in st.session_state:
@@ -83,7 +125,16 @@ def init_session_state():
         st.session_state.text_area = ""
 
 
-def get_book_folders(books_path):
+def get_book_folders(books_path: str) -> List[str]:
+    """
+    Get a sorted list of book folder names from the given path.
+
+    Args:
+        books_path (str): Path to the directory containing book folders
+
+    Returns:
+        List[str]: Sorted list of book folder names
+    """
     book_folders = sorted(glob.glob(os.path.join(books_path, "*")))
     book_folders = [
         os.path.basename(book_folder)
@@ -93,17 +144,66 @@ def get_book_folders(books_path):
     return book_folders
 
 
-def render_app():
+segments: List[str] = []
+
+
+def on_segment_change() -> None:
+    """
+    Callback function for segment selection changes.
+    Updates the session state index based on the selected segment.
+    """
+    global segments
+    st.session_state.index = segments.index(st.session_state.segment_select)
+
+
+def render_app() -> None:
+    """
+    Main application rendering function.
+    Handles the complete UI layout including:
+    - Sidebar navigation
+    - Book and page selection
+    - Image preview
+    - Text editing
+    - Progress tracking
+    - Navigation controls
+    """
+    global segments
     init_session_state()
     user_workspace = st.session_state["user_todo"]
     active_user = st.session_state["name"]
     books_path = user_workspace
     book_folders = get_book_folders(books_path)
 
-    with st.sidebar:
-        st.header("📚 Book Navigation")
+    # Add page configuration
 
-        # Book selection section
+    # Custom CSS for better styling
+    st.markdown(
+        """
+        <style>
+        .stButton button {
+            width: 100%;
+            border-radius: 5px;
+            height: 45px;
+        }
+        .stTextArea textarea {
+            font-size: 16px;
+            font-family: 'Courier New', monospace;
+        }
+        .sidebar-header {
+            margin-bottom: 20px;
+        }
+        </style>
+    """,
+        unsafe_allow_html=True,
+    )
+
+    with st.sidebar:
+        st.markdown("<div class='sidebar-header'>", unsafe_allow_html=True)
+        st.header("📚 Book Navigation")
+        st.markdown(f"👤 User: {active_user}", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # Book selection section with improved visuals
         st.subheader("📁 Select Book")
         book = st.selectbox(
             "Book",
@@ -116,7 +216,7 @@ def render_app():
         )
 
         if not book:
-            st.info("Please select a book to begin")
+            st.info("👆 Please select a book to begin")
             return
 
         # Page selection section
@@ -156,9 +256,13 @@ def render_app():
             )
 
     with st.container():
+        # Add a header for the main content area
+        st.markdown("### 📝 Text Editor")
 
         col1, col2 = st.columns(spec=[0.3, 0.7])
         with col1:
+            # Add a subheader for the page preview
+            st.markdown("#### Page Preview")
             page_path = (
                 "/".join(files[st.session_state.index].split("/")[0:-1]) + ".png"
             )
@@ -175,21 +279,29 @@ def render_app():
             st.image(original_image)
 
         with col2:
+            # Progress tracking
+            if get_finals(segments_files_path) == len(files):
+                st.success("✅ All lines completed!")
+            else:
+                progress = get_finals(segments_files_path) / len(files)
+                st.progress(progress, f"Progress: {int(progress * 100)}%")
 
-            def on_segment_change():
-                key = st.session_state.segment_select
-                page = key.replace(".png", "")
-                print(page)
-                page = int(page)
-                st.session_state.index = page
-
-            segments = [s.split("/")[-1] for s in files]
-            st.selectbox(
+            # Navigation controls with better styling
+            segments = [s.split("/")[-1] for s in files]  # Update global segments
+            selected_segment = st.selectbox(
                 options=segments,
-                label="line segment",
+                label="📄 Line Segment",
                 on_change=on_segment_change,
                 key="segment_select",
-                index=st.session_state.index,
+                # index=st.session_state.index,
+            )
+            if selected_segment is not None:
+                st.session_state.index = segments.index(selected_segment)
+            else:
+                st.session_state.index = None
+
+            st.write(
+                f"Selected segment:  {selected_segment}, index = {segments.index(selected_segment)}"
             )
 
             finalized_lines = get_finalized_lines(segments_files_path)
@@ -220,7 +332,11 @@ def render_app():
             else:
                 ocred_text = get_ocred_text(files[st.session_state.index])
 
-            def save():
+            def save() -> None:
+                """
+                Save the current text area content to a .final file.
+                Called automatically when text area content changes.
+                """
                 print("Text changed, saving!")
                 text = st.session_state.text_area
                 open(
@@ -228,48 +344,43 @@ def render_app():
                 ).write(text)
                 # st.rerun()
 
+            # Text editing area with better labeling
+            st.markdown("#### Edit Text")
             text = st.text_area(
-                label="Recognized text",
+                label="Edit recognized text below:",
                 value=ocred_text,
-                # on_change=lambda v: text_change(v),
                 max_chars=1000,
                 key="text_area",
-                height=80,
+                height=120,  # Increased height
                 on_change=save,
+                help="Edit the recognized text and it will auto-save when you make changes",
             )
 
-            if text != ocred_text:
-                print("Text changed, saving!")
-                open(
-                    files[st.session_state.index].replace(".png", ".final"), "w"
-                ).write(text)
-
+            # Navigation buttons with better layout
             with st.container():
-
-                col1, col2, col3 = st.columns(3)
-
+                col1, col2, col3 = st.columns([1, 2, 1])
                 with col1:
-                    btn_prev = st.button(
-                        "Previous",
+                    st.button(
+                        "⬅️ Previous",
                         on_click=lambda: navigate(-1),
+                        use_container_width=True,
                     )
                 with col2:
-                    pass
-                    # btn_save = st.button("Save", )
+                    st.markdown(
+                        f"<div style='text-align: center'>Line {st.session_state.index + 1} of {len(files)}</div>",
+                        unsafe_allow_html=True,
+                    )
                 with col3:
-                    btn_next = st.button(
-                        "Next",
-                        on_click=lambda: navigate(1),
+                    st.button(
+                        "Next ➡️", on_click=lambda: navigate(1), use_container_width=True
                     )
 
-                # Full text info remains outside the expander
-                st.info("Full text: ")
-
-                # st.write(segments_files_path.replace("*.png", ""))
-                st.code(
-                    get_all_texts(segments_files_path.replace("*.png", "")),
-                    language="markdown",
-                )
+                # Full text preview
+                with st.expander("📄 View Full Text", expanded=False):
+                    st.code(
+                        get_all_texts(segments_files_path.replace("*.png", "")),
+                        language="markdown",
+                    )
 
 
 system_loop(render_app)
