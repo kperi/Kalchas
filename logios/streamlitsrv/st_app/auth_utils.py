@@ -80,3 +80,30 @@ def system_loop(render_function):
         st.error("Username/password is incorrect")
     elif st.session_state["authentication_status"] is None:
         st.warning("Please enter your username and password")
+
+
+def init_session_state() -> None:
+    """
+    Initialize all required Streamlit session state variables if they don't exist.
+    Sets default values for index, authentication_status, name, user_todo,
+    segment_select, and text_area.
+    """
+    if "page_index" not in st.session_state or st.session_state.page_index is None:
+        st.session_state.page_index = 0
+
+    if (
+        "segment_index" not in st.session_state
+        or st.session_state.segment_index is None
+    ):
+        st.session_state.segment_index = 0
+
+    if "authentication_status" not in st.session_state:
+        st.session_state.authentication_status = None
+    if "name" not in st.session_state:
+        st.session_state.name = None
+    if "user_todo" not in st.session_state:
+        st.session_state.user_todo = None
+    if "segment_select" not in st.session_state:
+        st.session_state.segment_select = None
+    if "text_area" not in st.session_state:
+        st.session_state.text_area = ""

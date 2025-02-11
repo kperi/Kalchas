@@ -16,12 +16,15 @@ from st_app.page_management import (
 )
 
 from yaml.loader import SafeLoader
-from auth_utils import do_login, system_loop
 
+from auth_utils import system_loop, init_session_state
+
+init_session_state()
 # st.set_page_config(layout="wide")
 
 # if "authentication_status" not in st.session_state:
 #    login_status, user_workspace, _, _, _ = do_login()
+
 
 with open("./config.yaml") as file:
     config = yaml.load(file, Loader=SafeLoader)
@@ -36,7 +39,15 @@ with open("/app/st_app/vowel_table.txt") as f:
 
 def set_state() -> None:
     """Reset the index in session state to 0."""
-    st.session_state.index = 0
+    st.write("On page change")
+    st.session_state.page_index = 0
+    st.session_state.segment_index = 0
+
+
+def book_page_change() -> None:
+    """Reset the index in session state to 0."""
+    st.write("On page change")
+    st.session_state.segment_index = 0
 
 
 def navigate(step: int) -> None:
@@ -46,8 +57,9 @@ def navigate(step: int) -> None:
     Args:
         step (int): The number of steps to move (positive or negative)
     """
-    st.session_state.index += step
-    st.session_state.segment_select = segments[st.session_state.index]
+    st.write(f" segment index: = {st.session_state.segment_index}, step = {step}")
+    st.session_state.segment_index += step
+    st.session_state.segment_select = segments[st.session_state.segment_index]
 
 
 def get_finals(book_page_path: str) -> int:
@@ -60,6 +72,7 @@ def get_finals(book_page_path: str) -> int:
     Returns:
         int: Number of files with .final extension
     """
+    book_page_path = book_page_path.replace("*.png", "")
     finals = glob.glob(os.path.join(book_page_path, "*.final"))
     return len(finals)
 
@@ -102,27 +115,7 @@ def do_ocr() -> None:
         ret = process_image(
             st.session_state.page_path_selected, "http://ocr:8000/process_image"
         )
-    st.write(ret)
-
-
-def init_session_state() -> None:
-    """
-    Initialize all required Streamlit session state variables if they don't exist.
-    Sets default values for index, authentication_status, name, user_todo,
-    segment_select, and text_area.
-    """
-    if "index" not in st.session_state:
-        st.session_state.index = 0
-    if "authentication_status" not in st.session_state:
-        st.session_state.authentication_status = None
-    if "name" not in st.session_state:
-        st.session_state.name = None
-    if "user_todo" not in st.session_state:
-        st.session_state.user_todo = None
-    if "segment_select" not in st.session_state:
-        st.session_state.segment_select = None
-    if "text_area" not in st.session_state:
-        st.session_state.text_area = ""
+    # st.write(ret)
 
 
 def get_book_folders(books_path: str) -> List[str]:
@@ -153,7 +146,79 @@ def on_segment_change() -> None:
     Updates the session state index based on the selected segment.
     """
     global segments
-    st.session_state.index = segments.index(st.session_state.segment_select)
+    st.session_state.segment_index = segments.index(st.session_state.segment_select)
+    st.write(f"Segment index after change : {st.session_state.segment_index}")
+
+
+def render_sidebar():
+    user_workspace = st.session_state["user_todo"]
+    active_user = st.session_state["name"]
+    books_path = user_workspace
+    book_folders = get_book_folders(books_path)
+
+    st.markdown("<div class='sidebar-header'>", unsafe_allow_html=True)
+    st.header("📚 Book Navigation")
+    st.markdown(f"👤 User: {active_user}", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Book selection section with improved visuals
+    st.subheader("📁 Select Book")
+    book = st.selectbox(
+        "Book",
+        book_folders,
+        on_change=set_state,
+        index=None,
+        placeholder="Choose a book...",
+        help="Select a book to process",
+        label_visibility="collapsed",
+    )
+
+    if not book:
+        st.info("👆 Please select a book to begin")
+        return
+
+    # Page selection section
+    st.subheader("📄 Select Page")
+    book_pages = sorted(glob.glob(os.path.join(books_path, book, "*.png")))
+    select_pages = [os.path.basename(page) for page in book_pages]
+
+    pages = st.selectbox(
+        "Page",
+        select_pages,
+        on_change=book_page_change,
+        placeholder="Choose a page...",
+        help="Select a page to process",
+        label_visibility="collapsed",
+        # index=st.session_state.page_index,
+        index=0,
+    )
+
+    page_no = pages.split("/")[-1].replace(".png", "")
+    page_path_selected = books_path + "/" + book + "/" + page_no + ".png"
+    st.session_state.page_path_selected = page_path_selected
+    st.session_state.page_index = int(page_no)
+
+    segments_files_path = books_path + "/" + book + "/" + page_no + "/*.png"
+    segment_files = sorted(glob.glob(segments_files_path))
+    # st.write(f"Files = {segment_files}")
+
+    if len(segment_files) == 0:
+        st.warning("No segments found", icon="⚠️")
+        st.button("🔄 Run OCR", on_click=do_ocr, use_container_width=True)
+        return
+
+    # Settings section
+    with st.expander("⚙️ Settings", expanded=False):
+        st.toggle("Enable Auto-Save", value=True, key="auto_save")
+        st.divider()
+        st.subheader("Character Table")
+        document = VOWELS_TABLE.replace(" ", "  ")
+        st.markdown(
+            f'<div style="color:#FF9B9B; font-family: Courier New;font-size: small">{document}</div>',
+            unsafe_allow_html=True,
+        )
+
+    return book, pages, page_no, page_path_selected, segment_files, segments_files_path
 
 
 def render_app() -> None:
@@ -168,7 +233,7 @@ def render_app() -> None:
     - Navigation controls
     """
     global segments
-    init_session_state()
+
     user_workspace = st.session_state["user_todo"]
     active_user = st.session_state["name"]
     books_path = user_workspace
@@ -198,62 +263,9 @@ def render_app() -> None:
     )
 
     with st.sidebar:
-        st.markdown("<div class='sidebar-header'>", unsafe_allow_html=True)
-        st.header("📚 Book Navigation")
-        st.markdown(f"👤 User: {active_user}", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        # Book selection section with improved visuals
-        st.subheader("📁 Select Book")
-        book = st.selectbox(
-            "Book",
-            book_folders,
-            on_change=set_state,
-            index=None,
-            placeholder="Choose a book...",
-            help="Select a book to process",
-            label_visibility="collapsed",
+        book, pages, page_no, page_path_selected, segment_files, segments_files_path = (
+            render_sidebar()
         )
-
-        if not book:
-            st.info("👆 Please select a book to begin")
-            return
-
-        # Page selection section
-        st.subheader("📄 Select Page")
-        book_pages = sorted(glob.glob(os.path.join(books_path, book, "*.png")))
-        select_pages = [os.path.basename(page) for page in book_pages]
-        pages = st.selectbox(
-            "Page",
-            select_pages,
-            on_change=set_state,
-            placeholder="Choose a page...",
-            help="Select a page to process",
-            label_visibility="collapsed",
-        )
-
-        page_no = pages.split("/")[-1].replace(".png", "")
-        page_path_selected = books_path + "/" + book + "/" + page_no + ".png"
-        st.session_state.page_path_selected = page_path_selected
-
-        segments_files_path = books_path + "/" + book + "/" + page_no + "/*.png"
-        files = sorted(glob.glob(segments_files_path))
-
-        if len(files) == 0:
-            st.warning("No segments found", icon="⚠️")
-            st.button("🔄 Run OCR", on_click=do_ocr, use_container_width=True)
-            return
-
-        # Settings section
-        with st.expander("⚙️ Settings", expanded=False):
-            st.toggle("Enable Auto-Save", value=True, key="auto_save")
-            st.divider()
-            st.subheader("Character Table")
-            document = VOWELS_TABLE.replace(" ", "  ")
-            st.markdown(
-                f'<div style="color:#FF9B9B; font-family: Courier New;font-size: small">{document}</div>',
-                unsafe_allow_html=True,
-            )
 
     with st.container():
         # Add a header for the main content area
@@ -264,9 +276,12 @@ def render_app() -> None:
             # Add a subheader for the page preview
             st.markdown("#### Page Preview")
             page_path = (
-                "/".join(files[st.session_state.index].split("/")[0:-1]) + ".png"
+                "/".join(segment_files[st.session_state.segment_index].split("/")[0:-1])
+                + ".png"
             )
-            json_path = files[st.session_state.index].replace(".png", ".json")
+            json_path = segment_files[st.session_state.segment_index].replace(
+                ".png", ".json"
+            )
             job = json.load(open(json_path))
             coords = job["coords"]
 
@@ -280,57 +295,55 @@ def render_app() -> None:
 
         with col2:
             # Progress tracking
-            if get_finals(segments_files_path) == len(files):
+            if get_finals(segments_files_path) == len(segment_files):
                 st.success("✅ All lines completed!")
             else:
-                progress = get_finals(segments_files_path) / len(files)
+
+                progress = get_finals(segments_files_path) / len(segment_files)
                 st.progress(progress, f"Progress: {int(progress * 100)}%")
 
             # Navigation controls with better styling
-            segments = [s.split("/")[-1] for s in files]  # Update global segments
+            segments = [
+                s.split("/")[-1] for s in segment_files
+            ]  # Update global segments
             selected_segment = st.selectbox(
                 options=segments,
                 label="📄 Line Segment",
                 on_change=on_segment_change,
                 key="segment_select",
-                # index=st.session_state.index,
+                # index=st.session_state.segment_index or 0,
             )
             if selected_segment is not None:
-                st.session_state.index = segments.index(selected_segment)
+                st.session_state.segment_index = segments.index(selected_segment)
             else:
-                st.session_state.index = None
+                st.session_state.segment_index = None
 
-            # st.write(
-            #    f"Selected segment:  {selected_segment}, index = {segments.index(selected_segment)}"
-            # )
+            if get_finals(segments_files_path) == len(segment_files):
+                st.success("All segments are now completed")
 
-            finalized_lines = get_finalized_lines(segments_files_path)
-            # st.info(
-            #        f"Τρέχουσα γραμμή: {index+1}. Έχουν ολοκληρωθεί  οι γραμμές {finalized_lines} ( {get_finals(segments_files_path)} από {len(files)} γραμμές)"
-            #    )
-            progress_percent = get_finals(segments_files_path) / len(files)
+            ocred_text = ""
 
-            if get_finals(segments_files_path) == len(files):
-                st.success("Εχουν ολοκληρωθεί όλες οι γραμμές")
+            if st.session_state.segment_index is not None:
+                st.image(
+                    segment_files[st.session_state.segment_index],
+                    caption="Image",
+                    width=700,
+                    use_container_width=True,
+                )
+
+                is_finalized = has_final(segment_files[st.session_state.segment_index])
+                if is_finalized:
+                    ocred_text = open(
+                        segment_files[st.session_state.segment_index or 0].replace(
+                            ".png", ".final"
+                        )
+                    ).read()
+                else:
+                    ocred_text = get_ocred_text(
+                        segment_files[st.session_state.segment_index]
+                    )
             else:
-                # st.progress(
-                #    progress_percent, f"Εχουν ολοκληρωθεί οι γραμμές {finalized_lines}"
-                # )
-                pass
-            st.image(
-                files[st.session_state.index],
-                caption="Image",
-                width=700,
-                use_container_width=True,
-            )
-
-            is_finalized = has_final(files[st.session_state.index])
-            if is_finalized:
-                ocred_text = open(
-                    files[st.session_state.index].replace(".png", ".final")
-                ).read()
-            else:
-                ocred_text = get_ocred_text(files[st.session_state.index])
+                st.write("Segment index is NONE!")
 
             def save() -> None:
                 """
@@ -340,7 +353,10 @@ def render_app() -> None:
                 print("Text changed, saving!")
                 text = st.session_state.text_area
                 open(
-                    files[st.session_state.index].replace(".png", ".final"), "w"
+                    segment_files[st.session_state.segment_index].replace(
+                        ".png", ".final"
+                    ),
+                    "w",
                 ).write(text)
                 # st.rerun()
 
@@ -367,7 +383,7 @@ def render_app() -> None:
                     )
                 with col2:
                     st.markdown(
-                        f"<div style='text-align: center'>Line {st.session_state.index + 1} of {len(files)}</div>",
+                        f"<div style='text-align: center'>Line {(st.session_state.segment_index or 0) + 1} of {len(segment_files)}</div>",
                         unsafe_allow_html=True,
                     )
                 with col3:
@@ -384,10 +400,3 @@ def render_app() -> None:
 
 
 system_loop(render_app)
-if False:
-    if st.session_state["authentication_status"]:
-        render_app()
-    elif st.session_state["authentication_status"] is False:
-        st.error("Username/password is incorrect")
-    elif st.session_state["authentication_status"] is None:
-        st.warning("Please enter your username and password")
