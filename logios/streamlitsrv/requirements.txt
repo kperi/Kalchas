@@ -1,11 +1,11 @@
-streamlit==1.41.0
+streamlit==1.42.0
 streamlit_authenticator==0.4.1 
 PyMuPDF==1.25.2
 streamlit_cropper==0.2.2
 loguru==0.7.3
 requests==2.32.3
 opencv-python-headless==4.11.0.86
- 
+streamlit-tree-select==0.0.5
 #Python-fontconfig == 0.5.1
 #doclayout-yolo
 #matplotlib

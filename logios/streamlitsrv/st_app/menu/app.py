@@ -36,6 +36,8 @@ with open("/app/st_app/vowel_table.txt") as f:
 # with open("/app/st_app/style.css") as css:
 #    st.markdown(f"<style>{css.read()}</style>", unsafe_allow_html=True)
 
+segment_files = []
+
 
 def set_state() -> None:
     """Reset the index in session state to 0."""
@@ -46,7 +48,7 @@ def set_state() -> None:
 
 def book_page_change() -> None:
     """Reset the index in session state to 0."""
-    st.write("On page change")
+    # st.write("On page change")
     st.session_state.segment_index = 0
 
 
@@ -57,9 +59,10 @@ def navigate(step: int) -> None:
     Args:
         step (int): The number of steps to move (positive or negative)
     """
-    st.write(f" segment index: = {st.session_state.segment_index}, step = {step}")
     st.session_state.segment_index += step
-    st.session_state.segment_select = segments[st.session_state.segment_index]
+    st.session_state.segment_index = st.session_state.segment_index % (
+        len(segment_files) - 1
+    )
 
 
 def get_finals(book_page_path: str) -> int:
@@ -115,7 +118,6 @@ def do_ocr() -> None:
         ret = process_image(
             st.session_state.page_path_selected, "http://ocr:8000/process_image"
         )
-    # st.write(ret)
 
 
 def get_book_folders(books_path: str) -> List[str]:
@@ -146,8 +148,21 @@ def on_segment_change() -> None:
     Updates the session state index based on the selected segment.
     """
     global segments
-    st.session_state.segment_index = segments.index(st.session_state.segment_select)
+    # st.session_state.segment_index = segments.index(st.session_state.segment_select)
     st.write(f"Segment index after change : {st.session_state.segment_index}")
+
+
+def save() -> None:
+    """
+    Save the current text area content to a .final file.
+    Called automatically when text area content changes.
+    """
+    print("Text changed, saving!")
+    text = st.session_state.text_area
+    open(
+        segment_files[st.session_state.segment_index].replace(".png", ".final"),
+        "w",
+    ).write(text)
 
 
 def render_sidebar():
@@ -175,7 +190,7 @@ def render_sidebar():
 
     if not book:
         st.info("👆 Please select a book to begin")
-        return
+        return None, None
 
     # Page selection section
     st.subheader("📄 Select Page")
@@ -200,12 +215,11 @@ def render_sidebar():
 
     segments_files_path = books_path + "/" + book + "/" + page_no + "/*.png"
     segment_files = sorted(glob.glob(segments_files_path))
-    # st.write(f"Files = {segment_files}")
 
     if len(segment_files) == 0:
         st.warning("No segments found", icon="⚠️")
         st.button("🔄 Run OCR", on_click=do_ocr, use_container_width=True)
-        return
+        return None, None
 
     # Settings section
     with st.expander("⚙️ Settings", expanded=False):
@@ -218,7 +232,20 @@ def render_sidebar():
             unsafe_allow_html=True,
         )
 
-    return book, pages, page_no, page_path_selected, segment_files, segments_files_path
+    return segment_files, segments_files_path
+
+
+def draw_segment(index):
+    page_path = "/".join(segment_files[index].split("/")[0:-1]) + ".png"
+    json_path = segment_files[index].replace(".png", ".json")
+    job = json.load(open(json_path))
+    coords = job["coords"]
+
+    original_image = cv2.imread(page_path)
+    x1, y1, x2, y2 = coords
+    cv2.rectangle(original_image, (x1, y1), (x2, y2), color=(255, 0, 0), thickness=3)
+
+    st.image(original_image)
 
 
 def render_app() -> None:
@@ -233,11 +260,10 @@ def render_app() -> None:
     - Navigation controls
     """
     global segments
+    global segment_files
 
-    user_workspace = st.session_state["user_todo"]
-    active_user = st.session_state["name"]
-    books_path = user_workspace
-    book_folders = get_book_folders(books_path)
+    # books_path = st.session_state["user_todo"]
+    # book_folders = get_book_folders(books_path)
 
     # Add page configuration
 
@@ -263,9 +289,9 @@ def render_app() -> None:
     )
 
     with st.sidebar:
-        book, pages, page_no, page_path_selected, segment_files, segments_files_path = (
-            render_sidebar()
-        )
+        segment_files, segments_files_path = render_sidebar()
+        if not segment_files:
+            return
 
     with st.container():
         # Add a header for the main content area
@@ -275,24 +301,7 @@ def render_app() -> None:
         with col1:
             # Add a subheader for the page preview
             st.markdown("#### Page Preview")
-            page_path = (
-                "/".join(segment_files[st.session_state.segment_index].split("/")[0:-1])
-                + ".png"
-            )
-            json_path = segment_files[st.session_state.segment_index].replace(
-                ".png", ".json"
-            )
-            job = json.load(open(json_path))
-            coords = job["coords"]
-
-            original_image = cv2.imread(page_path)
-            x1, y1, x2, y2 = coords
-            cv2.rectangle(
-                original_image, (x1, y1), (x2, y2), color=(255, 0, 0), thickness=3
-            )
-
-            st.image(original_image)
-
+            draw_segment(index=st.session_state.segment_index)
         with col2:
             # Progress tracking
             if get_finals(segments_files_path) == len(segment_files):
@@ -306,17 +315,16 @@ def render_app() -> None:
             segments = [
                 s.split("/")[-1] for s in segment_files
             ]  # Update global segments
+
+            # st.write(f"Segments=> {segments}, len = {len(segments)}")
+
             selected_segment = st.selectbox(
                 options=segments,
                 label="📄 Line Segment",
                 on_change=on_segment_change,
-                key="segment_select",
-                # index=st.session_state.segment_index or 0,
+                index=st.session_state.segment_index or 0,
             )
-            if selected_segment is not None:
-                st.session_state.segment_index = segments.index(selected_segment)
-            else:
-                st.session_state.segment_index = None
+            st.session_state.segment_index = segments.index(selected_segment)
 
             if get_finals(segments_files_path) == len(segment_files):
                 st.success("All segments are now completed")
@@ -345,24 +353,9 @@ def render_app() -> None:
             else:
                 st.write("Segment index is NONE!")
 
-            def save() -> None:
-                """
-                Save the current text area content to a .final file.
-                Called automatically when text area content changes.
-                """
-                print("Text changed, saving!")
-                text = st.session_state.text_area
-                open(
-                    segment_files[st.session_state.segment_index].replace(
-                        ".png", ".final"
-                    ),
-                    "w",
-                ).write(text)
-                # st.rerun()
-
             # Text editing area with better labeling
             st.markdown("#### Edit Text")
-            text = st.text_area(
+            st.text_area(
                 label="Edit recognized text below:",
                 value=ocred_text,
                 max_chars=1000,

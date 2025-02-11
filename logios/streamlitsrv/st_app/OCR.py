@@ -8,10 +8,12 @@ import glob
 
 st.set_page_config(
     page_title="Logios - Greek Polytonic OCR",
-    page_icon="👋",
+    page_icon="📚",
     layout="wide",
+    initial_sidebar_state="expanded",
     # initial_sidebar_state="collapsed",
 )
+
 
 # Remove streamlit deploy button
 
@@ -73,7 +75,7 @@ def render_main(login_status):
 
     else:
         name = st.session_state["name"]
-        st.sidebar.markdown(f"## Welcome {name}")
+        # st.sidebar.markdown(f"## Welcome {name}")
 
         layout_detection = st.Page(
             "menu/layout.py",
