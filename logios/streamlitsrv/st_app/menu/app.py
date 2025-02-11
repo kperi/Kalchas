@@ -41,14 +41,14 @@ segment_files = []
 
 def set_state() -> None:
     """Reset the index in session state to 0."""
-    st.write("On page change")
+
     st.session_state.page_index = 0
     st.session_state.segment_index = 0
 
 
 def book_page_change() -> None:
     """Reset the index in session state to 0."""
-    # st.write("On page change")
+
     st.session_state.segment_index = 0
 
 

@@ -12,12 +12,11 @@ def render_app():
 
     login_status = st.session_state["authentication_status"]
     if not login_status:
-        st.warning("Πρέπει να είστε συνδεδεμένος για να μπορέσετε να ανεβάσετε ένα pdf")
+        st.warning("Please login to upload files")
         st.stop()
 
     uploaded_file = st.file_uploader("Choose a file", type="pdf")
 
-    user_uploads_dir = st.session_state["user_uploads"]
     user_uploads_dir = st.session_state["user_uploads"]
     # workspace_dir = st.session_state["user_workspace"]
 
@@ -51,11 +50,17 @@ def render_app():
             image.save(dest_file)
             pbar.progress(
                 float(page_num + 1) / doc.page_count,
-                "Μετατροπή σελίδων σε εικόνες png...",
+                "Converting pdf pages to image files...",
             )
             continue
 
-        st.success("Η μετατροπή ολοκληρώθηκε")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.success("Conversion completed")
+        with col2:
+            st.page_link(
+                "menu/editing.py", label="Click here to view and edit uploaded files"
+            )
 
 
 system_loop(render_app)
