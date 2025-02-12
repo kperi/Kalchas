@@ -149,7 +149,7 @@ def on_segment_change() -> None:
     """
     global segments
     # st.session_state.segment_index = segments.index(st.session_state.segment_select)
-    st.write(f"Segment index after change : {st.session_state.segment_index}")
+    # st.write(f"Segment index after change : {st.session_state.segment_index}")
 
 
 def save() -> None:
@@ -262,6 +262,14 @@ def render_app() -> None:
     global segments
     global segment_files
 
+    login_status = (
+        "authentication_status" in st.session_state
+        and st.session_state["authentication_status"] is not None
+    )
+    if not login_status:
+        st.warning("Please login ")
+        st.stop()
+        return
     # books_path = st.session_state["user_todo"]
     # book_folders = get_book_folders(books_path)
 
@@ -392,4 +400,5 @@ def render_app() -> None:
                     )
 
 
-system_loop(render_app)
+# system_loop(render_app)
+render_app()

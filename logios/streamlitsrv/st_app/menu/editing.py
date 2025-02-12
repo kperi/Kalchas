@@ -227,7 +227,8 @@ if login_status:
                             realtime_update=True,
                             box_color=box_color,
                             aspect_ratio=None,
-                            stroke_width=3,
+                            stroke_width=2,
+                            default_coords=(10, 300, 10, 300),
                             return_type="image",
                         )
 
@@ -251,7 +252,7 @@ if login_status:
                             st.session_state.last_action = "save"
 
                         st.button(
-                            "💾 Save Region (Ctrl+S)",
+                            "💾 Save Region",  # (Ctrl+S)",
                             key=f"save_{page_num}",
                             on_click=save_crop,
                             use_container_width=True,
@@ -262,9 +263,9 @@ if login_status:
                         st.caption(f"{len(cropped_files)} cropped regions found")
                         for idx, crop in enumerate(cropped_files, 1):
                             with st.container():
-                                crop_col1, crop_col2 = st.columns([4, 1])
+                                crop_col1, crop_col2 = st.columns([0.1, 0.1])
                                 with crop_col1:
-                                    st.image(crop, use_container_width=True)
+                                    st.image(crop, use_container_width=False, width=500)
                                 with crop_col2:
                                     st.caption(f"Region {idx}")
                                     if st.button("🗑️", key=f"delete_{idx}"):
@@ -297,7 +298,6 @@ if login_status:
                         ):
                             for crop in cropped_files:
                                 os.remove(crop)
-                            # st.rerun()
 
         else:
             st.info("No images found in the selected folder")

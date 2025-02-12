@@ -139,38 +139,41 @@ def render_cleanup():
 
 def import_export_workspace():
     st.subheader("Import/Export workspace")
-    
+
     workspace = "/app/data"
     if os.path.exists(workspace):
         if st.button("Export All Workspaces"):
             try:
                 # Create a timestamp for the zip file name
                 from datetime import datetime
+
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 zip_filename = f"workspace_backup_{timestamp}.zip"
-                
+
                 # Create zip file in memory
                 with st.spinner("Creating backup..."):
                     shutil.make_archive(
-                        base_name=os.path.join(workspace, zip_filename[:-4]),  # Remove .zip extension
-                        format='zip',
-                        root_dir=workspace
+                        base_name=os.path.join(
+                            workspace, zip_filename[:-4]
+                        ),  # Remove .zip extension
+                        format="zip",
+                        root_dir=workspace,
                     )
-                    
+
                     # Create download button for the zip file
                     zip_path = os.path.join(workspace, zip_filename)
-                    with open(zip_path, 'rb') as f:
+                    with open(zip_path, "rb") as f:
                         st.download_button(
                             label="Download Workspace Backup",
                             data=f,
                             file_name=zip_filename,
-                            mime="application/zip"
+                            mime="application/zip",
                         )
-                    
+
                     # Clean up the zip file after creating download button
                     if os.path.exists(zip_path):
                         os.remove(zip_path)
-                        
+
                 st.success("Backup created successfully!")
             except Exception as e:
                 st.error(f"Error creating backup: {str(e)}")
@@ -178,8 +181,20 @@ def import_export_workspace():
         st.error("Workspace directory not found")
 
 
+def user_management():
+    pass
+
+
 if st.session_state.get("authentication_status"):
-    tab1, tab2, tab3, tab4 = st.tabs(["Disk Usage", "File System", "Cleanup", "Export/Import Workspace"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(
+        [
+            "Disk Usage",
+            "File System",
+            "Cleanup",
+            "Export/Import Workspace",
+            "User Management",
+        ]
+    )
     with tab1:
         render_admin()
     with tab2:
@@ -188,5 +203,7 @@ if st.session_state.get("authentication_status"):
         render_cleanup()
     with tab4:
         import_export_workspace()
+    with tab5:
+        user_management()
 else:
     st.warning("Please log in to view admin panel")

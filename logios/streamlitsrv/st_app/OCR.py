@@ -1,10 +1,5 @@
 import streamlit as st
-import streamlit_authenticator as stauth
-from yaml.loader import SafeLoader
-import yaml
-from auth_utils import do_login
-import os
-import glob
+from menu.login import get_authenticator
 
 st.set_page_config(
     page_title="Logios - Greek Polytonic OCR",
@@ -33,21 +28,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-with open("./config.yaml") as file:
-    config = yaml.load(file, Loader=SafeLoader)
-
-
-login_status, user_todo, user_uploads, user_workspace, authenticator = do_login()
-
-active_user = st.session_state["name"]
-
-
-if login_status == False:
-    st.error("Username/password is incorrect")
-
-if login_status == None:
-    st.warning("Please enter your username and password")
-
 
 def render_main(login_status):
 
@@ -73,10 +53,29 @@ def render_main(login_status):
             """
         )
 
-    else:
-        name = st.session_state["name"]
-        # st.sidebar.markdown(f"## Welcome {name}")
+        login = st.Page(
+            "menu/login.py",
+            title="Login",
+            icon=":material/document_scanner:",
+        )
+        register = st.Page(
+            "menu/register.py",
+            title="Register",
+            icon=":material/document_scanner:",
+        )
+        pg = st.navigation(
+            {
+                "Menu": [login, register],
+            }
+        )
+        pg.run()
 
+    else:
+        authenticator = get_authenticator()
+        if authenticator is not None:
+            authenticator.logout(location="sidebar", key="side_logout")
+
+        name = st.session_state["name"]
         layout_detection = st.Page(
             "menu/layout.py",
             title="Page layout detection",
@@ -115,9 +114,13 @@ def render_main(login_status):
                 "Menu": menu,
             }
         )
-        # st.sidebar.image("./st_app/images/scholar.png", width=200)
         pg.run()
-        # pg.title("Logios")
 
 
-render_main(login_status=login_status)
+login_status = (
+    "authentication_status" in st.session_state
+    and st.session_state["authentication_status"] is not None
+)
+
+#   login_status = False
+render_main(login_status=login_status)  # login status
