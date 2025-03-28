@@ -1,12 +1,11 @@
-
 services:
   streamlitsrv:
     build: ./streamlitsrv
     ports:
-      - "8501:8501"
+      - "8502:8502"
     volumes:
       - .:/app
-      - ./streamlitsrv:/app         
+      - ./streamlitsrv:/app
       - upload_data:/app/data
     working_dir: /app
     depends_on:
@@ -16,10 +15,10 @@ services:
       - logios-network
 
   doclayout:
-    build: ./dlayout 
+    build: ./dlayout
     restart: on-failure
     ports:
-      - "8601:8601"
+      - "8602:8602"
     volumes:
       - .:/app
       - ./dlayout:/app
@@ -35,6 +34,7 @@ services:
     volumes:
       - .:/app
       - ./ocr:/app
+      - upload_data:/app/data
     working_dir: /app
     networks:
       - logios-network
@@ -42,6 +42,7 @@ services:
 volumes:
   upload_data:
   app:
+
 
 networks:
   logios-network:

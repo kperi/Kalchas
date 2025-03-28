@@ -16,25 +16,14 @@ def do_login():
     with open("./config.yaml") as file:
         config = yaml.load(file, Loader=SafeLoader)
 
-    # st.write(config)
-    # st.set_page_config(
-    #    page_title="Hello",
-    #    page_icon="👋",
-    # )
-
     authenticator = stauth.Authenticate(
         config["credentials"],
         config["cookie"]["name"],
         config["cookie"]["key"],
         config["cookie"]["expiry_days"],
-        # config["pre-authorized"],
-        # provider="google",
     )
 
-    # if st.session_state.get("authentication_status") is  None:
-    authenticator.login(
-        # location="sidebar",
-    )
+    authenticator.login()
 
     name = st.session_state["name"]
     login_status = st.session_state["authentication_status"]
@@ -45,11 +34,14 @@ def do_login():
     user_workspace = None
 
     if login_status:
+        # st.write("LOGIN")
+        # st.stop()
         st.session_state["name"] = name
         st.session_state["username"] = username
 
         st.session_state["authentication_status"] = True
-        authenticator.logout(location="sidebar")
+        # authenticator.logout(location="sidebar")
+        # authenticator.logout()
 
         system_workspace = config["system_workspace"]["path"]
 

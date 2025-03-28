@@ -94,7 +94,7 @@ def render_main(login_status):
         )
         pdf_upload = st.Page(
             "menu/pdf_upload.py",
-            title="File upload",
+            title="PDF upload",
             icon=":material/upload:",
         )
 
@@ -105,9 +105,13 @@ def render_main(login_status):
         )
 
         if name == "Kostas":
-            menu = [ocr, pdf_upload, page_editing, layout_detection, admin]
+            menu = [pdf_upload, page_editing, ocr, layout_detection, admin]
         else:
-            menu = [ocr, pdf_upload, page_editing, layout_detection]
+            menu = [
+                pdf_upload,
+                page_editing,
+                ocr,
+            ]
 
         pg = st.navigation(
             {

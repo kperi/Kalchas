@@ -1,38 +1,45 @@
-credentials:
-  usernames:
-    kperifanos:
-      email: kostas.perifanos@gmail.com
-      failed_login_attempts: 0 # Will be managed automatically
-      logged_in: False # Will be managed automatically
-      name: Kostas
-      workspace: KP
-      password: abc # Will be hashed automatically
-    nikoleta:
-      email: nikoleta.gatzoli@gmail.com
-      failed_login_attempts: 0 # Will be managed automatically
-      logged_in: False # Will be managed automatically
-      name: Nikoleta
-      workspace: NG
-      password: def # Will be hashed automatically
-    aglaia:
-      email: aggistriotiaglaia@yahoo.com
-      failed_login_attempts: 0 # Will be managed automatically
-      logged_in: False # Will be managed automatically
-      name: Aglaia 
-      workspace: AA 
-      password: def # Will be hashed automatically
-    demo:
-      email: some@yahoo1.com
-      failed_login_attempts: 0 # Will be managed automatically
-      logged_in: False # Will be managed automatically
-      name: Demo 
-      workspace: demo
-      password: def # Will be hashed automatically
-
 cookie:
   expiry_days: 30
-  key: some_signature_key # Must be string
+  key: some_signature_key
   name: some_cookie_name
+credentials:
+  usernames:
+    aglaia:
+      email: aggistriotiaglaia@yahoo.com
+      failed_login_attempts: 0
+      logged_in: false
+      name: Aglaia
+      password: $2b$12$ykUnPIMuswcD3WT4ualnXegzCzHPPuMHiXGaE1DLiRX5JDiQvuAzS
+      workspace: AA
+    demo:
+      email: some@yahoo1.com
+      failed_login_attempts: 0
+      logged_in: false
+      name: Demo
+      password: $2b$12$R9fi6SYrg1ZgUSl6gp3OkezQGHHV6OkMxGRVEWSadWz6CwrGJ1Kv6
+      workspace: demo
+    goutsos:
+      email: dgoutsos@phil.uoa.gr
+      first_name: dionysis
+      last_name: dionysis
+      logged_in: false
+      password: $2b$12$F1yaqAjXWPt66f11H8g8FuMk0Gwzv.3LJHWdN5xDN4tYNq3fIGlBy
+      password_hint: balh blah
+      roles: null
+    kperifanos:
+      email: kostas.perifanos@gmail.com
+      failed_login_attempts: 0
+      logged_in: false
+      name: Kostas
+      password: $2b$12$rJBmzNE6ISDRuW8bNoXileca7laIAEccoRvGM1VWXJtpdneNroAxm
+      workspace: KP
+    nikoleta:
+      email: nikoleta.gatzoli@gmail.com
+      failed_login_attempts: 0
+      logged_in: false
+      name: Nikoleta
+      password: $2b$12$1rTfJZotJYInK78GVy9oZOweUBmyKaoP8Cz7xOIihj9fLDaGYq3JK
+      workspace: NG
 pre-authorized:
   emails:
   - melsby@gmail.com
