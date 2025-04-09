@@ -18,7 +18,7 @@ RUN pip3 install -r requirements.txt
 
 EXPOSE 8501
 
-HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health
+HEALTHCHECK CMD curl --fail http://localhost:8602/_stcore/health
 
 COPY ./st_app /app/
 
@@ -30,4 +30,4 @@ WORKDIR /app/kalchas/logios
 
 #ENTRYPOINT ["streamlit", "run", "/app/st/OCR.py", "--server.port=8501", "--server.address=0.0.0.0"]
 ENV PYTHONPATH=/app/st:$PYTHONPATH
-ENTRYPOINT ["streamlit", "run", "/app/st_app/OCR.py", "--server.port=8501", "--server.address=0.0.0.0"]
+ENTRYPOINT ["streamlit", "run", "/app/st_app/OCR.py", "--server.port=8502",  "--server.baseUrlPath=logios", "--server.address=0.0.0.0"]

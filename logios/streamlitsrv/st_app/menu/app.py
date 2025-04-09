@@ -130,13 +130,18 @@ def get_book_folders(books_path: str) -> List[str]:
     Returns:
         List[str]: Sorted list of book folder names
     """
-    book_folders = sorted(glob.glob(os.path.join(books_path, "*")))
-    book_folders = [
-        os.path.basename(book_folder)
-        for book_folder in book_folders
-        if os.path.isdir(book_folder)
-    ]
-    return book_folders
+
+    if books_path is not None:
+
+        book_folders = sorted(glob.glob(os.path.join(books_path, "*")))
+        book_folders = [
+            os.path.basename(book_folder)
+            for book_folder in book_folders
+            if os.path.isdir(book_folder)
+        ]
+        return book_folders
+    else:
+        return []
 
 
 segments: List[str] = []

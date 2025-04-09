@@ -49,7 +49,7 @@ def render_main(login_status):
 
         st.markdown(
             """
-            ##### `Logios` is an an OCR engine developed by University of Athens. 
+            ##### `Logios` is an OCR engine developed by the National and Kapodistrian University of Athens.
             """
         )
 
@@ -65,7 +65,7 @@ def render_main(login_status):
         )
         pg = st.navigation(
             {
-                "Menu": [login, register],
+                "Menu": [login]#, register],
             }
         )
         pg.run()

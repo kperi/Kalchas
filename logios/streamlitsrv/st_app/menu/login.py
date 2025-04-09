@@ -4,6 +4,8 @@ from yaml.loader import SafeLoader
 import yaml
 from auth_utils import do_login
 
+st.info( "For registration information, please contact dgoutsos or kperifanos at phil.uoa.gr")
+
 st.title(f"Login")
 authenticator = None
 
