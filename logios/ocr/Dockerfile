@@ -4,18 +4,18 @@ RUN  mkdir -p /app
 
 
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    curl \
-    software-properties-common \
-    git \
-    libxext6 \  
-    && rm -rf /var/lib/apt/lists/*
+  build-essential \
+  curl \
+  software-properties-common \
+  git \
+  libxext6 \  
+  && rm -rf /var/lib/apt/lists/*
 
-RUN pip install torch==2.0.1 torchvision==0.15.2  --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir torch==2.0.1 torchvision==0.15.2  --index-url https://download.pytorch.org/whl/cpu
 
 COPY requirements.txt /app
-RUN pip install -r /app/requirements.txt 
- 
+RUN pip install --no-cache-dir -r /app/requirements.txt 
+
 EXPOSE 8000 8000
 RUN mkdir -p /app/ocr_server
 COPY  /ocr_server /app/ocr_server
