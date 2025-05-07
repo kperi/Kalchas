@@ -1,6 +1,7 @@
 import streamlit as st
 from menu.login import get_authenticator
 
+# import loguru
 st.set_page_config(
     page_title="Logios - Greek Polytonic OCR",
     page_icon="📚",
@@ -8,10 +9,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
     # initial_sidebar_state="collapsed",
 )
-
-
-# Remove streamlit deploy button
-
 
 st.markdown(
     """
@@ -30,8 +27,7 @@ st.markdown(
 
 
 def render_main(login_status):
-
-    hide_st_style = """
+    _ = """
                 <style>
                 #MainMenu {visibility: hidden;}
                 footer {visibility: hidden;}
@@ -58,23 +54,26 @@ def render_main(login_status):
             title="Login",
             icon=":material/document_scanner:",
         )
-        register = st.Page(
-            "menu/register.py",
-            title="Register",
-            icon=":material/document_scanner:",
-        )
+        # register = st.Page(
+        #    "menu/register.py",
+        #    title="Register",
+        #    icon=":material/document_scanner:",
+        # )
         pg = st.navigation(
             {
-                "Menu": [login]#, register],
+                "Menu": [login]  # , register],
             }
         )
         pg.run()
 
     else:
         authenticator = get_authenticator()
-        if authenticator is not None:
-            authenticator.logout(location="sidebar", key="side_logout")
-
+        try:
+            if authenticator is not None:
+                authenticator.logout(location="sidebar", key="side_logout")
+        except Exception as e:
+            # logger.error(f"Error {e}")
+            print(f"Error : {e}")
         name = st.session_state["name"]
         layout_detection = st.Page(
             "menu/layout.py",
@@ -121,6 +120,7 @@ def render_main(login_status):
         pg.run()
 
 
+# TODO: fix the authentication madness
 login_status = (
     "authentication_status" in st.session_state
     and st.session_state["authentication_status"] is not None
