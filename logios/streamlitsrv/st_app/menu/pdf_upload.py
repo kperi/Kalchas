@@ -9,7 +9,7 @@ import io
 
 
 def render_app():
-
+    do_login()
     login_status = st.session_state["authentication_status"]
     if not login_status:
         st.warning("Please login to upload files")
@@ -35,7 +35,6 @@ def render_app():
         pbar = st.progress(0.0)
         doc = fitz.open(dest_filename)
         for page_num in range(doc.page_count):
-
             # st.markdown("## Page: " + str(page_num + 1))
             page = doc.load_page(page_num)
             pixmap = page.get_pixmap(dpi=300)

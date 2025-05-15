@@ -8,3 +8,7 @@ font="sans serif"
 
 [client]
 showSidebarNavigation = false
+
+
+[server]
+maxUploadSize = 400

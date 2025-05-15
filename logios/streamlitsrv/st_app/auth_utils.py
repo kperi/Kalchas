@@ -6,13 +6,7 @@ import os
 from loguru import logger
 
 
-def login_cb():
-    logger.info(f"loggin callback:")
-    pass
-
-
 def do_login():
-
     with open("./config.yaml") as file:
         config = yaml.load(file, Loader=SafeLoader)
 
@@ -69,7 +63,7 @@ def system_loop(render_function):
     elif st.session_state["authentication_status"]:
         render_function()
     elif st.session_state["authentication_status"] is False:
-        st.error("Username/password is incorrect")
+        st.error("Username or password is incorrect")
     elif st.session_state["authentication_status"] is None:
         st.warning("Please enter your username and password")
 
