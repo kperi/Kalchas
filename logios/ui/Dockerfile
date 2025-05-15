@@ -16,14 +16,14 @@ RUN npm install --frozen-lockfile
 COPY . .
 
 # Disable Next.js telemetry during the build
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NEXT_TELEMETRY_DISABLED=1
 
 # Build the Next.js application
 # This will also trace output files if `output: 'standalone'` is set in next.config.mjs
 RUN npm run build
 
 # 2. Runner stage: Production image
-FROM node:20-alpine AS runner
+FROM node:slim-alpine AS runner
 
 WORKDIR /app
 
