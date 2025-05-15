@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flask Image and PDF Upload</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</head>
+<body>
+    {% include 'layout.html' %}
+    
+    <div class="container">
+        <h1>Upload Image or PDF</h1>
+        <form action="{{ url_for('app.upload_file') }}" method="post" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="file">Choose an image or PDF (max 100MB):</label>
+                <input type="file" name="file" id="file" accept="image/*,.pdf" required>
+            </div>
+            <button type="submit">Upload</button>
+        </form>
+        
+        {% if uploaded_file_url %}
+            <h2>Uploaded File Preview</h2>
+            <div id="preview-container">
+                <img src="{{ uploaded_file_url }}" alt="Uploaded Image" id="uploaded-image" style="display: none;">
+                <iframe src="{{ uploaded_file_url }}" style="display: none;" id="uploaded-pdf"></iframe>
+            </div>
+            <button id="crop-button" style="display: none;">Crop Image</button>
+        {% endif %}
+    </div>
+
+    <script>
+        document.getElementById('file').addEventListener('change', function() {
+            const file = this.files[0];
+            const previewImage = document.getElementById('uploaded-image');
+            const previewPdf = document.getElementById('uploaded-pdf');
+            const cropButton = document.getElementById('crop-button');
+
+            if (file) {
+                const fileURL = URL.createObjectURL(file);
+                if (file.type.startsWith('image/')) {
+                    previewImage.src = fileURL;
+                    previewImage.style.display = 'block';
+                    previewPdf.style.display = 'none';
+                    cropButton.style.display = 'block';
+                } else if (file.type === 'application/pdf') {
+                    previewPdf.src = fileURL;
+                    previewPdf.style.display = 'block';
+                    previewImage.style.display = 'none';
+                    cropButton.style.display = 'none';
+                }
+            }
+        });
+    </script>
+</body>
+</html>

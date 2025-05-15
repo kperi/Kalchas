@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Logios App{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            background: #222;
+        }
+        nav li {
+            margin: 0;
+        }
+        nav a {
+            display: block;
+            padding: 1em 1.5em;
+            color: #fff;
+            text-decoration: none;
+        }
+        nav a.active, nav a:focus {
+            background: #007bff;
+        }
+        .menu-toggle {
+            display: none;
+            background: #222;
+            color: #fff;
+            border: none;
+            font-size: 2em;
+            padding: 0.5em 1em;
+        }
+        @media (max-width: 600px) {
+            nav ul {
+                flex-direction: column;
+                display: none;
+            }
+            nav ul.open {
+                display: flex;
+            }
+            .menu-toggle {
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+        <ul id="main-menu">
+            <li><a href="{{ url_for('app.index') }}">Home</a></li>
+            <li><a href="{{ url_for('app.upload_file') }}">Upload</a></li>
+            <li><a href="{{ url_for('app.crop_image') }}">Crop</a></li>
+            <li><a href="{{ url_for('app.image_preview') }}">OCR</a></li>
+            <li><a href="{{ url_for('app.index') }}">Admin</a></li>
+        </ul>
+    </nav>
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </div>
+    <script>
+        // Responsive menu toggle
+        document.querySelector('.menu-toggle').addEventListener('click', function() {
+            document.getElementById('main-menu').classList.toggle('open');
+        });
+
+        // Highlight active menu item
+        const links = document.querySelectorAll('nav a');
+        const currentUrl = window.location.pathname;
+        links.forEach(link => {
+            if (link.getAttribute('href') === currentUrl) {
+                link.classList.add('active');
+            }
+        });
+
+        // Keyboard navigation for menu
+        document.getElementById('main-menu').addEventListener('keydown', function(e) {
+            const items = Array.from(links);
+            let idx = items.findIndex(item => item === document.activeElement);
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                items[(idx + 1) % items.length].focus();
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                items[(idx - 1 + items.length) % items.length].focus();
+            }
+        });
+    </script>
+</body>
+</html>

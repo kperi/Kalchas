@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crop Image</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/cropper.js') }}"></script>
+</head>
+<body>
+    {% include 'layout.html' %}
+    <div class="container">
+        <h2>Crop Image</h2>
+        <div class="image-container">
+            <img id="image" src="{{ url_for('static', filename=image_path) }}" alt="Image to crop">
+        </div>
+        <div class="crop-controls">
+            <button id="crop-button">Crop</button>
+            <input type="hidden" id="cropped-image" name="cropped-image">
+        </div>
+    </div>
+    <script>
+        const image = document.getElementById('image');
+        const cropButton = document.getElementById('crop-button');
+        let cropper;
+
+        window.onload = function() {
+            cropper = new Cropper(image, {
+                aspectRatio: 16 / 9,
+                viewMode: 1,
+                autoCropArea: 1,
+                crop(event) {
+                    // You can get the crop data here if needed
+                },
+            });
+        };
+
+        cropButton.addEventListener('click', function() {
+            const canvas = cropper.getCroppedCanvas();
+            document.getElementById('cropped-image').value = canvas.toDataURL();
+            // You can submit the form or handle the cropped image as needed
+        });
+    </script>
+</body>
+</html>
