@@ -1,0 +1,73 @@
+{% extends "layout.html" %}
+
+{% block title %}Upload Document - Logios App{% endblock %}
+
+{% block content %}
+<div class="gradio-component-group" style="max-width: 700px; margin-left: auto; margin-right: auto;">
+    <h1>Upload New Document</h1>
+    <form action="{{ url_for('app.show_upload_page') }}" method="post" enctype="multipart/form-data">
+        <div class="form-group" style="margin-bottom: 1rem;">
+            <label for="file">Choose an Image or PDF file (Max 100MB):</label>
+            <input type="file" name="file" id="file" accept="image/*,.pdf" required>
+        </div>
+        <button type="submit" class="gradio-button gradio-button-primary gradio-button-fullwidth">Upload Document</button>
+    </form>
+
+    <div id="preview-area" class="gradio-display-area" style="margin-top: 1.5rem;">
+        <p class="gradio-placeholder-text">File preview will appear here once selected.</p>
+        <img src="#" alt="Image Preview" id="uploaded-image-preview" style="display: none;">
+        <iframe src="#" style="display: none; width:100%; height:400px;" id="uploaded-pdf-preview"></iframe>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const fileInput = document.getElementById('file');
+        const previewImage = document.getElementById('uploaded-image-preview');
+        const previewPdf = document.getElementById('uploaded-pdf-preview');
+        const previewArea = document.getElementById('preview-area');
+        let previewAreaTextNode = previewArea.querySelector('.gradio-placeholder-text');
+
+        if (fileInput) {
+            fileInput.addEventListener('change', function() {
+                const file = this.files[0];
+
+                // Reset previews
+                previewImage.style.display = 'none';
+                previewImage.src = '#';
+                previewPdf.style.display = 'none';
+                previewPdf.src = '#';
+                
+                if (!previewAreaTextNode) { // Recreate if removed
+                    previewAreaTextNode = document.createElement('p');
+                    previewAreaTextNode.className = 'gradio-placeholder-text';
+                    previewArea.appendChild(previewAreaTextNode);
+                }
+                previewAreaTextNode.textContent = 'File preview will appear here once selected.';
+                previewAreaTextNode.style.display = 'block';
+
+
+                if (file) {
+                    const fileURL = URL.createObjectURL(file);
+                    if (previewAreaTextNode) previewAreaTextNode.style.display = 'none';
+
+                    if (file.type.startsWith('image/')) {
+                        previewImage.src = fileURL;
+                        previewImage.style.display = 'block';
+                    } else if (file.type === 'application/pdf') {
+                        previewPdf.src = fileURL;
+                        previewPdf.style.display = 'block';
+                    } else {
+                        if(previewAreaTextNode) {
+                            previewAreaTextNode.textContent = 'File type not supported for preview.';
+                            previewAreaTextNode.style.display = 'block';
+                        }
+                    }
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}
