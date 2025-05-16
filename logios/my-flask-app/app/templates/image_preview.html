@@ -151,10 +151,14 @@
                             </div>
                             
                             <div class="selected-line-container" style="margin-top: 1rem; border: 1px solid #dee2e6; border-radius: 5px; padding: 10px;">
-                                <div class="selected-line-image" style="text-align: center; margin-bottom: 10px;">
-                                    <!-- Selected line image will be shown here by showSelectedSegment JS function -->
+                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                                    <button id="prev-segment-btn" class="gradio-button gradio-button-secondary" style="padding: 5px 10px; font-size:0.9em;">&lt; Prev</button>
+                                    <div class="selected-line-image" style="text-align: center; flex-grow: 1; min-height: 50px;">
+                                        <!-- Selected line image will be shown here by showSelectedSegment JS function -->
+                                    </div>
+                                    <button id="next-segment-btn" class="gradio-button gradio-button-secondary" style="padding: 5px 10px; font-size:0.9em;">Next &gt;</button>
                                 </div>
-                                <div class="selected-line-text" style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; font-family: monospace;">
+                                <div class="selected-line-text" style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; font-family: monospace; min-height: 30px;">
                                     <!-- Selected line text will be shown here by showSelectedSegment JS function -->
                                 </div>
                             </div>
@@ -178,21 +182,70 @@
     </div>
 
     <script>
+        // Global variables to store segment context for navigation
+        let currentSegmentsList = [];
+        let currentSegmentFolderGlobal = '';
+        let currentSegmentPageIdGlobal = '';
+        let currentSegmentDisplayIndex = -1;
+
         document.addEventListener('DOMContentLoaded', function() {
             console.log('OCR page ready');
             
-            // Check if a page is selected and try to load segments
             const selectedPng = "{{ request.args.get('selected_png') }}";
             const selectedFolder = "{{ selected_folder }}";
             
             if (selectedPng && selectedFolder) {
-                // Extract the base filename without extension
                 const pageId = selectedPng.split('.')[0];
-                
-                // Try to load existing segments if available
                 checkForExistingSegments(selectedFolder, pageId);
             }
+
+            // Event listeners for new Prev/Next buttons
+            const prevBtn = document.getElementById('prev-segment-btn');
+            const nextBtn = document.getElementById('next-segment-btn');
+
+            if (prevBtn) {
+                prevBtn.onclick = function() {
+                    if (currentSegmentDisplayIndex > 0) {
+                        displaySegmentByIndex(currentSegmentDisplayIndex - 1);
+                    }
+                };
+            }
+            if (nextBtn) {
+                nextBtn.onclick = function() {
+                    if (currentSegmentDisplayIndex < currentSegmentsList.length - 1) {
+                        displaySegmentByIndex(currentSegmentDisplayIndex + 1);
+                    }
+                };
+            }
         });
+
+        function updateNavigationButtons() {
+            const prevBtn = document.getElementById('prev-segment-btn');
+            const nextBtn = document.getElementById('next-segment-btn');
+            if (!prevBtn || !nextBtn) return;
+
+            prevBtn.disabled = (currentSegmentDisplayIndex <= 0);
+            nextBtn.disabled = (currentSegmentDisplayIndex >= currentSegmentsList.length - 1);
+        }
+
+        function displaySegmentByIndex(index) {
+            if (index >= 0 && index < currentSegmentsList.length) {
+                currentSegmentDisplayIndex = index;
+                const segment = currentSegmentsList[index];
+                // Ensure global folder and pageId are set before calling showSelectedSegment
+                showSelectedSegment(currentSegmentFolderGlobal, currentSegmentPageIdGlobal, segment); 
+                updateNavigationButtons();
+
+                // Highlight the corresponding button in the top .line-segments-nav
+                document.querySelectorAll('.line-segments-nav .segment-btn').forEach((btn, i) => {
+                    if (i === index) {
+                        btn.style.backgroundColor = '#e9ecef'; btn.style.borderColor = '#adb5bd'; btn.style.fontWeight = 'bold';
+                    } else {
+                        btn.style.backgroundColor = '#f1f3f5'; btn.style.borderColor = '#dee2e6'; btn.style.fontWeight = 'normal';
+                    }
+                });
+            }
+        }
         
         function checkForExistingSegments(folder, pageId) {
             const segmentLoading = document.getElementById('segment-loading');
@@ -202,20 +255,17 @@
             
             segmentLoading.textContent = "Checking for existing segments...";
             
-            // Clear existing options except the first one
             while (segmentSelect.options.length > 1) {
                 segmentSelect.remove(1);
             }
             
-            // Get the URL for segments endpoint - using the correct path structure
             const segmentsUrl = `{{ url_for('app.get_segments', user_id='USERID', folder='FOLDER', page_id='PAGEID') }}`
                 .replace('USERID', '{{ session.get("user_id", "anonymous") }}')
                 .replace('FOLDER', encodeURIComponent(folder))
                 .replace('PAGEID', encodeURIComponent(pageId));
             
-            console.log('Fetching segments from:', segmentsUrl);
+            console.log('[checkForExistingSegments] Fetching segments from:', segmentsUrl);
             
-            // Try to get segments for this page
             fetch(segmentsUrl)
                 .then(response => {
                     if (!response.ok) {
@@ -224,31 +274,27 @@
                     return response.json();
                 })
                 .then(data => {
-                    console.log('Segments response:', data);
+                    console.log('[checkForExistingSegments] Segments response:', data);
                     
-                    // Check if we have segments
                     if (data.success && data.segments && Array.isArray(data.segments) && data.segments.length > 0) {
-                        // We have segments - populate dropdown
-                        data.segments.forEach((segment, index) => {
+                        data.segments.forEach((segment, index) => { // index is 0-based
                             const option = document.createElement('option');
-                            option.value = segment.id || `${index}`;
-                            
-                            // Create display text based on segment content
-                            let displayText = '';
-                            if (segment.text && typeof segment.text === 'string') {
-                                // Handle plain text segments
-                                const truncatedText = segment.text.substring(0, 30);
-                                displayText = `Segment ${index + 1}: ${truncatedText}${segment.text.length > 30 ? '...' : ''}`;
-                            } else if (segment.text && Array.isArray(segment.text) && segment.text[0] && typeof segment.text[0] === 'string') {
-                                // Handle array text ([text, confidence])
-                                 const truncatedText = segment.text[0].substring(0, 30);
-                                 displayText = `Segment ${index + 1}: ${truncatedText}${segment.text[0].length > 30 ? '...' : ''}`;
-                            } else if (segment.coords) {
-                                // Handle segments with coords but no clear text
-                                displayText = `Segment ${index + 1}: [${segment.coords.join(', ')}]`;
-                            } else {
-                                // Generic fallback
-                                displayText = `Segment ${index + 1}`;
+                            option.value = index; // Use 0-based index for the option value
+
+                            let displayText = `Segment ${index + 1}`; // Default display text
+                            if (segment.text) {
+                                let textSample = '';
+                                if (typeof segment.text === 'string') {
+                                    textSample = segment.text;
+                                } else if (Array.isArray(segment.text) && typeof segment.text[0] === 'string') {
+                                    textSample = segment.text[0];
+                                }
+                                if (textSample) {
+                                    const truncatedText = textSample.substring(0, 30);
+                                    displayText = `Segment ${index + 1}: ${truncatedText}${textSample.length > 30 ? '...' : ''}`;
+                                }
+                            } else if (segment.id) { // Fallback to segment.id if no text
+                                displayText = `Segment ${index + 1} (ID: ${segment.id})`;
                             }
                             
                             option.textContent = displayText;
@@ -257,92 +303,90 @@
                         
                         segmentLoading.textContent = `${data.segments.length} segments available`;
                         
-                        // Check if we have a selected segment in URL
                         const urlParams = new URLSearchParams(window.location.search);
-                        const selectedSegment = urlParams.get('selected_segment');
+                        const selectedSegmentFromUrl = urlParams.get('selected_segment'); // This should be an index
                         
-                        if (selectedSegment) {
-                            segmentSelect.value = selectedSegment;
+                        if (selectedSegmentFromUrl !== null) { // Check for null or undefined explicitly
+                            segmentSelect.value = selectedSegmentFromUrl;
                         }
+
+                        // If sidebar dropdown is populated, try to load segments into the main navigation area
+                        console.log('[checkForExistingSegments] Sidebar dropdown populated, calling loadLineSegments.');
+                        loadLineSegments(folder, pageId);
+
                     } else {
-                        // No segments found
                         segmentLoading.textContent = "No segments found. Run OCR to detect segments.";
-                        
-                        // Log more details if there's an error
                         if (data.error) {
-                            console.warn(`Error: ${data.error}`);
+                            console.warn(`[checkForExistingSegments] Error from /get_segments: ${data.error}`);
+                        }
+                        // Ensure the main segment navigation area is hidden if no segments for dropdown
+                        const lineSegmentsContainer = document.getElementById('line-segments-container');
+                        if (lineSegmentsContainer) {
+                            lineSegmentsContainer.style.display = 'none';
                         }
                     }
                 })
                 .catch(error => {
-                    console.error('Error loading segments:', error);
+                    console.error('[checkForExistingSegments] Error loading segments:', error);
                     segmentLoading.textContent = "Error loading segments. Run OCR to detect segments.";
+                    // Ensure the main segment navigation area is hidden on error
+                    const lineSegmentsContainer = document.getElementById('line-segments-container');
+                    if (lineSegmentsContainer) {
+                        lineSegmentsContainer.style.display = 'none';
+                    }
                 });
         }
         
         function populateSegmentsDropdown(folder, pageId, segments) {
             const segmentSelect = document.getElementById('segment-select');
+            const segmentLoading = document.getElementById('segment-loading'); // Added for consistency
             if (!segmentSelect) return;
             
-            console.log('Populating segments dropdown with:', segments);
+            console.log('[populateSegmentsDropdown] Populating with segments:', segments);
             
-            // Clear existing options except the first one
             while (segmentSelect.options.length > 1) {
                 segmentSelect.remove(1);
             }
             
-            // Add each segment as an option
-            segments.forEach((segment, index) => {
-                const option = document.createElement('option');
-                option.value = segment.id || `${index}`;
-                
-                // Handle different segment structures
-                let displayText = '';
-                if (segment.text && typeof segment.text === 'string') {
-                    // Normal text segment
-                    displayText = `Segment ${index + 1}: ${segment.text.substring(0, 30)}${segment.text.length > 30 ? '...' : ''}`;
-                } else if (segment.text && Array.isArray(segment.text) && segment.text[0] && typeof segment.text[0] === 'string') {
-                    // Handle array text ([text, confidence])
-                     const truncatedText = segment.text[0].substring(0, 30);
-                     displayText = `Segment ${index + 1}: ${truncatedText}${segment.text[0].length > 30 ? '...' : ''}`;
-                } else if (segment.status) {
-                    // Status segment from OCR service
-                    displayText = `Status: ${segment.status}`;
-                } else if (segment.file) {
-                    // File reference segment
-                    displayText = `File: ${segment.file.split('/').pop()}`;
-                } else {
-                    // Generic fallback
-                    displayText = `Segment ${index + 1}`;
-                }
-                
-                option.textContent = displayText;
-                segmentSelect.appendChild(option);
-            });
-            
-            // Check if we have a selected segment in URL
-            const urlParams = new URLSearchParams(window.location.search);
-            const selectedSegment = urlParams.get('selected_segment');
-            
-            if (selectedSegment) {
-                segmentSelect.value = selectedSegment;
-                // The following block that calls showSelectedSegment and shows line-segments-container
-                // is removed to prevent redundant updates to the main OCR display area
-                // when a segment is selected via the sidebar (URL parameter).
-                // The server-side rendering already handles a preview for this case.
-                /*
-                // Find and display the selected segment
-                const segment = segments.find(s => String(s.id) === String(selectedSegment));
-                if (segment) {
-                    showSelectedSegment(folder, pageId, segment);
-                    
-                    // Show the segments container
-                    const lineSegmentsContainer = document.getElementById('line-segments-container');
-                    if (lineSegmentsContainer) {
-                        lineSegmentsContainer.style.display = 'block';
+            if (segments && Array.isArray(segments) && segments.length > 0) {
+                segments.forEach((segment, index) => { // index is 0-based
+                    const option = document.createElement('option');
+                    option.value = index; // Use 0-based index for the option value
+
+                    let displayText = `Segment ${index + 1}`; // Default display text
+                    if (segment.text) {
+                        let textSample = '';
+                        if (typeof segment.text === 'string') {
+                            textSample = segment.text;
+                        } else if (Array.isArray(segment.text) && typeof segment.text[0] === 'string') {
+                            textSample = segment.text[0];
+                        } else if (segment.status) { // From OCR service direct status
+                            textSample = `Status: ${segment.status}`;
+                        } else if (segment.file) { // From OCR service direct file
+                             textSample = `File: ${segment.file.split('/').pop()}`;
+                        }
+                        if (textSample) {
+                            const truncatedText = textSample.substring(0, 30);
+                            displayText = `Segment ${index + 1}: ${truncatedText}${textSample.length > 30 ? '...' : ''}`;
+                        }
+                    } else if (segment.id) { // Fallback to segment.id if no text
+                         displayText = `Segment ${index + 1} (ID: ${segment.id})`;
                     }
+                    
+                    option.textContent = displayText;
+                    segmentSelect.appendChild(option);
+                });
+                if (segmentLoading) segmentLoading.textContent = `${segments.length} segments detected`;
+
+                const urlParams = new URLSearchParams(window.location.search);
+                const selectedSegmentFromUrl = urlParams.get('selected_segment'); // This should be an index
+                
+                if (selectedSegmentFromUrl !== null) {
+                    segmentSelect.value = selectedSegmentFromUrl;
                 }
-                */
+
+            } else {
+                 if (segmentLoading) segmentLoading.textContent = "No segments detected by OCR.";
             }
         }
         
@@ -433,15 +477,19 @@
             console.log(`[loadLineSegments] Called for folder: "${folder}", pageId: "${pageId}"`);
 
             if (!lineSegmentsContainer || !lineSegmentsNav || !selectedLineImageEl || !selectedLineTextEl) {
-                console.error("[loadLineSegments] Critical HTML elements for segment navigation not found! Ensure IDs 'line-segments-container', and classes '.line-segments-nav', '.selected-line-image', '.selected-line-text' exist.");
+                console.error("[loadLineSegments] Critical HTML elements for segment navigation not found!");
                 return;
             }
 
-            // Reset and hide the container initially
             lineSegmentsNav.innerHTML = ''; 
             selectedLineImageEl.innerHTML = ''; 
             selectedLineTextEl.innerText = ''; 
             lineSegmentsContainer.style.display = 'none'; 
+            currentSegmentsList = []; // Reset global list
+            currentSegmentDisplayIndex = -1; // Reset index
+            currentSegmentFolderGlobal = folder; // Store for use by displaySegmentByIndex
+            currentSegmentPageIdGlobal = pageId; // Store for use by displaySegmentByIndex
+            updateNavigationButtons(); // Initially disable buttons
 
             const segmentsUrl = `{{ url_for('app.get_segments', user_id='USERID', folder='FOLDER', page_id='PAGEID') }}`
                 .replace('USERID', '{{ session.get("user_id", "anonymous") }}')
@@ -462,16 +510,17 @@
                     return response.json();
                 })
                 .then(data => {
-                    console.log('[loadLineSegments] Segments data received:', JSON.stringify(data, null, 2)); // VERY IMPORTANT LOG
+                    console.log('[loadLineSegments] Segments data received:', JSON.stringify(data, null, 2)); 
                     
                     if (data && data.success === true && data.segments && Array.isArray(data.segments) && data.segments.length > 0) {
-                        console.log(`[loadLineSegments] ${data.segments.length} segments found. Displaying container.`);
-                        lineSegmentsContainer.style.display = 'block'; // Make the container visible
+                        currentSegmentsList = data.segments; // Store fetched segments globally
+                        console.log(`[loadLineSegments] ${currentSegmentsList.length} segments found. Displaying container.`);
+                        lineSegmentsContainer.style.display = 'block'; 
 
-                        data.segments.forEach((segment, index) => {
+                        currentSegmentsList.forEach((segment, index) => {
                             if (!segment || typeof segment !== 'object') {
                                 console.warn(`[loadLineSegments] Segment at index ${index} is not a valid object:`, segment);
-                                return; // Skip invalid segment
+                                return; 
                             }
 
                             const segmentBtn = document.createElement('button');
@@ -492,51 +541,47 @@
                                 }
                                 
                                 if (textSample) {
-                                    segmentFullText = textSample; // Full text for title
+                                    segmentFullText = textSample; 
                                     let shortSample = textSample.trim().substring(0,15);
                                     btnText = `${index + 1}: ${shortSample}${textSample.length > 15 ? '...' : ''}`;
                                 }
                             }
                             segmentBtn.textContent = btnText;
                             segmentBtn.title = segmentFullText;
-                            // Ensure segment.id is a string or number for the dataset/attribute
-                            segmentBtn.dataset.segmentId = String(segment.id || index); 
-
-                            console.log(`[loadLineSegments] Creating button for segment ${index} (ID: ${segment.id || 'N/A'}), Text: "${btnText}"`);
+                            segmentBtn.dataset.segmentIndex = index; // Store index for easy access
 
                             segmentBtn.onclick = function(e) {
                                 e.preventDefault();
-                                console.log('[loadLineSegments] Button clicked for segment data:', segment);
-                                showSelectedSegment(folder, pageId, segment); // Pass the full segment object
-                                document.querySelectorAll('.segment-btn').forEach(btn => {
-                                    btn.style.backgroundColor = '#f1f3f5'; btn.style.borderColor = '#dee2e6'; btn.style.fontWeight = 'normal';
-                                });
-                                segmentBtn.style.backgroundColor = '#e9ecef'; segmentBtn.style.borderColor = '#adb5bd'; segmentBtn.style.fontWeight = 'bold';
+                                const clickedIndex = parseInt(this.dataset.segmentIndex, 10);
+                                displaySegmentByIndex(clickedIndex);
                             };
                             lineSegmentsNav.appendChild(segmentBtn);
                         });
 
-                        if (data.segments[0]) {
-                            console.log('[loadLineSegments] Auto-selecting first segment.');
-                            showSelectedSegment(folder, pageId, data.segments[0]);
-                            const firstBtn = lineSegmentsNav.querySelector('.segment-btn');
-                            if (firstBtn) {
-                                firstBtn.style.backgroundColor = '#e9ecef'; firstBtn.style.borderColor = '#adb5bd'; firstBtn.style.fontWeight = 'bold';
-                            }
+                        if (currentSegmentsList.length > 0) {
+                            displaySegmentByIndex(0); // Display the first segment
+                        } else {
+                             updateNavigationButtons(); // Ensure buttons are disabled if no segments
                         }
                     } else {
-                        console.log('[loadLineSegments] No valid segments found (or data.success not true / segments array empty). Segment navigation will remain hidden.');
+                        console.log('[loadLineSegments] No valid segments found. Segment navigation will remain hidden.');
                         lineSegmentsContainer.style.display = 'none';
+                        currentSegmentsList = [];
+                        currentSegmentDisplayIndex = -1;
+                        updateNavigationButtons();
                         if (data && data.error) console.warn(`[loadLineSegments] Error from /get_segments: ${data.error}`);
                     }
                 })
                 .catch(error => {
                     console.error('[loadLineSegments] Fetch/Processing Error for segments:', error);
                     lineSegmentsContainer.style.display = 'none';
+                    currentSegmentsList = [];
+                    currentSegmentDisplayIndex = -1;
+                    updateNavigationButtons();
                 });
         }
 
-        function showSelectedSegment(folder, pageId, segment) {
+        function showSelectedSegment(folder, pageId, segment) { // folder and pageId are now passed correctly
             const selectedLineImageContainer = document.querySelector('.selected-line-image');
             const selectedLineTextContainer = document.querySelector('.selected-line-text');
             
@@ -544,7 +589,6 @@
                 console.error('[showSelectedSegment] HTML elements for displaying selected segment not found!');
                 return;
             }
-            // Ensure segment is an object
             if (!segment || typeof segment !== 'object') {
                 console.error('[showSelectedSegment] Invalid segment data provided:', segment);
                 selectedLineImageContainer.innerHTML = `<p style="font-size:0.9em; color:red;">Error: Invalid segment data.</p>`;
@@ -554,7 +598,7 @@
             console.log('[showSelectedSegment] Displaying segment:', JSON.stringify(segment));
  
             if (segment.has_image === true && (segment.id !== null && segment.id !== undefined)) {
-                const segmentIdStr = String(segment.id); // Ensure ID is a string
+                const segmentIdStr = String(segment.id); 
                 const imageUrl = `/uploads/{{ session.get('user_id', 'anonymous') }}/${encodeURIComponent(folder)}/TOOCR/${encodeURIComponent(pageId)}/${encodeURIComponent(segmentIdStr)}.png`;
                 console.log('[showSelectedSegment] Image URL:', imageUrl);
                 selectedLineImageContainer.innerHTML = `
@@ -573,7 +617,7 @@
                     if (segment.text.length > 1 && typeof segment.text[1] === 'number') {
                         displayText += ` (Confidence: ${segment.text[1].toFixed(3)})`;
                     }
-                } else displayText = JSON.stringify(segment.text); // Fallback for other structures
+                } else displayText = JSON.stringify(segment.text); 
             } else if (segment.coords && Array.isArray(segment.coords)) {
                  displayText = `Coordinates: [${segment.coords.join(', ')}]`;
             }
@@ -581,12 +625,6 @@
             selectedLineTextContainer.innerText = displayText;
             console.log('[showSelectedSegment] Displayed text:', displayText);
         }
-
-        // Add event listener for page load
-        document.addEventListener('DOMContentLoaded', function() {
-            // You can add any initialization here if needed
-            console.log('OCR page ready');
-        });
     </script>
     {% endblock %}
 </body>
