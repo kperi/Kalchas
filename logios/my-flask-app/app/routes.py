@@ -202,6 +202,83 @@ def image_preview():
             except Exception as e:
                 current_app.logger.error(f"Error loading segment data: {str(e)}")
 
+    # New logic to determine image filename using selected_segment as an INDEX
+    resolved_segment_image_filename = None
+    selected_segment_id_display = selected_segment  # What to show in the H5 tag
+
+    if selected_segment is not None:  # selected_segment is from the dropdown
+        page_id = request.args.get("selected_png").split(".")[0]
+
+        # Logic to load segment_data (JSON) - this might use actual_segment_data_to_load
+        # ... ensure segment_data is loaded ...
+
+        segment_image_directory = os.path.join(
+            current_app.config["UPLOAD_FOLDER"],
+            session.get("user_id", "anonymous"),
+            selected_folder,
+            "TOOCR",
+            page_id,
+        )
+        if os.path.isdir(segment_image_directory):
+            try:
+                # Ensure PNGs are sorted consistently (e.g., numerically if names are "0.png", "1.png", "10.png")
+                # A natural sort function might be needed for robust sorting of names like "1.png", "2.png", "10.png".
+                # For simple "0.png", "1.png" ... "9.png", "10.png", basic sort is fine.
+                png_filenames = sorted(
+                    [
+                        f
+                        for f in os.listdir(segment_image_directory)
+                        if f.lower().endswith(".png")
+                    ]
+                )
+
+                segment_index_from_dropdown = int(
+                    selected_segment
+                )  # Assumes selected_segment is a 0-based index string
+
+                if 0 <= segment_index_from_dropdown < len(png_filenames):
+                    resolved_segment_image_filename = png_filenames[
+                        segment_index_from_dropdown
+                    ]
+                    # If you also want to display the original ID (if it was different from index)
+                    # selected_segment_id_display = os.path.splitext(resolved_segment_image_filename)[0]
+                else:
+                    current_app.logger.warning(
+                        f"Segment index {segment_index_from_dropdown} out of bounds."
+                    )
+                    # Fallback: try to use selected_segment as a direct name if index fails
+                    if f"{selected_segment}.png" in png_filenames:
+                        resolved_segment_image_filename = f"{selected_segment}.png"
+                    else:
+                        resolved_segment_image_filename = (
+                            "error_image_not_found.png"  # Placeholder
+                        )
+            except ValueError:
+                current_app.logger.error(
+                    f"Could not convert selected_segment '{selected_segment}' to an integer index. Trying as direct filename."
+                )
+                # Fallback: treat selected_segment as a direct filename base
+                if os.path.exists(
+                    os.path.join(segment_image_directory, f"{selected_segment}.png")
+                ):
+                    resolved_segment_image_filename = f"{selected_segment}.png"
+                else:
+                    resolved_segment_image_filename = (
+                        "error_filename_invalid.png"  # Placeholder
+                    )
+            except Exception as e:
+                current_app.logger.error(f"Error resolving segment image filename: {e}")
+                resolved_segment_image_filename = (
+                    "error_processing_image_list.png"  # Placeholder
+                )
+        else:
+            current_app.logger.warning(
+                f"Segment image directory not found: {segment_image_directory}"
+            )
+            resolved_segment_image_filename = (
+                "error_directory_not_found.png"  # Placeholder
+            )
+
     return render_template(
         "image_preview.html",
         folders=ocr_ready_folders,
@@ -209,6 +286,8 @@ def image_preview():
         png_files=png_files,
         selected_segment=selected_segment,
         segment_data=segment_data,
+        resolved_segment_image_filename=resolved_segment_image_filename,
+        selected_segment_id_display=selected_segment_id_display,
     )
 
 
@@ -925,6 +1004,13 @@ def get_segments(user_id, folder, page_id):
             page_id,
         )
 
+        import glob
+
+        pngs = glob.glob(segments_dir + "/*.png")
+        pngs = sorted(pngs)
+        for png in pngs:
+            logger.info(f"PNG FILE IS {png}")
+
         logger.info(f"Segments path = {segments_dir}")
         # Try the directory of individual segment files
         if os.path.exists(segments_dir) and os.path.isdir(segments_dir):
@@ -967,7 +1053,9 @@ def get_segment_image(user_id, folder, page_id, segment_id):
         page_id,  # Segment images are directly under the page_id directory
     )
 
-    image_path = os.path.join(segments_dir, f"{segment_id}.png")
+    logger.info(f"SEGMENTS DIR: {segments_dir}")
+
+    image_path = os.path.join(segments_dir, f"{int(segment_id):03d}.png")
     current_app.logger.info(f"Attempting to serve segment image: {image_path}")
 
     if not os.path.exists(segments_dir):
@@ -981,7 +1069,7 @@ def get_segment_image(user_id, folder, page_id, segment_id):
         return "Segment image not found", 404
 
     try:
-        return send_from_directory(segments_dir, f"{segment_id}.png")
+        return send_from_directory(segments_dir, f"{int(segment_id):03d}.png")
     except Exception as e:
         current_app.logger.error(f"Error serving segment image: {str(e)}")
         return f"Error serving segment image: {str(e)}", 500

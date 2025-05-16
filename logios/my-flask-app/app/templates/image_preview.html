@@ -102,14 +102,16 @@
                     {% if selected_segment %} {# selected_segment is passed from routes.py context #}
                         <div id="sidebar-selected-segment-preview" style="margin-top: 1rem; margin-bottom: 1rem; padding: 1rem; border: 1px solid #e0e0e0; background-color: #fdfdfd; border-radius: 5px;">
                             <h5 style="margin-top:0; margin-bottom: 0.5rem; font-size: 1em; color: #333;">
-                                Preview of Selected Segment: {{ selected_segment }}
+                                Preview of Selected Segment: {{ selected_segment_id_display | default(selected_segment) }} {# Assume backend provides selected_segment_id_display if different from index #}
                             </h5>
                             <div style="text-align: center; margin-bottom: 0.5rem;">
-                                <!-- Corrected path: remove the extra "segments" directory -->
-                                <img src="/uploads/{{ session.get('user_id', 'anonymous') }}/{{ selected_folder }}/TOOCR/{{ request.args.get('selected_png').split('.')[0] }}/{{ selected_segment }}.png"
-                                     alt="Selected Segment {{ selected_segment }} from sidebar"
+                                <!-- Use the filename resolved by the backend -->
+                            
+
+                                <img src="{{ url_for('app.get_segment_image', user_id=session.get('user_id', 'anonymous'), folder=selected_folder, page_id=request.args.get('selected_png').split('.')[0], segment_id=selected_segment) }}"
+                                     alt="Selected Segment Image"
                                      style="max-width: 100%; max-height: 200px; border: 1px solid #ccc; object-fit: contain; background-color: #fff;"
-                                     onerror="this.onerror=null; this.alt='Image not found or error loading.'; this.src=''; this.parentElement.innerHTML='<p style=\\\'font-size:0.9em; color:red;\\\'>Image not found for segment {{ selected_segment }}</p>';">
+                                     onerror="this.onerror=null; this.alt='Image not found or error loading.'; this.src=''; this.parentElement.innerHTML='<p style=\\\'font-size:0.9em; color:red;\\\'>Image not found: {{ resolved_segment_image_filename }}</p>';">
                             </div>
                             {% if segment_data and segment_data.text %} {# segment_data is also passed from routes.py context #}
                                 <div style="padding: 0.5rem; background-color: #f0f0f0; border-radius: 3px;">
@@ -129,6 +131,10 @@
                             {% elif segment_data %}
                                 <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">(No text data available for this segment in the JSON)</p>
                             {% endif %}
+                            <p style="font-size: 0.8em; color: #6c757d; margin-bottom: 0.3rem; word-break: break-all;">
+                                <!-- Display the path using the resolved filename -->
+                                Image Path: <code>/uploads/{{ session.get('user_id', 'anonymous') }}/{{ selected_folder }}/TOOCR/{{ request.args.get('selected_png').split('.')[0] }}/{{ resolved_segment_image_filename }}</code>
+                            </p>
                         </div>
                     {% endif %}
                     <!-- END: Preview for Segment Selected from Sidebar Dropdown -->
@@ -155,7 +161,7 @@
                         </div>
                         
                         <textarea id="ocr-result" placeholder="Extracted text will appear here..." style="height: 200px; width: 100%; font-family: monospace;" readonly></textarea>
-                        <div id="ocr-status" style="margin-top: 0.5rem; font-size: 0.8em; color: #6c757d;"></div>
+                        {# <div id="ocr-status" style="margin-top: 0.5rem; font-size: 0.8em; color: #6c757d;"></div> #}
                     </div>
                 </div>
                 {% elif selected_folder %}
@@ -233,10 +239,10 @@
                                 // Handle plain text segments
                                 const truncatedText = segment.text.substring(0, 30);
                                 displayText = `Segment ${index + 1}: ${truncatedText}${segment.text.length > 30 ? '...' : ''}`;
-                            } else if (segment.text && Array.isArray(segment.text) && segment.text[0]) {
+                            } else if (segment.text && Array.isArray(segment.text) && segment.text[0] && typeof segment.text[0] === 'string') {
                                 // Handle array text ([text, confidence])
-                                const truncatedText = segment.text[0].substring(0, 30);
-                                displayText = `Segment ${index + 1}: ${truncatedText}${segment.text[0].length > 30 ? '...' : ''}`;
+                                 const truncatedText = segment.text[0].substring(0, 30);
+                                 displayText = `Segment ${index + 1}: ${truncatedText}${segment.text[0].length > 30 ? '...' : ''}`;
                             } else if (segment.coords) {
                                 // Handle segments with coords but no clear text
                                 displayText = `Segment ${index + 1}: [${segment.coords.join(', ')}]`;
@@ -292,9 +298,13 @@
                 
                 // Handle different segment structures
                 let displayText = '';
-                if (segment.text) {
+                if (segment.text && typeof segment.text === 'string') {
                     // Normal text segment
                     displayText = `Segment ${index + 1}: ${segment.text.substring(0, 30)}${segment.text.length > 30 ? '...' : ''}`;
+                } else if (segment.text && Array.isArray(segment.text) && segment.text[0] && typeof segment.text[0] === 'string') {
+                    // Handle array text ([text, confidence])
+                     const truncatedText = segment.text[0].substring(0, 30);
+                     displayText = `Segment ${index + 1}: ${truncatedText}${segment.text[0].length > 30 ? '...' : ''}`;
                 } else if (segment.status) {
                     // Status segment from OCR service
                     displayText = `Status: ${segment.status}`;
@@ -316,8 +326,13 @@
             
             if (selectedSegment) {
                 segmentSelect.value = selectedSegment;
+                // The following block that calls showSelectedSegment and shows line-segments-container
+                // is removed to prevent redundant updates to the main OCR display area
+                // when a segment is selected via the sidebar (URL parameter).
+                // The server-side rendering already handles a preview for this case.
+                /*
                 // Find and display the selected segment
-                const segment = segments.find(s => s.id === selectedSegment);
+                const segment = segments.find(s => String(s.id) === String(selectedSegment));
                 if (segment) {
                     showSelectedSegment(folder, pageId, segment);
                     
@@ -327,6 +342,7 @@
                         lineSegmentsContainer.style.display = 'block';
                     }
                 }
+                */
             }
         }
         
@@ -536,12 +552,10 @@
                 return;
             }
             console.log('[showSelectedSegment] Displaying segment:', JSON.stringify(segment));
-
-            // Update image: Path includes '/segments/' subdirectory
-            // Example: /uploads/USER/FOLDER/TOOCR/segments/PAGE_ID/SEGMENT_ID.png
+ 
             if (segment.has_image === true && (segment.id !== null && segment.id !== undefined)) {
                 const segmentIdStr = String(segment.id); // Ensure ID is a string
-                const imageUrl = `/uploads/{{ session.get('user_id', 'anonymous') }}/${encodeURIComponent(folder)}/TOOCR/segments/${encodeURIComponent(pageId)}/${encodeURIComponent(segmentIdStr)}.png`;
+                const imageUrl = `/uploads/{{ session.get('user_id', 'anonymous') }}/${encodeURIComponent(folder)}/TOOCR/${encodeURIComponent(pageId)}/${encodeURIComponent(segmentIdStr)}.png`;
                 console.log('[showSelectedSegment] Image URL:', imageUrl);
                 selectedLineImageContainer.innerHTML = `
                     <img src="${imageUrl}" alt="Line segment ${segmentIdStr}" style="max-width: 100%; max-height:150px; border: 1px solid #dee2e6; object-fit: contain;"
