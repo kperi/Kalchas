@@ -74,7 +74,7 @@
             {% if selected_folder and image_to_crop_filename %}
             <div style="text-align: center; margin-top: 1.5rem;">
                 <button id="crop-button-action" class="gradio-button gradio-button-primary">Crop Selected Area</button>
-                <form id="crop-result-form" method="POST" action="{{ url_for('app.crop_image') }}" style="display:none;">
+                <form id="crop-result-form" method="POST" action="{{ url_for('app.process_cropped_image') }}" style="display:none;">
                     <input type="hidden" name="original_folder" value="{{ selected_folder }}">
                     <input type="hidden" name="original_filename" value="{{ image_to_crop_filename }}">
                     <input type="hidden" id="cropped-image-data" name="cropped_image_data">
@@ -143,9 +143,8 @@
                             if (cropperInstance) {
                                 const canvas = cropperInstance.getCroppedCanvas({});
                                 if (canvas) {
-                                    croppedImageDataInput.value = canvas.toDataURL('image/png'); 
-                                    alert('Cropped image data captured. Implement submission (e.g., via AJAX) to process.');
-                                    // cropResultForm.submit(); 
+                                    croppedImageDataInput.value = canvas.toDataURL('image/png');
+                                    cropResultForm.submit(); // Actually submit the form
                                 } else {
                                     alert('Could not get cropped canvas.');
                                 }
@@ -155,6 +154,26 @@
                 }
             });
         </script>
+        {% endif %}
+
+        {% if selected_folder and image_to_crop_filename and cropped_images %}
+        <div class="gradio-component-group" style="margin-top: 2rem;">
+            <h3>Existing Crops for This Page</h3>
+            <div class="crop-gallery" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; margin-top: 15px;">
+                {% for cropped_img in cropped_images %}
+                <div class="crop-thumbnail" style="border: 1px solid #ddd; border-radius: 4px; padding: 10px; text-align: center;">
+                    <!-- Use url_for to generate the correct URL path -->
+                    <img src="{{ url_for('app.uploaded_cropped_file', 
+                              user_id=session.get('user_id', 'anonymous'), 
+                              folder=selected_folder,
+                              filename=cropped_img) }}"
+                         alt="Cropped section" 
+                         style="max-width: 100%; max-height: 120px; margin-bottom: 8px;">
+                    <div style="font-size: 0.8em; word-break: break-all;">{{ cropped_img }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
         {% endif %}
         {% endblock %}
     </div>

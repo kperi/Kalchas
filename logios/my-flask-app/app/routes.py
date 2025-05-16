@@ -12,6 +12,8 @@ from flask import (
 from werkzeug.utils import secure_filename
 from pdf2image import convert_from_path
 import os
+import base64
+import re
 
 from loguru import logger
 
@@ -186,23 +188,20 @@ def crop_image():
     selected_folder = request.args.get("selected_folder")
     image_to_crop_filename = request.args.get("image_file")
 
-    # Initialize png_files list
+    # Initialize png_files list and cropped_images list
     png_files_in_selected_folder = []
+    cropped_images = []
 
     # If a folder is selected, get the PNG files in that folder
     if selected_folder:
         folder_path = os.path.join(upload_root, selected_folder)
 
-        # Debug output for server logs
-        current_app.logger.info(f"Looking for PNG files in: {folder_path}")
-
         if os.path.exists(folder_path):
             try:
                 # List all files in the folder
                 all_files = os.listdir(folder_path)
-                current_app.logger.info(f"All files in folder: {all_files}")
 
-                # Filter for PNG files only
+                # Filter for PNG files only (exclude cropped subfolder)
                 png_files_in_selected_folder = [
                     f for f in all_files if f.lower().endswith(".png")
                 ]
@@ -216,14 +215,23 @@ def crop_image():
                     )
                 )
 
-                current_app.logger.info(
-                    f"PNG files found: {png_files_in_selected_folder}"
-                )
+                # Check for cropped images if an image is selected
+                if image_to_crop_filename:
+                    cropped_dir = os.path.join(folder_path, "cropped")
+                    original_page_base = os.path.splitext(image_to_crop_filename)[0]
+
+                    if os.path.exists(cropped_dir):
+                        # Get all cropped images for the selected page
+                        cropped_images = [
+                            f
+                            for f in os.listdir(cropped_dir)
+                            if f.startswith(f"{original_page_base}_cropped_")
+                            and f.endswith(".png")
+                        ]
+                        cropped_images.sort()
+
             except Exception as e:
-                current_app.logger.error(f"Error listing PNG files: {str(e)}")
-                png_files_in_selected_folder = []
-        else:
-            current_app.logger.error(f"Selected folder does not exist: {folder_path}")
+                current_app.logger.error(f"Error listing files: {str(e)}")
 
     return render_template(
         "crop_menu.html",
@@ -231,6 +239,7 @@ def crop_image():
         selected_folder=selected_folder,
         png_files_in_selected_folder=png_files_in_selected_folder,
         image_to_crop_filename=image_to_crop_filename,
+        cropped_images=cropped_images,
     )
 
 
@@ -286,6 +295,25 @@ def uploaded_file(user_id, folder, filename):
 
         current_app.logger.error(f"Traceback: {traceback.format_exc()}")
         return "Error serving file", 500
+
+
+@app.route("/uploads/<user_id>/<folder>/cropped/<filename>")
+def uploaded_cropped_file(user_id, folder, filename):
+    """Serve cropped image files from the cropped subdirectory"""
+    upload_dir_base = current_app.config["UPLOAD_FOLDER"]
+    # Path to the cropped folder containing the requested file
+    directory_to_serve_from = os.path.join(
+        upload_dir_base, str(user_id), folder, "cropped"
+    )
+
+    current_app.logger.info(f"Attempting to serve cropped file: {filename}")
+    current_app.logger.info(f"From cropped directory: {directory_to_serve_from}")
+
+    try:
+        return send_from_directory(directory_to_serve_from, filename)
+    except Exception as e:
+        current_app.logger.error(f"Error serving cropped file: {str(e)}")
+        return "Error serving cropped file", 500
 
 
 @app.route("/admin")
@@ -346,3 +374,83 @@ def fs_check():
                     results.append(f"Dir {bd_path} contents: {os.listdir(bd_path)}")
 
     return "<br>".join(results), 200, {"Content-Type": "text/html"}
+
+
+@app.route("/process_cropped_image", methods=["POST"])
+def process_cropped_image():
+    # Get form data
+    original_folder = request.form.get("original_folder")
+    original_filename = request.form.get("original_filename")
+    cropped_image_data = request.form.get("cropped_image_data")
+
+    # Validate input
+    if not all([original_folder, original_filename, cropped_image_data]):
+        flash("Missing required crop parameters", "danger")
+        return redirect(url_for("app.crop_image"))
+
+    # Get the user ID (or use anonymous)
+    user_id = session.get("user_id", "anonymous")
+
+    # Define the directory where the original file is stored
+    original_dir = os.path.join(
+        current_app.config["UPLOAD_FOLDER"],
+        str(user_id),
+        original_folder,
+    )
+
+    # Create a 'cropped' subfolder if it doesn't exist
+    cropped_dir = os.path.join(original_dir, "cropped")
+    os.makedirs(cropped_dir, exist_ok=True)
+
+    # Get the base filename without extension (e.g., "001" from "001.png")
+    original_page_base = os.path.splitext(original_filename)[0]
+
+    # Find existing cropped images to determine the next number
+    existing_crops = [
+        f
+        for f in os.listdir(cropped_dir)
+        if f.startswith(f"{original_page_base}_cropped_")
+    ]
+
+    # Extract numbers from existing crop files using regex
+    crop_numbers = []
+    for crop_file in existing_crops:
+        match = re.search(r"_cropped_(\d{3})\.png$", crop_file)
+        if match:
+            crop_numbers.append(int(match.group(1)))
+
+    # Determine the next crop number
+    next_crop_num = 1
+    if crop_numbers:
+        next_crop_num = max(crop_numbers) + 1
+
+    # Format the new filename: original_page_cropped_XXX.png
+    cropped_filename = f"{original_page_base}_cropped_{next_crop_num:03d}.png"
+    cropped_file_path = os.path.join(cropped_dir, cropped_filename)
+
+    try:
+        # Remove the data:image/png;base64, part from the data URL
+        image_data = re.sub(r"^data:image/\w+;base64,", "", cropped_image_data)
+
+        # Decode the base64 data
+        binary_data = base64.b64decode(image_data)
+
+        # Save the cropped image
+        with open(cropped_file_path, "wb") as f:
+            f.write(binary_data)
+
+        current_app.logger.info(f"Saved cropped image to {cropped_file_path}")
+        flash(f"Successfully saved cropped image as {cropped_filename}", "success")
+
+    except Exception as e:
+        current_app.logger.error(f"Error saving cropped image: {str(e)}")
+        flash(f"Error saving cropped image: {str(e)}", "danger")
+
+    # Redirect back to the crop page with the same folder and file selected
+    return redirect(
+        url_for(
+            "app.crop_image",
+            selected_folder=original_folder,
+            image_file=original_filename,
+        )
+    )
