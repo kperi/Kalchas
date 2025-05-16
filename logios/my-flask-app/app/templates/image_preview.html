@@ -16,12 +16,12 @@
     <div class="gradio-two-column-layout">
         <aside class="gradio-sidebar">
             <div class="gradio-component-group">
-                <h3>Document Navigation</h3>
+                <h3>OCR-Ready Documents</h3>
                 <form method="get" action="{{ url_for('app.image_preview') }}" id="folder-form">
                     <div style="margin-bottom: 1rem;">
                         <label for="folder-select">Select Document:</label>
                         <select name="selected_folder" id="folder-select" onchange="document.getElementById('folder-form').submit()">
-                            <option value="">-- Select Document --</option>
+                            <option value="">-- Select OCR-Ready Document --</option>
                             {% for folder in folders %}
                                 <option value="{{ folder }}" {% if folder == selected_folder %}selected{% endif %}>{{ folder }}</option>
                             {% endfor %}
@@ -34,37 +34,128 @@
                 <form method="get" action="{{ url_for('app.image_preview') }}" id="file-form">
                     <input type="hidden" name="selected_folder" value="{{ selected_folder }}">
                     <div style="margin-bottom: 1rem;">
-                        <label for="png-select">Select Page:</label>
+                        <label for="png-select">Select Page/Crop:</label>
                         <select name="selected_png" id="png-select" onchange="document.getElementById('file-form').submit()">
                             <option value="">-- Select Page --</option>
                             {% for png in png_files %}
-                                <option value="{{ png }}" {% if png == request.args.get('selected_png') %}selected{% endif %}>Page {{ png.split('.')[0] | int }}</option>
+                                <option value="{{ png }}" {% if png == request.args.get('selected_png') %}selected{% endif %}>
+                                    {% if 'crop' in png %}
+                                        {{ png.split('.')[0] }} <!-- Show full name for crops -->
+                                    {% else %}
+                                        Page {{ png.split('_')[1].split('.')[0] | int }} <!-- Extract page number for regular pages -->
+                                    {% endif %}
+                                </option>
                             {% endfor %}
                         </select>
                     </div>
                     <noscript><button type="submit" class="gradio-button gradio-button-secondary">Show Page</button></noscript>
                 </form>
+
+                {% if selected_folder and request.args.get('selected_png') %}
+                <form method="get" action="{{ url_for('app.image_preview') }}" id="segment-form">
+                    <input type="hidden" name="selected_folder" value="{{ selected_folder }}">
+                    <input type="hidden" name="selected_png" value="{{ request.args.get('selected_png') }}">
+                    <div style="margin-top: 1rem;">
+                        <label for="segment-select">Select Detected Segment:</label>
+                        <select name="selected_segment" id="segment-select" onchange="document.getElementById('segment-form').submit()">
+                            <option value="">-- Select Segment --</option>
+                            <!-- Segments will be populated in JavaScript after OCR completes -->
+                        </select>
+                        <div id="segment-loading" style="font-size: 0.8em; margin-top: 5px; color: #6c757d;">
+                            Run OCR to detect segments
+                        </div>
+                    </div>
+                    <noscript><button type="submit" class="gradio-button gradio-button-secondary">View Segment</button></noscript>
+                </form>
+                {% endif %}
+
                 {% elif selected_folder %}
-                <p class="gradio-placeholder-text" style="font-size: 0.9em; margin-top: 1rem;">No pages found in this document.</p>
+                <p class="gradio-placeholder-text" style="font-size: 0.9em; margin-top: 1rem;">No pages found in the OCR folder.</p>
+                {% endif %}
+                
+                {% if folders|length == 0 %}
+                <div style="margin-top: 1rem; padding: 1rem; background-color: #fff3cd; border: 1px solid #ffeeba; border-radius: 5px;">
+                    <p style="margin: 0; color: #856404; font-size: 0.9em;">No OCR-ready documents found.</p>
+                    <p style="margin-top: 0.5rem; font-size: 0.8em;">Documents become OCR-ready after using the "Move to OCR" button in the Image Cropping Tool.</p>
+                    <a href="{{ url_for('app.crop_image') }}" class="gradio-button gradio-button-secondary" style="margin-top: 0.5rem; font-size: 0.8em;">Go to Image Cropping Tool</a>
+                </div>
                 {% endif %}
             </div>
         </aside>
 
         <main class="gradio-main-content">
             <div class="gradio-component-group">
-                <h2>Page Preview & OCR</h2>
-                <h1> {{session.get('user_id', 'anonymous') }} // {{selected_folder }} // {{request.args.get('selected_png')}} </h1>
+                <h2>OCR Document Preview</h2>
+                
                 {% if selected_folder and request.args.get('selected_png') %}
                 <div class="gradio-display-area" style="flex-direction: column; align-items: stretch; gap: 1.5rem;">
-                    <div class="gradio-display-area" style="min-height: 40vh; padding:0; border: none; background: #fff;"> <!-- Inner display for image -->
+                    <div class="gradio-display-area" style="min-height: 40vh; padding:0; border: none; background: #fff;"> <!-- Inner display for main page image -->
                          <img id="preview-image"
-                             src="{{ url_for('app.uploaded_file', user_id=session.get('user_id', 'anonymous'), folder=selected_folder, filename=request.args.get('selected_png'), _external=False) }}"
+                             src="{{ url_for('app.uploaded_toocr_file', 
+                               user_id=session.get('user_id', 'anonymous'), 
+                               folder=selected_folder, 
+                               filename=request.args.get('selected_png')) }}"
                              alt="Page Preview">
                     </div>
+
+                    <!-- START: Preview for Segment Selected from Sidebar Dropdown -->
+                    {% if selected_segment %} {# selected_segment is passed from routes.py context #}
+                        <div id="sidebar-selected-segment-preview" style="margin-top: 1rem; margin-bottom: 1rem; padding: 1rem; border: 1px solid #e0e0e0; background-color: #fdfdfd; border-radius: 5px;">
+                            <h5 style="margin-top:0; margin-bottom: 0.5rem; font-size: 1em; color: #333;">
+                                Preview of Selected Segment: {{ selected_segment }}
+                            </h5>
+                            <div style="text-align: center; margin-bottom: 0.5rem;">
+                                <!-- Corrected path: remove the extra "segments" directory -->
+                                <img src="/uploads/{{ session.get('user_id', 'anonymous') }}/{{ selected_folder }}/TOOCR/{{ request.args.get('selected_png').split('.')[0] }}/{{ selected_segment }}.png"
+                                     alt="Selected Segment {{ selected_segment }} from sidebar"
+                                     style="max-width: 100%; max-height: 200px; border: 1px solid #ccc; object-fit: contain; background-color: #fff;"
+                                     onerror="this.onerror=null; this.alt='Image not found or error loading.'; this.src=''; this.parentElement.innerHTML='<p style=\\\'font-size:0.9em; color:red;\\\'>Image not found for segment {{ selected_segment }}</p>';">
+                            </div>
+                            {% if segment_data and segment_data.text %} {# segment_data is also passed from routes.py context #}
+                                <div style="padding: 0.5rem; background-color: #f0f0f0; border-radius: 3px;">
+                                    <p style="font-family: monospace; white-space: pre-wrap; font-size: 0.9em; margin:0; color: #333;">
+                                        {% if segment_data.text is string %}
+                                            {{ segment_data.text }}
+                                        {% elif segment_data.text is iterable and segment_data.text[0] is string %}
+                                            {{ segment_data.text[0] }} {# Assuming [text, confidence] format #}
+                                            {% if segment_data.text[1] is number %}
+                                                (Confidence: {{ "%.3f"|format(segment_data.text[1]) }})
+                                            {% endif %}
+                                        {% else %}
+                                            {{ segment_data.text | tojson }} {# Fallback for other structures #}
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            {% elif segment_data %}
+                                <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">(No text data available for this segment in the JSON)</p>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                    <!-- END: Preview for Segment Selected from Sidebar Dropdown -->
+
                     <div class="ocr-section gradio-component-group" style="margin-top:0; padding: 1rem; background-color: #f9fafb;"> <!-- Nested component group for OCR -->
                         <h4>Text Recognition (OCR)</h4>
-                        <button class="gradio-button gradio-button-primary" onclick="alert('OCR functionality to be implemented!')" style="margin-bottom: 1rem;">Extract Text from Page</button>
-                        <textarea placeholder="Extracted text will appear here..." readonly></textarea>
+                        <button class="gradio-button gradio-button-primary" onclick="performOCR()" style="margin-bottom: 1rem;">Extract Text from Page</button>
+                        
+                        <!-- Line Segments Navigation - Initially hidden -->
+                        <div id="line-segments-container" style="display: none; margin-bottom: 1rem;">
+                            <h5>Line Segments</h5>
+                            <div class="line-segments-nav" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; max-height: 200px; overflow-y: auto;">
+                                <!-- Line segments will be added here dynamically by loadLineSegments JS function -->
+                            </div>
+                            
+                            <div class="selected-line-container" style="margin-top: 1rem; border: 1px solid #dee2e6; border-radius: 5px; padding: 10px;">
+                                <div class="selected-line-image" style="text-align: center; margin-bottom: 10px;">
+                                    <!-- Selected line image will be shown here by showSelectedSegment JS function -->
+                                </div>
+                                <div class="selected-line-text" style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; font-family: monospace;">
+                                    <!-- Selected line text will be shown here by showSelectedSegment JS function -->
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <textarea id="ocr-result" placeholder="Extracted text will appear here..." style="height: 200px; width: 100%; font-family: monospace;" readonly></textarea>
+                        <div id="ocr-status" style="margin-top: 0.5rem; font-size: 0.8em; color: #6c757d;"></div>
                     </div>
                 </div>
                 {% elif selected_folder %}
@@ -73,12 +164,416 @@
                 </div>
                 {% else %}
                 <div class="gradio-display-area">
-                    <p class="gradio-placeholder-text">Please select a document from the sidebar to view its pages.</p>
+                    <p class="gradio-placeholder-text">Please select an OCR-ready document from the sidebar.</p>
                 </div>
                 {% endif %}
             </div>
         </main>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('OCR page ready');
+            
+            // Check if a page is selected and try to load segments
+            const selectedPng = "{{ request.args.get('selected_png') }}";
+            const selectedFolder = "{{ selected_folder }}";
+            
+            if (selectedPng && selectedFolder) {
+                // Extract the base filename without extension
+                const pageId = selectedPng.split('.')[0];
+                
+                // Try to load existing segments if available
+                checkForExistingSegments(selectedFolder, pageId);
+            }
+        });
+        
+        function checkForExistingSegments(folder, pageId) {
+            const segmentLoading = document.getElementById('segment-loading');
+            const segmentSelect = document.getElementById('segment-select');
+            
+            if (!segmentLoading || !segmentSelect) return;
+            
+            segmentLoading.textContent = "Checking for existing segments...";
+            
+            // Clear existing options except the first one
+            while (segmentSelect.options.length > 1) {
+                segmentSelect.remove(1);
+            }
+            
+            // Get the URL for segments endpoint - using the correct path structure
+            const segmentsUrl = `{{ url_for('app.get_segments', user_id='USERID', folder='FOLDER', page_id='PAGEID') }}`
+                .replace('USERID', '{{ session.get("user_id", "anonymous") }}')
+                .replace('FOLDER', encodeURIComponent(folder))
+                .replace('PAGEID', encodeURIComponent(pageId));
+            
+            console.log('Fetching segments from:', segmentsUrl);
+            
+            // Try to get segments for this page
+            fetch(segmentsUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Failed to load segments: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Segments response:', data);
+                    
+                    // Check if we have segments
+                    if (data.success && data.segments && Array.isArray(data.segments) && data.segments.length > 0) {
+                        // We have segments - populate dropdown
+                        data.segments.forEach((segment, index) => {
+                            const option = document.createElement('option');
+                            option.value = segment.id || `${index}`;
+                            
+                            // Create display text based on segment content
+                            let displayText = '';
+                            if (segment.text && typeof segment.text === 'string') {
+                                // Handle plain text segments
+                                const truncatedText = segment.text.substring(0, 30);
+                                displayText = `Segment ${index + 1}: ${truncatedText}${segment.text.length > 30 ? '...' : ''}`;
+                            } else if (segment.text && Array.isArray(segment.text) && segment.text[0]) {
+                                // Handle array text ([text, confidence])
+                                const truncatedText = segment.text[0].substring(0, 30);
+                                displayText = `Segment ${index + 1}: ${truncatedText}${segment.text[0].length > 30 ? '...' : ''}`;
+                            } else if (segment.coords) {
+                                // Handle segments with coords but no clear text
+                                displayText = `Segment ${index + 1}: [${segment.coords.join(', ')}]`;
+                            } else {
+                                // Generic fallback
+                                displayText = `Segment ${index + 1}`;
+                            }
+                            
+                            option.textContent = displayText;
+                            segmentSelect.appendChild(option);
+                        });
+                        
+                        segmentLoading.textContent = `${data.segments.length} segments available`;
+                        
+                        // Check if we have a selected segment in URL
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const selectedSegment = urlParams.get('selected_segment');
+                        
+                        if (selectedSegment) {
+                            segmentSelect.value = selectedSegment;
+                        }
+                    } else {
+                        // No segments found
+                        segmentLoading.textContent = "No segments found. Run OCR to detect segments.";
+                        
+                        // Log more details if there's an error
+                        if (data.error) {
+                            console.warn(`Error: ${data.error}`);
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading segments:', error);
+                    segmentLoading.textContent = "Error loading segments. Run OCR to detect segments.";
+                });
+        }
+        
+        function populateSegmentsDropdown(folder, pageId, segments) {
+            const segmentSelect = document.getElementById('segment-select');
+            if (!segmentSelect) return;
+            
+            console.log('Populating segments dropdown with:', segments);
+            
+            // Clear existing options except the first one
+            while (segmentSelect.options.length > 1) {
+                segmentSelect.remove(1);
+            }
+            
+            // Add each segment as an option
+            segments.forEach((segment, index) => {
+                const option = document.createElement('option');
+                option.value = segment.id || `${index}`;
+                
+                // Handle different segment structures
+                let displayText = '';
+                if (segment.text) {
+                    // Normal text segment
+                    displayText = `Segment ${index + 1}: ${segment.text.substring(0, 30)}${segment.text.length > 30 ? '...' : ''}`;
+                } else if (segment.status) {
+                    // Status segment from OCR service
+                    displayText = `Status: ${segment.status}`;
+                } else if (segment.file) {
+                    // File reference segment
+                    displayText = `File: ${segment.file.split('/').pop()}`;
+                } else {
+                    // Generic fallback
+                    displayText = `Segment ${index + 1}`;
+                }
+                
+                option.textContent = displayText;
+                segmentSelect.appendChild(option);
+            });
+            
+            // Check if we have a selected segment in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const selectedSegment = urlParams.get('selected_segment');
+            
+            if (selectedSegment) {
+                segmentSelect.value = selectedSegment;
+                // Find and display the selected segment
+                const segment = segments.find(s => s.id === selectedSegment);
+                if (segment) {
+                    showSelectedSegment(folder, pageId, segment);
+                    
+                    // Show the segments container
+                    const lineSegmentsContainer = document.getElementById('line-segments-container');
+                    if (lineSegmentsContainer) {
+                        lineSegmentsContainer.style.display = 'block';
+                    }
+                }
+            }
+        }
+        
+        function performOCR() {
+            const resultArea = document.getElementById('ocr-result');
+            const ocrButton = document.querySelector('.ocr-section button');
+            const lineSegmentsContainer = document.getElementById('line-segments-container');
+            const segmentLoading = document.getElementById('segment-loading');
+
+            ocrButton.disabled = true;
+            ocrButton.textContent = "Processing...";
+            resultArea.value = "OCR processing in progress. Please wait...";
+            if(lineSegmentsContainer) lineSegmentsContainer.style.display = 'none';
+            if (segmentLoading) segmentLoading.textContent = "Processing segments...";
+
+            const selectedPng = "{{ request.args.get('selected_png') }}";
+            const selectedFolder = "{{ selected_folder }}";
+
+            fetch('{{ url_for("app.process_ocr") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ folder: selectedFolder, filename: selectedPng })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`OCR server returned status ${response.status}`);
+                }
+                return response.json();
+            })
+            .then((data) => {
+                console.log('performOCR - OCR Response:', data);
+                if (data.success) {
+                    // Safely set the main OCR text result
+                    if (typeof data.text === 'string') {
+                        resultArea.value = data.text;
+                    } else if (data.segments && data.segments.length > 0) {
+                        let fullText = data.segments.map(s => {
+                            if (typeof s.text === 'string') return s.text;
+                            if (Array.isArray(s.text) && typeof s.text[0] === 'string') return s.text[0];
+                            return '';
+                        }).join('\n');
+                        resultArea.value = fullText.trim() || "Segments processed. See details below.";
+                    } else if (data.status) {
+                         resultArea.value = `OCR Status: ${data.status}${data.file ? '\nFile: ' + data.file : ''}`;
+                    } else {
+                        resultArea.value = "OCR processing complete. View segments below.";
+                    }
+
+                    // Update the sidebar segments dropdown
+                    if (data.page_id && data.segments && data.segments.length > 0) {
+                        populateSegmentsDropdown(selectedFolder, data.page_id, data.segments);
+                        if (segmentLoading) segmentLoading.textContent = `${data.segments.length} segments detected`;
+                    } else {
+                        if (segmentLoading) segmentLoading.textContent = "No segments detected by OCR.";
+                    }
+                    
+                    // Load the main content line segment navigation buttons
+                    if (data.page_id) {
+                        console.log('performOCR - Calling loadLineSegments for page_id:', data.page_id);
+                        loadLineSegments(selectedFolder, data.page_id);
+                    } else {
+                        console.warn('performOCR - No page_id in OCR response, cannot load line segments.');
+                         if(lineSegmentsContainer) lineSegmentsContainer.style.display = 'none';
+                    }
+                } else {
+                    resultArea.value = "Error performing OCR: " + (data.error || "Unknown error");
+                    if (segmentLoading) segmentLoading.textContent = "OCR failed. Please try again.";
+                    console.error('performOCR - OCR Error:', data.error);
+                }
+            })
+            .catch(error => {
+                resultArea.value = "Error performing OCR: " + error.message;
+                console.error('performOCR - Fetch/Network Error:', error);
+                if (segmentLoading) segmentLoading.textContent = "OCR error. Please try again.";
+            })
+            .finally(() => {
+                ocrButton.disabled = false;
+                ocrButton.textContent = "Extract Text from Page";
+            });
+        }
+        
+        function loadLineSegments(folder, pageId) {
+            const lineSegmentsContainer = document.getElementById('line-segments-container');
+            const lineSegmentsNav = document.querySelector('.line-segments-nav');
+            const selectedLineImageEl = document.querySelector('.selected-line-image');
+            const selectedLineTextEl = document.querySelector('.selected-line-text');
+            
+            console.log(`[loadLineSegments] Called for folder: "${folder}", pageId: "${pageId}"`);
+
+            if (!lineSegmentsContainer || !lineSegmentsNav || !selectedLineImageEl || !selectedLineTextEl) {
+                console.error("[loadLineSegments] Critical HTML elements for segment navigation not found! Ensure IDs 'line-segments-container', and classes '.line-segments-nav', '.selected-line-image', '.selected-line-text' exist.");
+                return;
+            }
+
+            // Reset and hide the container initially
+            lineSegmentsNav.innerHTML = ''; 
+            selectedLineImageEl.innerHTML = ''; 
+            selectedLineTextEl.innerText = ''; 
+            lineSegmentsContainer.style.display = 'none'; 
+
+            const segmentsUrl = `{{ url_for('app.get_segments', user_id='USERID', folder='FOLDER', page_id='PAGEID') }}`
+                .replace('USERID', '{{ session.get("user_id", "anonymous") }}')
+                .replace('FOLDER', encodeURIComponent(folder))
+                .replace('PAGEID', encodeURIComponent(pageId));
+            
+            console.log('[loadLineSegments] Fetching segments from:', segmentsUrl);
+
+            fetch(segmentsUrl)
+                .then(response => {
+                    console.log(`[loadLineSegments] Fetch response status for "${segmentsUrl}": ${response.status}`);
+                    if (!response.ok) {
+                        // Try to get error message from response body if possible
+                        return response.text().then(text => {
+                            throw new Error(`Failed to load segments for navigation: ${response.status}. Server response: ${text}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('[loadLineSegments] Segments data received:', JSON.stringify(data, null, 2)); // VERY IMPORTANT LOG
+                    
+                    if (data && data.success === true && data.segments && Array.isArray(data.segments) && data.segments.length > 0) {
+                        console.log(`[loadLineSegments] ${data.segments.length} segments found. Displaying container.`);
+                        lineSegmentsContainer.style.display = 'block'; // Make the container visible
+
+                        data.segments.forEach((segment, index) => {
+                            if (!segment || typeof segment !== 'object') {
+                                console.warn(`[loadLineSegments] Segment at index ${index} is not a valid object:`, segment);
+                                return; // Skip invalid segment
+                            }
+
+                            const segmentBtn = document.createElement('button');
+                            segmentBtn.className = 'segment-btn';
+                            segmentBtn.style.cssText = `
+                                padding: 5px 10px; background-color: #f1f3f5; border: 1px solid #dee2e6;
+                                border-radius: 4px; cursor: pointer; min-width: 60px;
+                                text-align: center; font-size: 0.9em; margin: 2px;`;
+                            
+                            let btnText = `L${index + 1}`;
+                            let segmentFullText = `Segment ${index + 1}`;
+                            if (segment.text) {
+                                let textSample = '';
+                                if (typeof segment.text === 'string') {
+                                    textSample = segment.text;
+                                } else if (Array.isArray(segment.text) && typeof segment.text[0] === 'string') {
+                                    textSample = segment.text[0];
+                                }
+                                
+                                if (textSample) {
+                                    segmentFullText = textSample; // Full text for title
+                                    let shortSample = textSample.trim().substring(0,15);
+                                    btnText = `${index + 1}: ${shortSample}${textSample.length > 15 ? '...' : ''}`;
+                                }
+                            }
+                            segmentBtn.textContent = btnText;
+                            segmentBtn.title = segmentFullText;
+                            // Ensure segment.id is a string or number for the dataset/attribute
+                            segmentBtn.dataset.segmentId = String(segment.id || index); 
+
+                            console.log(`[loadLineSegments] Creating button for segment ${index} (ID: ${segment.id || 'N/A'}), Text: "${btnText}"`);
+
+                            segmentBtn.onclick = function(e) {
+                                e.preventDefault();
+                                console.log('[loadLineSegments] Button clicked for segment data:', segment);
+                                showSelectedSegment(folder, pageId, segment); // Pass the full segment object
+                                document.querySelectorAll('.segment-btn').forEach(btn => {
+                                    btn.style.backgroundColor = '#f1f3f5'; btn.style.borderColor = '#dee2e6'; btn.style.fontWeight = 'normal';
+                                });
+                                segmentBtn.style.backgroundColor = '#e9ecef'; segmentBtn.style.borderColor = '#adb5bd'; segmentBtn.style.fontWeight = 'bold';
+                            };
+                            lineSegmentsNav.appendChild(segmentBtn);
+                        });
+
+                        if (data.segments[0]) {
+                            console.log('[loadLineSegments] Auto-selecting first segment.');
+                            showSelectedSegment(folder, pageId, data.segments[0]);
+                            const firstBtn = lineSegmentsNav.querySelector('.segment-btn');
+                            if (firstBtn) {
+                                firstBtn.style.backgroundColor = '#e9ecef'; firstBtn.style.borderColor = '#adb5bd'; firstBtn.style.fontWeight = 'bold';
+                            }
+                        }
+                    } else {
+                        console.log('[loadLineSegments] No valid segments found (or data.success not true / segments array empty). Segment navigation will remain hidden.');
+                        lineSegmentsContainer.style.display = 'none';
+                        if (data && data.error) console.warn(`[loadLineSegments] Error from /get_segments: ${data.error}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('[loadLineSegments] Fetch/Processing Error for segments:', error);
+                    lineSegmentsContainer.style.display = 'none';
+                });
+        }
+
+        function showSelectedSegment(folder, pageId, segment) {
+            const selectedLineImageContainer = document.querySelector('.selected-line-image');
+            const selectedLineTextContainer = document.querySelector('.selected-line-text');
+            
+            if (!selectedLineImageContainer || !selectedLineTextContainer) {
+                console.error('[showSelectedSegment] HTML elements for displaying selected segment not found!');
+                return;
+            }
+            // Ensure segment is an object
+            if (!segment || typeof segment !== 'object') {
+                console.error('[showSelectedSegment] Invalid segment data provided:', segment);
+                selectedLineImageContainer.innerHTML = `<p style="font-size:0.9em; color:red;">Error: Invalid segment data.</p>`;
+                selectedLineTextContainer.innerText = 'Error: Invalid segment data.';
+                return;
+            }
+            console.log('[showSelectedSegment] Displaying segment:', JSON.stringify(segment));
+
+            // Update image: Path includes '/segments/' subdirectory
+            // Example: /uploads/USER/FOLDER/TOOCR/segments/PAGE_ID/SEGMENT_ID.png
+            if (segment.has_image === true && (segment.id !== null && segment.id !== undefined)) {
+                const segmentIdStr = String(segment.id); // Ensure ID is a string
+                const imageUrl = `/uploads/{{ session.get('user_id', 'anonymous') }}/${encodeURIComponent(folder)}/TOOCR/segments/${encodeURIComponent(pageId)}/${encodeURIComponent(segmentIdStr)}.png`;
+                console.log('[showSelectedSegment] Image URL:', imageUrl);
+                selectedLineImageContainer.innerHTML = `
+                    <img src="${imageUrl}" alt="Line segment ${segmentIdStr}" style="max-width: 100%; max-height:150px; border: 1px solid #dee2e6; object-fit: contain;"
+                         onerror="this.onerror=null; this.alt='Image not found or error loading.'; this.src=''; this.parentElement.innerHTML='<p style=\\'font-size:0.9em; color:red;\\'>Image not found: ${segmentIdStr}.png</p>';">`;
+            } else {
+                console.log(`[showSelectedSegment] No image for this segment. has_image: ${segment.has_image}, id: ${segment.id}`);
+                selectedLineImageContainer.innerHTML = `<p style="font-size:0.9em; color:#6c757d;">(No image available for this segment)</p>`;
+            }
+            
+            let displayText = '(No text recognized for this segment)';
+            if (segment.text) {
+                if (typeof segment.text === 'string') displayText = segment.text;
+                else if (Array.isArray(segment.text) && segment.text.length > 0 && typeof segment.text[0] === 'string') {
+                    displayText = segment.text[0];
+                    if (segment.text.length > 1 && typeof segment.text[1] === 'number') {
+                        displayText += ` (Confidence: ${segment.text[1].toFixed(3)})`;
+                    }
+                } else displayText = JSON.stringify(segment.text); // Fallback for other structures
+            } else if (segment.coords && Array.isArray(segment.coords)) {
+                 displayText = `Coordinates: [${segment.coords.join(', ')}]`;
+            }
+            
+            selectedLineTextContainer.innerText = displayText;
+            console.log('[showSelectedSegment] Displayed text:', displayText);
+        }
+
+        // Add event listener for page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // You can add any initialization here if needed
+            console.log('OCR page ready');
+        });
+    </script>
     {% endblock %}
 </body>
 </html>

@@ -3,6 +3,7 @@ from config import Config
 from wtforms.validators import DataRequired, Length
 from flask_wtf.file import FileAllowed, FileRequired
 from flask_sqlalchemy import SQLAlchemy
+import os
 
 db = SQLAlchemy()
 
@@ -13,6 +14,9 @@ def create_app():
     app.config["UPLOAD_FOLDER"] = "/app/uploads"  # Use absolute path for Docker
     app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024  # 100 MB
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///site.db"
+
+    # OCR service URL - adjust based on your Docker Compose setup
+    app.config["OCR_SERVICE_URL"] = os.environ.get("OCR_SERVICE_URL", "http://ocr:8000")
 
     db.init_app(app)
 

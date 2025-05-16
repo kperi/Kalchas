@@ -35,26 +35,30 @@ services:
       - .:/app
       - ./ocr:/app
       - upload_data:/app/data
+      - ./uploads:/app/uploads  # Add this line to mount uploads directory
     working_dir: /app
     networks:
       - logios-network
+    ports:
+      - "8000:8000"  # Add this to expose OCR service port
 
   flaskui:
     build:
       context: ./my-flask-app
       dockerfile: Dockerfile
     ports:
-      - "5001:5001" # Assuming your Flask app inside the container runs on port 5001
+      - "5001:5001" 
     volumes:
-      - ./uploads:/app/uploads  # Map local uploads to container path
+      - ./uploads:/app/uploads
     networks:
       - logios-network
     restart: unless-stopped
+    environment:
+      - OCR_SERVICE_URL=http://ocr:8000  # Add this to specify OCR service URL
 
 volumes:
   upload_data:
   app:
-
 
 networks:
   logios-network:
