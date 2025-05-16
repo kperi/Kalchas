@@ -10,7 +10,7 @@
 <body>
     {% include 'layout.html' %}
     
-    <div class="container">
+    <!-- <div class="container">
         <h1>Upload Image or PDF</h1>
         <form action="{{ url_for('app.upload_file') }}" method="post" enctype="multipart/form-data">
             <div class="form-group">
@@ -28,7 +28,7 @@
             </div>
             <button id="crop-button" style="display: none;">Crop Image</button>
         {% endif %}
-    </div>
+    </div> -->
 
     <script>
         document.getElementById('file').addEventListener('change', function() {

@@ -11,3 +11,4 @@ WTForms==3.0.1
 Flask-SQLAlchemy==2.5.1
 SQLAlchemy==1.4.49
 pdf2image==1.17.0
+loguru

@@ -51,10 +51,10 @@
         <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
         <ul id="main-menu">
             <li><a href="{{ url_for('app.index') }}">Home</a></li>
-            <li><a href="{{ url_for('app.upload_file') }}">Upload</a></li>
-            <li><a href="{{ url_for('app.crop_image') }}">Crop</a></li>
+            <li><a href="{{ url_for('app.upload_file') }}">Upload a new PDF</a></li>
+            <li><a href="{{ url_for('app.crop_image') }}">Edit Uploaded files</a></li>
             <li><a href="{{ url_for('app.image_preview') }}">OCR</a></li>
-            <li><a href="{{ url_for('app.index') }}">Admin</a></li>
+            <li><a href="{{ url_for('app.admin') }}">Admin</a></li>
         </ul>
     </nav>
     <div class="container">
