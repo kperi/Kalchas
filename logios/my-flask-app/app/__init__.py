@@ -10,7 +10,7 @@ db = SQLAlchemy()
 def create_app():
     app = Flask(__name__)
     app.config["SECRET_KEY"] = "your_secret_key"
-    app.config["UPLOAD_FOLDER"] = "uploads"
+    app.config["UPLOAD_FOLDER"] = "/app/uploads"  # Use absolute path for Docker
     app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024  # 100 MB
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///site.db"
 

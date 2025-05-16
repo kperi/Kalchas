@@ -1,7 +1,7 @@
 # Dockerfile for Next.js UI application
 
 # 1. Builder stage: Install dependencies and build the application
-FROM node:20-alpine AS builder
+FROM node:24-slim AS builder
 
 # Set working directory
 WORKDIR /app
@@ -10,7 +10,7 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 
 # Install dependencies using the lock file for reproducible builds
-RUN npm install --frozen-lockfile
+RUN npm install # --frozen-lockfile
 
 # Copy the rest of the application source code
 COPY . .
@@ -23,7 +23,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 # 2. Runner stage: Production image
-FROM node:slim-alpine AS runner
+FROM node:24-slim AS runner
 
 WORKDIR /app
 

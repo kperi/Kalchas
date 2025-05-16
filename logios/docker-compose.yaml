@@ -39,19 +39,16 @@ services:
     networks:
       - logios-network
 
-  ui:
+  flaskui:
     build:
-      context: ./ui # Path to your Next.js app directory (where Dockerfile is)
+      context: ./my-flask-app
       dockerfile: Dockerfile
     ports:
-      - "3000:3000" # Map host port 3000 to container port 3000
+      - "5001:5001" # Assuming your Flask app inside the container runs on port 5001
+    volumes:
+      - ./uploads:/app/uploads  # Map local uploads to container path
     networks:
       - logios-network
-    environment:
-      - NODE_ENV=production
-      - PORT=3000
-      # Add any other environment variables your Next.js app needs at runtime
-      # Example: NEXT_PUBLIC_API_URL=http://backend-service:port/api
     restart: unless-stopped
 
 volumes:

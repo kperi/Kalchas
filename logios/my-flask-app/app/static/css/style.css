@@ -1,69 +1,311 @@
-body {
-    font-family: Arial, sans-serif;
+body, html {
     margin: 0;
     padding: 0;
-    background-color: #f4f4f4;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    background-color: #f9fafb; /* Gradio-like page background */
+    color: #1f2937; /* Default text color */
+    font-size: 16px;
+    line-height: 1.6;
 }
 
-header {
-    background: #35424a;
-    color: #ffffff;
-    padding: 10px 0;
-    text-align: center;
+* {
+    box-sizing: border-box;
 }
 
-h1 {
+/* Main Navigation (Simplified Gradio-like Header) */
+nav {
+    background-color: #ffffff;
+    padding: 0.75rem 1.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    border-bottom: 1px solid #e5e7eb;
+}
+
+nav ul {
+    list-style: none;
+    padding: 0;
     margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
 }
 
-.container {
-    width: 80%;
-    margin: auto;
-    overflow: hidden;
+nav a {
+    color: #374151;
+    text-decoration: none;
+    font-weight: 500;
+    padding: 0.5rem 0;
+    transition: color 0.2s ease;
 }
 
-form {
-    background: #ffffff;
-    padding: 20px;
-    border-radius: 5px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+nav a:hover, nav a.active {
+    color: #2563eb; /* Gradio primary blue */
+}
+
+.menu-toggle {
+    display: none; /* Will be handled by media queries if needed */
+    background: none;
+    border: none;
+    color: #374151;
+    font-size: 1.5em;
+    cursor: pointer;
+}
+
+/* Main Content Container */
+.page-container {
+    max-width: 1200px; /* Default max-width, can be overridden */
+    margin: 2rem auto;
+    padding: 1.5rem;
+}
+
+/* Gradio-like Component Styling */
+.gradio-component-group {
+    background-color: #ffffff;
+    padding: 1.5rem; /* 20px to 25px */
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    border: 1px solid #e5e7eb; /* Light border */
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03), 0 1px 2px rgba(0,0,0,0.03);
+}
+
+.gradio-component-group h2, .gradio-component-group h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: #111827; /* Darker for headings within components */
+    font-weight: 600;
+    border-bottom: 1px solid #f3f4f6;
+    padding-bottom: 0.75rem;
+}
+.gradio-component-group h1 { /* For main page titles inside a component group */
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    font-size: 1.8em;
+    color: #111827;
+    text-align: center;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 1rem;
+}
+
+
+/* Forms and Inputs */
+label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #374151;
+    font-size: 0.9em;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="email"],
+select,
+textarea {
+    width: 100%;
+    padding: 0.75rem 1rem; /* 10px 12px */
+    border-radius: 6px;
+    border: 1px solid #d1d5db;
+    background-color: #fff;
+    font-size: 0.95em;
+    color: #1f2937;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus,
+select:focus,
+textarea:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    outline: none;
 }
 
 input[type="file"] {
-    margin: 10px 0;
+    display: block;
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background-color: #f9fafb;
+    margin-bottom: 0.5rem; /* Added for spacing */
 }
-
-button {
-    background: #35424a;
-    color: #ffffff;
+input[type="file"]::file-selector-button {
+    margin-right: 0.75rem;
+    padding: 0.5rem 0.75rem;
     border: none;
-    padding: 10px 15px;
+    background-color: #374151; /* Darker button for file input */
+    color: white;
+    border-radius: 4px;
     cursor: pointer;
-    border-radius: 5px;
+    transition: background-color 0.2s ease;
+}
+input[type="file"]::file-selector-button:hover {
+    background-color: #1f2937;
 }
 
-button:hover {
-    background: #45a049;
-}
 
-.image-preview {
-    margin: 20px 0;
+/* Buttons */
+.gradio-button {
+    padding: 0.75rem 1.25rem; /* 12px 20px */
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: 500;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    text-decoration: none; /* For <a> styled as buttons */
+    display: inline-block; /* For <a> styled as buttons */
     text-align: center;
 }
 
-.image-preview img {
-    max-width: 100%;
-    height: auto;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+.gradio-button-primary {
+    background-color: #2563eb;
+    color: white;
+}
+.gradio-button-primary:hover {
+    background-color: #1d4ed8;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
-.crop-menu {
+.gradio-button-secondary {
+    background-color: #6b7280;
+    color: white;
+}
+.gradio-button-secondary:hover {
+    background-color: #4b5563;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.gradio-button-danger {
+    background-color: #dc2626;
+    color: white;
+}
+.gradio-button-danger:hover {
+    background-color: #b91c1c;
+}
+
+.gradio-button-fullwidth {
+    width: 100%;
+    display: block;
+}
+
+
+/* Alerts / Flash Messages */
+.alert {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 6px;
+    border: 1px solid transparent;
+}
+.alert-success {
+    color: #0f5132;
+    background-color: #d1e7dd;
+    border-color: #badbcc;
+}
+.alert-danger {
+    color: #842029;
+    background-color: #f8d7da;
+    border-color: #f5c2c7;
+}
+.alert-info {
+    color: #055160;
+    background-color: #cff4fc;
+    border-color: #b6effb;
+}
+.alert-warning {
+    color: #664d03;
+    background-color: #fff3cd;
+    border-color: #ffecb5;
+}
+
+
+/* Specific Component Area Styling (e.g., image preview, OCR section) */
+.gradio-display-area {
+    margin-top: 1.5rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1rem;
+    background-color: #f9fafb; /* Consistent with input groups */
+    min-height: 200px; /* Adjust as needed */
     display: flex;
     justify-content: center;
-    margin: 20px 0;
+    align-items: center;
+    overflow: auto; /* For large content */
+}
+.gradio-display-area img {
+    max-width: 100%;
+    max-height: 60vh; /* Adjust as needed */
+    display: block;
+    border-radius: 4px;
+    object-fit: contain;
+}
+.gradio-placeholder-text {
+    color: #6b7280;
+    font-size: 1em;
+    text-align: center;
 }
 
-.crop-menu button {
-    margin: 0 10px;
+/* Two-column layout for preview/crop pages */
+.gradio-two-column-layout {
+    display: flex;
+    gap: 1.5rem;
+}
+.gradio-sidebar {
+    width: 300px; /* Adjust as needed */
+    flex-shrink: 0;
+}
+.gradio-main-content {
+    flex-grow: 1;
+    min-width: 0; /* Prevents overflow issues with flex items */
+}
+
+/* Admin Table */
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    font-size: 0.9em;
+}
+.admin-table th, .admin-table td {
+    border: 1px solid #e5e7eb;
+    padding: 0.75rem 1rem;
+    text-align: left;
+}
+.admin-table th {
+    background-color: #f3f4f6;
+    font-weight: 600;
+    color: #374151;
+}
+.admin-table tr:nth-child(even) {
+    background-color: #f9fafb;
+}
+
+/* Responsive Nav */
+@media (max-width: 768px) {
+    nav ul {
+        flex-direction: column;
+        align-items: flex-start;
+        display: none; /* Initially hidden on mobile */
+        width: 100%;
+    }
+    nav ul.open {
+        display: flex; /* Shown when toggled */
+    }
+    nav li {
+        width: 100%;
+    }
+    nav a {
+        padding: 0.75rem 0;
+        display: block;
+        width: 100%;
+    }
+    .menu-toggle {
+        display: block;
+    }
+    .gradio-two-column-layout {
+        flex-direction: column;
+    }
+    .gradio-sidebar {
+        width: 100%;
+    }
 }

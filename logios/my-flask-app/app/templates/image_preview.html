@@ -13,201 +13,12 @@
     {% block title %}Document Preview & OCR - Logios App{% endblock %}
 
     {% block content %}
-    <style>
-        /* General Page & Container Styles */
-        .preview-page-container { /* New wrapper for the whole page content */
-            padding: 20px;
-            background-color: #f4f7f6; /* Light, neutral background for the page */
-            min-height: calc(100vh - 100px); /* Adjust based on your nav/footer height */
-        }
-
-        .preview-container {
-            display: flex;
-            gap: 25px; /* Increased gap */
-            background-color: #ffffff; /* White background for the main app area */
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Softer shadow */
-            overflow: hidden; /* To contain child elements with border-radius */
-            max-width: 1400px; /* Max width for larger screens */
-            margin: 0 auto; /* Center the container */
-        }
-
-        /* Sidebar Styles */
-        .sidebar {
-            width: 280px; /* Slightly wider sidebar */
-            padding: 25px;
-            border-right: 1px solid #e0e0e0; /* Lighter border */
-            background-color: #f8f9fa; /* Very light gray for sidebar */
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .sidebar h3 {
-            margin-top: 0;
-            margin-bottom: 15px;
-            font-size: 1.3em;
-            color: #333;
-            border-bottom: 2px solid #007bff; /* Accent color for heading */
-            padding-bottom: 8px;
-        }
-
-        .sidebar label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: #555;
-            font-size: 0.95em;
-        }
-
-        .sidebar select {
-            width: 100%;
-            padding: 10px 12px; /* Increased padding */
-            margin-bottom: 10px; /* Reduced bottom margin as gap is used */
-            box-sizing: border-box;
-            border: 1px solid #ced4da;
-            border-radius: 5px;
-            background-color: #fff;
-            font-size: 0.9em;
-            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-        }
-
-        .sidebar select:focus {
-            border-color: #007bff;
-            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-            outline: none;
-        }
-
-        .sidebar .form-group { /* Wrapper for label + select */
-            margin-bottom: 15px;
-        }
-
-        .sidebar p { /* For "No PNG files" message */
-            font-size: 0.9em;
-            color: #6c757d;
-        }
-
-        /* Main Content Area Styles */
-        .main-content {
-            flex-grow: 1;
-            padding: 25px;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .main-content h2 {
-            margin-top: 0;
-            margin-bottom: 20px;
-            font-size: 1.8em;
-            color: #2c3e50;
-        }
-
-        .image-display-area { /* New wrapper for image and OCR */
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column; /* Stack image and OCR section */
-            gap: 20px;
-            align-items: center; /* Center image if it's not full width */
-        }
-        
-        .image-preview-wrapper {
-            border: 1px solid #dee2e6;
-            border-radius: 6px;
-            padding: 10px;
-            background-color: #fdfdfd;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            display: flex; /* For centering image */
-            justify-content: center;
-            align-items: center;
-            width: 100%; /* Take available width */
-            max-height: 60vh; /* Limit image preview height */
-            overflow: auto; /* Add scrollbars if image is too big */
-        }
-
-        .image-display-area img#preview-image {
-            max-width: 100%;
-            max-height: 100%; /* Fill the wrapper but not exceed it */
-            object-fit: contain; /* Ensure aspect ratio is maintained */
-            border-radius: 4px; /* Slight rounding for the image itself */
-        }
-
-        .ocr-section {
-            width: 100%;
-            padding: 20px;
-            background-color: #f8f9fa;
-            border: 1px solid #e0e0e0;
-            border-radius: 6px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-
-        .ocr-section h4 {
-            margin-top: 0;
-            margin-bottom: 15px;
-            font-size: 1.2em;
-            color: #333;
-        }
-
-        .ocr-section button {
-            background-color: #007bff;
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            font-size: 1em;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.2s ease;
-            margin-bottom: 15px;
-        }
-
-        .ocr-section button:hover {
-            background-color: #0056b3;
-        }
-
-        .ocr-section textarea {
-            width: 100%;
-            min-height: 150px; /* Increased min-height */
-            padding: 10px;
-            border: 1px solid #ced4da;
-            border-radius: 5px;
-            font-family: 'Menlo', 'Monaco', 'Consolas', "Courier New", monospace; /* Monospace for OCR text */
-            font-size: 0.9em;
-            resize: vertical; /* Allow vertical resize */
-        }
-
-        .no-content-message { /* For "Please select..." messages */
-            text-align: center;
-            padding: 60px 20px;
-            color: #6c757d;
-            font-size: 1.1em;
-            background-color: #f8f9fa;
-            border-radius: 6px;
-            border: 1px dashed #ced4da;
-            flex-grow: 1; /* Take up space if no image */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        /* Hide noscript buttons if JS is enabled (handled by onchange) */
-        .sidebar form button[type="submit"] {
-            display: none; 
-        }
-        /* Show them if JS is disabled */
-        .no-js .sidebar form button[type="submit"] {
-            display: inline-block;
-            margin-top: 10px;
-            padding: 8px 15px;
-            font-size: 0.9em;
-        }
-
-    </style>
-
-    <div class="preview-page-container">
-        <div class="preview-container">
-            <aside class="sidebar">
+    <div class="gradio-two-column-layout">
+        <aside class="gradio-sidebar">
+            <div class="gradio-component-group">
                 <h3>Document Navigation</h3>
-                <div class="form-group">
-                    <form method="get" action="{{ url_for('app.image_preview') }}" id="folder-form">
+                <form method="get" action="{{ url_for('app.image_preview') }}" id="folder-form">
+                    <div style="margin-bottom: 1rem;">
                         <label for="folder-select">Select Document:</label>
                         <select name="selected_folder" id="folder-select" onchange="document.getElementById('folder-form').submit()">
                             <option value="">-- Select Document --</option>
@@ -215,55 +26,58 @@
                                 <option value="{{ folder }}" {% if folder == selected_folder %}selected{% endif %}>{{ folder }}</option>
                             {% endfor %}
                         </select>
-                        <noscript><button type="submit" class="btn btn-secondary btn-sm">View Document</button></noscript>
-                    </form>
-                </div>
+                    </div>
+                    <noscript><button type="submit" class="gradio-button gradio-button-secondary">View Document</button></noscript>
+                </form>
 
                 {% if selected_folder and png_files %}
-                <div class="form-group">
-                    <form method="get" action="{{ url_for('app.image_preview') }}" id="file-form">
-                        <input type="hidden" name="selected_folder" value="{{ selected_folder }}">
+                <form method="get" action="{{ url_for('app.image_preview') }}" id="file-form">
+                    <input type="hidden" name="selected_folder" value="{{ selected_folder }}">
+                    <div style="margin-bottom: 1rem;">
                         <label for="png-select">Select Page:</label>
                         <select name="selected_png" id="png-select" onchange="document.getElementById('file-form').submit()">
                             <option value="">-- Select Page --</option>
                             {% for png in png_files %}
-                                <option value="{{ png }}" {% if png == request.args.get('selected_png') %}selected{% endif %}>Page {{ png.split('.')[0] | int }}</option> {# Assuming png is like 001.png #}
+                                <option value="{{ png }}" {% if png == request.args.get('selected_png') %}selected{% endif %}>Page {{ png.split('.')[0] | int }}</option>
                             {% endfor %}
                         </select>
-                        <noscript><button type="submit" class="btn btn-secondary btn-sm">Show Page</button></noscript>
-                    </form>
-                </div>
+                    </div>
+                    <noscript><button type="submit" class="gradio-button gradio-button-secondary">Show Page</button></noscript>
+                </form>
                 {% elif selected_folder %}
-                <p>No pages found in this document.</p>
+                <p class="gradio-placeholder-text" style="font-size: 0.9em; margin-top: 1rem;">No pages found in this document.</p>
                 {% endif %}
-            </aside>
+            </div>
+        </aside>
 
-            <main class="main-content">
+        <main class="gradio-main-content">
+            <div class="gradio-component-group">
                 <h2>Page Preview & OCR</h2>
+                <h1> {{session.get('user_id', 'anonymous') }} // {{selected_folder }} // {{request.args.get('selected_png')}} </h1>
                 {% if selected_folder and request.args.get('selected_png') %}
-                <div class="image-display-area">
-                    <div class="image-preview-wrapper">
-                        <img id="preview-image"
-                             src="{{ url_for('app.uploaded_file', user_id=session.get('user_id', 'anonymous'), folder=selected_folder, filename=request.args.get('selected_png')) }}"
+                <div class="gradio-display-area" style="flex-direction: column; align-items: stretch; gap: 1.5rem;">
+                    <div class="gradio-display-area" style="min-height: 40vh; padding:0; border: none; background: #fff;"> <!-- Inner display for image -->
+                         <img id="preview-image"
+                             src="{{ url_for('app.uploaded_file', user_id=session.get('user_id', 'anonymous'), folder=selected_folder, filename=request.args.get('selected_png'), _external=False) }}"
                              alt="Page Preview">
                     </div>
-                    <div class="ocr-section">
+                    <div class="ocr-section gradio-component-group" style="margin-top:0; padding: 1rem; background-color: #f9fafb;"> <!-- Nested component group for OCR -->
                         <h4>Text Recognition (OCR)</h4>
-                        <button onclick="alert('OCR functionality to be implemented!')">Extract Text from Page</button>
+                        <button class="gradio-button gradio-button-primary" onclick="alert('OCR functionality to be implemented!')" style="margin-bottom: 1rem;">Extract Text from Page</button>
                         <textarea placeholder="Extracted text will appear here..." readonly></textarea>
                     </div>
                 </div>
                 {% elif selected_folder %}
-                <div class="no-content-message">
-                    <p>Please select a page from the sidebar to preview and perform OCR.</p>
+                <div class="gradio-display-area">
+                    <p class="gradio-placeholder-text">Please select a page from the sidebar to preview and perform OCR.</p>
                 </div>
                 {% else %}
-                <div class="no-content-message">
-                    <p>Please select a document from the sidebar to view its pages.</p>
+                <div class="gradio-display-area">
+                    <p class="gradio-placeholder-text">Please select a document from the sidebar to view its pages.</p>
                 </div>
                 {% endif %}
-            </main>
-        </div>
+            </div>
+        </main>
     </div>
     {% endblock %}
 </body>

@@ -1,0 +1,33 @@
+<!-- filepath: /Users/konstantinosperifanos/code/projects/logios/Kalchas/logios/my-flask-app/app/templates/login.html -->
+{% extends "layout.html" %}
+
+{% block title %}Login - Logios App{% endblock %}
+
+{% block content %}
+<div class="gradio-component-group" style="max-width: 450px; margin: 3rem auto;">
+    <h1 style="font-size: 1.6em; margin-bottom: 1.5rem;">Login to Your Account</h1>
+    <form method="POST" action="{{ url_for('auth.login') }}">
+        {{ form.hidden_tag() }}
+        <div style="margin-bottom: 1rem;">
+            {{ form.username.label }}
+            {{ form.username(class="form-control") }} {# Assuming your form fields can take a class #}
+            {% for error in form.username.errors %}
+                <span style="color: red; font-size: 0.8em;">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div style="margin-bottom: 1.5rem;">
+            {{ form.password.label }}
+            {{ form.password(class="form-control") }}
+            {% for error in form.password.errors %}
+                <span style="color: red; font-size: 0.8em;">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div style="margin-bottom: 1rem;">
+            {{ form.submit(class="gradio-button gradio-button-primary gradio-button-fullwidth") }}
+        </div>
+    </form>
+    <p style="text-align: center; font-size: 0.9em; margin-top: 1.5rem;">
+        Don't have an account? <a href="{{ url_for('auth.register') }}" style="color: #2563eb; text-decoration: none;">Sign up here</a>
+    </p>
+</div>
+{% endblock %}

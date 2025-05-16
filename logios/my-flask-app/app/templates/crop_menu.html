@@ -5,124 +5,79 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Crop Image - Logios App</title>
     {% block head_extra %}
-    {# Load Cropper.js CSS if you have it locally, or use a CDN #}
     <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-    <style>
-        .crop-container {
-            max-width: 900px;
-            margin: 20px auto;
-            padding: 20px;
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .crop-container h2 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #333;
-        }
-        .selection-form .form-group {
-            margin-bottom: 15px;
-        }
-        .selection-form label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        .selection-form select {
-            width: 100%;
-            padding: 10px;
-            border-radius: 4px;
-            border: 1px solid #ccc;
-        }
-        .image-display-container {
-            margin-top: 20px;
-            max-width: 100%; /* Cropper will manage image size */
-            min-height: 300px; /* Placeholder if no image */
-            border: 1px dashed #ccc;
-            padding: 10px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .image-display-container img {
-            max-width: 100%; /* Ensure image fits container before cropper init */
-            display: block; /* Remove extra space below image */
-        }
-        .crop-controls {
-            margin-top: 20px;
-            text-align: center;
-        }
-        .crop-controls button {
-            padding: 10px 20px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 1em;
-        }
-        .crop-controls button:hover {
-            background-color: #0056b3;
-        }
-        .placeholder-text {
-            color: #777;
-            font-style: italic;
-        }
-    </style>
     {% endblock %}
 </head>
 <body>
     {% include 'layout.html' %}
     <div class="container">
         {% block content %}
-        <div class="crop-container">
-            <h2>Crop Image</h2>
+        <div class="gradio-component-group" style="max-width: 1000px; margin-left: auto; margin-right: auto;">
+            <h1>Image Cropping Tool</h1>
 
             <form method="GET" action="{{ url_for('app.crop_image') }}" class="selection-form">
-                <div class="form-group">
-                    <label for="folder-select">Select Document/Folder:</label>
-                    <select name="selected_folder" id="folder-select" onchange="this.form.submit()">
-                        <option value="">-- Select a Document --</option>
-                        {% for folder in folders %}
-                            <option value="{{ folder }}" {% if folder == selected_folder %}selected{% endif %}>{{ folder }}</option>
-                        {% endfor %}
-                    </select>
+                <div class="gradio-component-group" style="background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
+                    <div style="margin-bottom: 1rem;">
+                        <label for="folder-select">Select Document:</label>
+                        <select name="selected_folder" id="folder-select" onchange="this.form.submit()">
+                            <option value="">-- Select a Document --</option>
+                            {% for folder in folders %}
+                                <option value="{{ folder }}" {% if folder == selected_folder %}selected{% endif %}>{{ folder }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    {% if selected_folder %}
+                    <div style="margin-bottom: 1rem;">
+                        <label for="file-select">Select Page/Image:</label>
+                        
+                        <!-- Debug info for PNG files -->
+                        <div style="margin-bottom: 10px; padding: 5px; border: 1px solid #ddd; background-color: #f5f5f5; font-size: 0.8em;">
+                            <strong>Debug:</strong> Found {{ png_files_in_selected_folder|length }} PNG files
+                            {% if not png_files_in_selected_folder %}
+                                <p>No PNG files found. Check if files exist in the directory and if they have .png extension.</p>
+                            {% endif %}
+                        </div>
+                        
+                        <select name="image_file" id="file-select" onchange="this.form.submit()">
+                            <option value="">-- Select an Image --</option>
+                            {% for png_file in png_files_in_selected_folder %}
+                                 <option value="{{ png_file }}" {% if png_file == image_to_crop_filename %}selected{% endif %}>Page {{ png_file.split('.')[0] | int }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+                    <noscript><button type="submit" class="gradio-button gradio-button-secondary">Load Selections</button></noscript>
                 </div>
-                
-                {# Placeholder for file selection - This would be the next step #}
-                {% if selected_folder %}
-                <div class="form-group">
-                    <label for="file-select">Select Page/Image (to be implemented):</label>
-                    <select name="image_file" id="file-select" onchange="this.form.submit()">
-                        <option value="">-- Select an Image --</option>
-                        {# Populate this with files from selected_folder via another backend call or JS #}
-                        {% if image_to_crop_filename %}
-                        <option value="{{ image_to_crop_filename }}" selected>{{ image_to_crop_filename }}</option>
-                        {% endif %}
-                    </select>
-                </div>
-                {% endif %}
-                <noscript><button type="submit">Load Selections</button></noscript>
             </form>
 
-            <div class="image-display-container">
+            {% if selected_folder and image_to_crop_filename %}
+            <div style="margin-bottom: 10px; padding: 5px; border: 1px solid #ddd; background-color: #f5f5f5;">
+                <strong>Debug Info:</strong> 
+                <span style="font-family: monospace; word-break: break-all;">
+                    Path: /uploads/{{session.get('user_id', 'anonymous')}}/{{selected_folder}}/{{image_to_crop_filename}}
+                </span>
+            </div>
+            {% endif %}
+
+            <div class="gradio-display-area" style="min-height: 400px; background-color: #e5e7eb;"> <!-- Slightly darker background for cropper area -->
                 {% if selected_folder and image_to_crop_filename %}
-                    <img id="image_to_crop_element" src="{{ url_for('app.uploaded_file', user_id=session.get('user_id', 'anonymous'), folder=selected_folder, filename=image_to_crop_filename) }}" alt="Image to crop">
+                    <img id="image_to_crop_element" 
+                         src="/uploads/{{session.get('user_id', 'anonymous')}}/{{selected_folder}}/{{image_to_crop_filename}}" 
+                         alt="Image to crop">
                 {% else %}
-                    <p class="placeholder-text">Please select a document and an image to start cropping.</p>
+                    <p class="gradio-placeholder-text">Select a document and page to begin cropping.</p>
                 {% endif %}
             </div>
 
             {% if selected_folder and image_to_crop_filename %}
-            <div class="crop-controls">
-                <button id="crop-button-action">Crop Image</button>
-                <form id="crop-result-form" method="POST" action="{{ url_for('app.process_cropped_image') }}"> {# Example action for submitting crop data #}
+            <div style="text-align: center; margin-top: 1.5rem;">
+                <button id="crop-button-action" class="gradio-button gradio-button-primary">Crop Selected Area</button>
+                <form id="crop-result-form" method="POST" action="{{ url_for('app.crop_image') }}" style="display:none;">
                     <input type="hidden" name="original_folder" value="{{ selected_folder }}">
                     <input type="hidden" name="original_filename" value="{{ image_to_crop_filename }}">
                     <input type="hidden" id="cropped-image-data" name="cropped_image_data">
-                    {# Add other necessary fields like crop coordinates if needed #}
                 </form>
             </div>
             {% endif %}
@@ -137,43 +92,65 @@
                 const croppedImageDataInput = document.getElementById('cropped-image-data');
                 let cropperInstance;
 
+                console.log("Image source:", imageElement.src);
+
                 if (imageElement && imageElement.getAttribute('src')) { // Check if image src is set
+                    // Add event listeners before initializing
+                    imageElement.onload = function() {
+                        console.log("Image loaded successfully");
+                        initializeCropper();
+                    };
+                    
+                    imageElement.onerror = function() {
+                        console.error("Failed to load image");
+                        const displayArea = document.querySelector('.gradio-display-area');
+                        if(displayArea) {
+                            displayArea.innerHTML = '<p class="gradio-placeholder-text">Could not load image. Please check the file path and server logs.</p>';
+                        }
+                    };
+                    
+                    // Check if image is already loaded (might happen with cached images)
+                    if (imageElement.complete && imageElement.naturalWidth > 0) {
+                        console.log("Image already loaded, initializing cropper");
+                        initializeCropper();
+                    }
+                }
+                
+                function initializeCropper() {
+                    if (imageElement.naturalWidth === 0) {
+                        console.error("Image has zero width");
+                        return;
+                    }
+                    
+                    console.log("Initializing Cropper.js");
                     cropperInstance = new Cropper(imageElement, {
-                        aspectRatio: NaN, // Free aspect ratio, or set as needed e.g., 16 / 9
-                        viewMode: 1,    // Restrict crop box to canvas
-                        autoCropArea: 0.8, // Initial crop area size (80%)
+                        aspectRatio: NaN, 
+                        viewMode: 1,    
+                        autoCropArea: 0.85, 
                         responsive: true,
-                        checkCrossOrigin: false, // Important if image source is different
-                        // Add other Cropper.js options as needed
+                        background: false, 
+                        modal: false, 
+                        guides: true,
+                        center: true,
+                        highlight: false, 
+                        cropBoxMovable: true,
+                        cropBoxResizable: true,
+                        checkCrossOrigin: false,
                     });
 
                     if (cropButtonAction) {
                         cropButtonAction.addEventListener('click', function () {
                             if (cropperInstance) {
-                                const canvas = cropperInstance.getCroppedCanvas({
-                                    // Options for getCroppedCanvas (e.g., width, height, fillColor)
-                                    // width: 800, 
-                                    // height: 600,
-                                });
+                                const canvas = cropperInstance.getCroppedCanvas({});
                                 if (canvas) {
-                                    croppedImageDataInput.value = canvas.toDataURL('image/png'); // Or 'image/jpeg'
-                                    // cropResultForm.submit(); // Uncomment to submit the form
-                                    alert('Cropped image data is ready in the hidden field. Implement form submission or AJAX.');
-                                    // Example: Display cropped image (optional)
-                                    // const croppedPreview = document.createElement('img');
-                                    // croppedPreview.src = canvas.toDataURL('image/png');
-                                    // document.querySelector('.crop-container').appendChild(croppedPreview);
+                                    croppedImageDataInput.value = canvas.toDataURL('image/png'); 
+                                    alert('Cropped image data captured. Implement submission (e.g., via AJAX) to process.');
+                                    // cropResultForm.submit(); 
                                 } else {
                                     alert('Could not get cropped canvas.');
                                 }
                             }
                         });
-                    }
-                } else {
-                    if (document.querySelector('.placeholder-text')) {
-                         // Already showing placeholder
-                    } else if (document.querySelector('.image-display-container')) {
-                        document.querySelector('.image-display-container').innerHTML = '<p class="placeholder-text">Image not found or not selected.</p>';
                     }
                 }
             });
