@@ -1075,8 +1075,8 @@ def get_segment_image(user_id, folder, page_id, segment_id):
         return f"Error serving segment image: {str(e)}", 500
 
 
-@app.route("/get_segments/<user_id>/<folder>/<page_id>")
-def get_segments(user_id, folder, page_id):
+@app.route("/get_segments_1/<user_id>/<folder>/<page_id>")
+def get_segments_1(user_id, folder, page_id):
     """Return segments for a specific page"""
     try:
         # First try to find the combined JSON file (stored at the parent level)
@@ -1159,3 +1159,58 @@ def get_segment_json(user_id, folder, page_id, segment_id):
     except Exception as e:
         current_app.logger.error(f"Error serving segment json: {str(e)}")
         return f"Error serving segment json: {str(e)}", 500
+
+
+@app.route("/get_segment_preview/<user_id>/<folder>/<page_id>/<segment_index>")
+def get_segment_preview(user_id, folder, page_id, segment_index):
+    try:
+        segments_dir = os.path.join(
+            current_app.config["UPLOAD_FOLDER"], user_id, folder, "TOOCR", page_id
+        )
+
+        if not os.path.exists(segments_dir):
+            return (
+                jsonify({"success": False, "error": "Segments directory not found"}),
+                404,
+            )
+
+        segment_files = sorted(
+            [f for f in os.listdir(segments_dir) if f.endswith(".json")]
+        )
+        segment_idx = int(segment_index)
+
+        if not (0 <= segment_idx < len(segment_files)):
+            return (
+                jsonify({"success": False, "error": "Segment index out of bounds"}),
+                404,
+            )
+
+        json_filename = segment_files[segment_idx]
+        with open(os.path.join(segments_dir, json_filename), "r") as f:
+            segment_data = json.load(f)
+
+        # Generate image URL
+        image_url = url_for(
+            "app.get_segment_image",
+            user_id=user_id,
+            folder=folder,
+            page_id=page_id,
+            segment_id=segment_data.get("id", segment_idx),
+        )
+
+        return jsonify(
+            {
+                "success": True,
+                "data": {
+                    "text": segment_data.get("text", ""),
+                    "imageUrl": image_url,
+                    "confidence": segment_data.get("confidence"),
+                    "id": segment_data.get("id"),
+                    "coords": segment_data.get("coords", []),
+                },
+            }
+        )
+
+    except Exception as e:
+        current_app.logger.error(f"Error getting segment preview: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500

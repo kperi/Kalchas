@@ -65,20 +65,19 @@
                 </form>
 
                 {% if selected_folder and request.args.get('selected_png') %}
-                <form method="get" action="{{ url_for('app.image_preview') }}" id="segment-form">
+                <form id="segment-form" onsubmit="return false;">
                     <input type="hidden" name="selected_folder" value="{{ selected_folder }}">
                     <input type="hidden" name="selected_png" value="{{ request.args.get('selected_png') }}">
                     <div style="margin-top: 1rem;">
                         <label for="segment-select">Select Detected Segment:</label>
-                        <select name="selected_segment" id="segment-select" onchange="document.getElementById('segment-form').submit()">
+                        <select name="selected_segment" id="segment-select">
                             <option value="">-- Select Segment --</option>
-                            <!-- Segments will be populated in JavaScript after OCR completes -->
+                            <!-- Segments will be populated in JavaScript -->
                         </select>
                         <div id="segment-loading" style="font-size: 0.8em; margin-top: 5px; color: #6c757d;">
                             Run OCR to detect segments
                         </div>
                     </div>
-                    <noscript><button type="submit" class="gradio-button gradio-button-secondary">View Segment</button></noscript>
                 </form>
                 {% endif %}
 
@@ -166,12 +165,23 @@
                                     </div>
                                     <button id="next-segment-btn" class="gradio-button gradio-button-secondary" style="padding: 5px 10px; font-size:0.9em;">Next &gt;</button>
                                 </div>
-                                <div class="selected-line-text" style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; font-family: monospace; min-height: 30px;">
+                                <div class="selected-line-text" style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; font-family: monospace; min-height: 30px; margin-bottom: 10px;">
                                     <!-- Selected line text will be shown here by showSelectedSegment JS function -->
                                 </div>
+                                <button id="view-segment-json-btn" class="gradio-button gradio-button-sm" style="font-size:0.8em; padding: 3px 8px;">View Segment JSON</button>
                             </div>
                         </div>
                         
+                        <!-- Container for displaying segment JSON -->
+                        <div id="segment-json-display-container" style="display: none; margin-top: 1rem; margin-bottom: 1rem; padding: 1rem; border: 1px solid #e0e0e0; background-color: #f8f9fa; border-radius: 5px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                <h6 style="margin: 0;">Segment JSON Data:</h6>
+                                <button id="close-segment-json-btn" class="gradio-button gradio-button-sm" style="font-size:0.8em; padding: 3px 8px;">×</button>
+                            </div>
+                            <div id="segment-json-loading" style="display: none; color: #6c757d; font-size: 0.9em; padding: 10px 0;">Loading JSON data...</div>
+                            <pre id="segment-json-content" style="white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; background-color: #fff; padding:10px; border-radius: 3px; margin-bottom: 0;"></pre>
+                        </div>
+
                         <textarea id="ocr-result" placeholder="Extracted text will appear here..." style="height: 200px; width: 100%; font-family: monospace;" readonly></textarea>
                         {# <div id="ocr-status" style="margin-top: 0.5rem; font-size: 0.8em; color: #6c757d;"></div> #}
                     </div>
@@ -210,6 +220,9 @@
             // Event listeners for new Prev/Next buttons
             const prevBtn = document.getElementById('prev-segment-btn');
             const nextBtn = document.getElementById('next-segment-btn');
+            const viewJsonBtn = document.getElementById('view-segment-json-btn');
+            const closeJsonBtn = document.getElementById('close-segment-json-btn');
+            const jsonDisplayContainer = document.getElementById('segment-json-display-container');
 
             if (prevBtn) {
                 prevBtn.onclick = function() {
@@ -225,7 +238,141 @@
                     }
                 };
             }
+            // Update the view JSON button handler
+            if (viewJsonBtn) {
+                viewJsonBtn.onclick = function() {
+                    toggleSegmentJson(true); // true to show
+                };
+            }
+            
+            if (closeJsonBtn) {
+                closeJsonBtn.onclick = function() {
+                    toggleSegmentJson(false); // false to hide
+                };
+            }
         });
+
+        function toggleSegmentJson(show) {
+            const container = document.getElementById('segment-json-display-container');
+            const loadingEl = document.getElementById('segment-json-loading');
+            const contentEl = document.getElementById('segment-json-content');
+            
+            if (!container || !loadingEl || !contentEl) {
+                console.error('[toggleSegmentJson] Required elements not found');
+                return;
+            }
+            
+            if (show) {
+                container.style.display = 'block';
+                loadingEl.style.display = 'block';
+                contentEl.style.display = 'none';
+                fetchSegmentJson();
+            } else {
+                container.style.display = 'none';
+                contentEl.textContent = '';
+            }
+        }
+
+        function fetchSegmentJson() {
+            const loadingEl = document.getElementById('segment-json-loading');
+            const contentEl = document.getElementById('segment-json-content');
+            
+            if (!loadingEl || !contentEl) {
+                console.error('[fetchSegmentJson] Required elements not found');
+                return;
+            }
+            
+            // Debug logging
+            console.log('[fetchSegmentJson] Current state:', {
+                index: currentSegmentDisplayIndex,
+                listLength: currentSegmentsList?.length,
+                folder: currentSegmentFolderGlobal,
+                pageId: currentSegmentPageIdGlobal
+            });
+
+            // Validate segment index
+            if (currentSegmentDisplayIndex < 0 || !currentSegmentsList || currentSegmentDisplayIndex >= currentSegmentsList.length) {
+                const error = 'No segment is currently selected or invalid segment index.';
+                console.error('[fetchSegmentJson]', error);
+                contentEl.textContent = `Error: ${error}`;
+                loadingEl.style.display = 'none';
+                contentEl.style.display = 'block';
+                return;
+            }
+            
+            // Get current segment
+            const segment = currentSegmentsList[currentSegmentDisplayIndex];
+            
+            // Debug logging
+            console.log('[fetchSegmentJson] Selected segment:', segment);
+
+            // Validate segment object
+            if (!segment) {
+                const error = 'Selected segment data is null or undefined.';
+                console.error('[fetchSegmentJson]', error);
+                contentEl.textContent = `Error: ${error}`;
+                loadingEl.style.display = 'none';
+                contentEl.style.display = 'block';
+                return;
+            }
+
+            // Get segment ID (handle both string and number types)
+            const segmentId = segment.id !== undefined ? String(segment.id) : 
+                             currentSegmentDisplayIndex.toString().padStart(3, '0');
+            
+            if (!segmentId) {
+                const error = 'Unable to determine segment ID.';
+                console.error('[fetchSegmentJson]', error);
+                contentEl.textContent = `Error: ${error}`;
+                loadingEl.style.display = 'none';
+                contentEl.style.display = 'block';
+                return;
+            }
+
+            const userId = '{{ session.get("user_id", "anonymous") }}';
+            const folder = currentSegmentFolderGlobal;
+            const pageId = currentSegmentPageIdGlobal;
+            
+            if (!userId || !folder || !pageId) {
+                const error = 'Missing required information to fetch JSON data.';
+                console.error('[fetchSegmentJson]', error, { userId, folder, pageId });
+                contentEl.textContent = `Error: ${error}`;
+                loadingEl.style.display = 'none';
+                contentEl.style.display = 'block';
+                return;
+            }
+            
+            // Construct URL with proper encoding
+            const jsonUrl = `/get_segment_json/${encodeURIComponent(userId)}/${encodeURIComponent(folder)}/${encodeURIComponent(pageId)}/${encodeURIComponent(segmentId)}`;
+            
+            console.log('[fetchSegmentJson] Fetching JSON from:', jsonUrl);
+            
+            // Show loading state
+            loadingEl.style.display = 'block';
+            contentEl.style.display = 'none';
+            
+            fetch(jsonUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            throw new Error(`Server error ${response.status}: ${text}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Format JSON with indentation for readability
+                    contentEl.textContent = JSON.stringify(data, null, 2);
+                    loadingEl.style.display = 'none';
+                    contentEl.style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('[fetchSegmentJson] Error:', error);
+                    contentEl.textContent = `Error loading JSON: ${error.message}`;
+                    loadingEl.style.display = 'none';
+                    contentEl.style.display = 'block';
+                });
+        }
 
         function updateNavigationButtons() {
             const prevBtn = document.getElementById('prev-segment-btn');
@@ -239,40 +386,95 @@
             nextBtn.style.opacity = nextBtn.disabled ? 0.6 : 1;
         }
 
-        function displaySegmentByIndex(index) {
+        function displaySegmentByIndex(index, updateUrl = true) {
             if (index >= 0 && index < currentSegmentsList.length) {
                 currentSegmentDisplayIndex = index;
-                const segment = currentSegmentsList[index];
-                // Ensure global folder and pageId are set before calling showSelectedSegment
-                showSelectedSegment(currentSegmentFolderGlobal, currentSegmentPageIdGlobal, segment); 
+                
+                // Update navigation buttons state
                 updateNavigationButtons();
 
-                // Highlight the corresponding button in the top .line-segments-nav
+                // Update segment buttons highlighting
                 document.querySelectorAll('.line-segments-nav .segment-btn').forEach((btn, i) => {
                     if (i === index) {
-                        btn.style.backgroundColor = '#e9ecef'; btn.style.borderColor = '#adb5bd'; btn.style.fontWeight = 'bold';
+                        btn.style.backgroundColor = '#e9ecef';
+                        btn.style.borderColor = '#adb5bd';
+                        btn.style.fontWeight = 'bold';
                     } else {
-                        btn.style.backgroundColor = '#f1f3f5'; btn.style.borderColor = '#dee2e6'; btn.style.fontWeight = 'normal';
+                        btn.style.backgroundColor = '#f1f3f5';
+                        btn.style.borderColor = '#dee2e6';
+                        btn.style.fontWeight = 'normal';
                     }
                 });
 
-                // Update the sidebar dropdown to reflect the current segment
-                const segmentSelectDropdown = document.getElementById('segment-select');
-                if (segmentSelectDropdown) {
-                    // Check if the dropdown's current value is different from the new index
-                    // to prevent re-triggering change event if already correctly set (e.g., on page load by checkForExistingSegments)
-                    if (segmentSelectDropdown.value !== String(index)) {
-                        segmentSelectDropdown.value = index;
-                        // Trigger the onchange event to submit the form and reload the page
-                        // This will re-render the sidebar preview server-side
-                        console.log(`[displaySegmentByIndex] Dropdown value changed to ${index}, dispatching change event to submit form.`);
-                        segmentSelectDropdown.dispatchEvent(new Event('change'));
-                    } else {
-                        console.log(`[displaySegmentByIndex] Dropdown value already ${index}, no change event dispatched.`);
-                    }
+                // Update dropdown without triggering form submit
+                const segmentSelect = document.getElementById('segment-select');
+                if (segmentSelect) {
+                    segmentSelect.value = index;
                 }
+
+                // Update URL if requested
+                if (updateUrl) {
+                    const url = new URL(window.location);
+                    url.searchParams.set('selected_segment', index);
+                    history.pushState({ segmentIndex: index }, '', url);
+                }
+
+                // Fetch and display segment preview
+                const userId = '{{ session.get("user_id", "anonymous") }}';
+                const previewUrl = `/get_segment_preview/${encodeURIComponent(userId)}/${encodeURIComponent(currentSegmentFolderGlobal)}/${encodeURIComponent(currentSegmentPageIdGlobal)}/${index}`;
+                
+                // Show loading state
+                const imageContainer = document.querySelector('.selected-line-image');
+                const textContainer = document.querySelector('.selected-line-text');
+                if (imageContainer) imageContainer.innerHTML = '<p style="text-align:center; color:#6c757d;">Loading image...</p>';
+                if (textContainer) textContainer.innerHTML = '<p style="text-align:center; color:#6c757d;">Loading text...</p>';
+
+                fetch(previewUrl)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Server returned ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then((data) => {
+                        if (data.success && data.data) {
+                            // Update image
+                            if (imageContainer && data.data.imageUrl) {
+                                imageContainer.innerHTML = `
+                                    <img src="${data.data.imageUrl}" 
+                                         alt="Segment ${index + 1}" 
+                                         style="max-width: 100%; max-height:150px; border: 1px solid #dee2e6; object-fit: contain; background-color: #fff;"
+                                         onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<p style=\\\'color:red;\\\'>Error loading image</p>';">
+                                `;
+                            }
+
+                            // Update text
+                            if (textContainer) {
+                                let displayText = data.data.text || '(No text available)';
+                                if (data.data.confidence) {
+                                    displayText += ` (Confidence: ${data.data.confidence.toFixed(3)})`;
+                                }
+                                textContainer.textContent = displayText;
+                            }
+                        } else {
+                            throw new Error(data.error || 'Failed to load segment preview');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error loading segment preview:', error);
+                        if (imageContainer) imageContainer.innerHTML = '<p style="color:red;">Error loading image</p>';
+                        if (textContainer) textContainer.innerHTML = '<p style="color:red;">Error loading text</p>';
+                    });
             }
         }
+
+        // Update the segment-select dropdown handler
+        document.getElementById('segment-select').onchange = function() {
+            const selectedIndex = parseInt(this.value, 10);
+            if (!isNaN(selectedIndex)) {
+                displaySegmentByIndex(selectedIndex, true);
+            }
+        };
         
         function checkForExistingSegments(folder, pageId) {
             const segmentLoading = document.getElementById('segment-loading');
