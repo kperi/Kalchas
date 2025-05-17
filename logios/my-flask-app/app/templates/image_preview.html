@@ -6,6 +6,19 @@
     <title>Document Preview & OCR - Logios App</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <style>
+        .loading-dots::after {
+            content: ' .';
+            animation: dots 1s steps(5, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { color: rgba(0,0,0,0); text-shadow: .25em 0 0 rgba(0,0,0,0), .5em 0 0 rgba(0,0,0,0); }
+            40% { color: inherit; text-shadow: .25em 0 0 rgba(0,0,0,0), .5em 0 0 rgba(0,0,0,0); }
+            60% { text-shadow: .25em 0 0 inherit, .5em 0 0 rgba(0,0,0,0); }
+            80%, 100% { text-shadow: .25em 0 0 inherit, .5em 0 0 inherit; }
+        }
+    </style>
 </head>
 <body>
     {% extends "layout.html" %}
@@ -98,55 +111,50 @@
                              alt="Page Preview">
                     </div>
 
-                    <!-- START: Preview for Segment Selected from Sidebar Dropdown -->
-                    {% if selected_segment %} {# selected_segment is passed from routes.py context #}
-                        <div id="sidebar-selected-segment-preview" style="margin-top: 1rem; margin-bottom: 1rem; padding: 1rem; border: 1px solid #e0e0e0; background-color: #fdfdfd; border-radius: 5px;">
-                            <h5 style="margin-top:0; margin-bottom: 0.5rem; font-size: 1em; color: #333;">
-                                Preview of Selected Segment: {{ selected_segment_id_display | default(selected_segment) }} {# Assume backend provides selected_segment_id_display if different from index #}
-                            </h5>
-                            <div style="text-align: center; margin-bottom: 0.5rem;">
-                                <!-- Use the filename resolved by the backend -->
-                            
-
-                                <img src="{{ url_for('app.get_segment_image', user_id=session.get('user_id', 'anonymous'), folder=selected_folder, page_id=request.args.get('selected_png').split('.')[0], segment_id=selected_segment) }}"
-                                     alt="Selected Segment Image"
-                                     style="max-width: 100%; max-height: 200px; border: 1px solid #ccc; object-fit: contain; background-color: #fff;"
-                                     onerror="this.onerror=null; this.alt='Image not found or error loading.'; this.src=''; this.parentElement.innerHTML='<p style=\\\'font-size:0.9em; color:red;\\\'>Image not found: {{ resolved_segment_image_filename }}</p>';">
-                            </div>
-                            {% if segment_data and segment_data.text %} {# segment_data is also passed from routes.py context #}
-                                <div style="padding: 0.5rem; background-color: #f0f0f0; border-radius: 3px;">
-                                    <p style="font-family: monospace; white-space: pre-wrap; font-size: 0.9em; margin:0; color: #333;">
-                                        {% if segment_data.text is string %}
-                                            {{ segment_data.text }}
-                                        {% elif segment_data.text is iterable and segment_data.text[0] is string %}
-                                            {{ segment_data.text[0] }} {# Assuming [text, confidence] format #}
-                                            {% if segment_data.text[1] is number %}
-                                                (Confidence: {{ "%.3f"|format(segment_data.text[1]) }})
-                                            {% endif %}
-                                        {% else %}
-                                            {{ segment_data.text | tojson }} {# Fallback for other structures #}
-                                        {% endif %}
-                                    </p>
-                                </div>
-                            {% elif segment_data %}
-                                <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">(No text data available for this segment in the JSON)</p>
-                            {% endif %}
-                            <p style="font-size: 0.8em; color: #6c757d; margin-bottom: 0.3rem; word-break: break-all;">
-                                <!-- Display the path using the resolved filename -->
-                                Image Path: <code>/uploads/{{ session.get('user_id', 'anonymous') }}/{{ selected_folder }}/TOOCR/{{ request.args.get('selected_png').split('.')[0] }}/{{ resolved_segment_image_filename }}</code>
-                            </p>
-                        </div>
-                    {% endif %}
-                    <!-- END: Preview for Segment Selected from Sidebar Dropdown -->
+                    <!-- MOVED BLOCK WILL GO HERE -->
 
                     <div class="ocr-section gradio-component-group" style="margin-top:0; padding: 1rem; background-color: #f9fafb;"> <!-- Nested component group for OCR -->
                         <h4>Text Recognition (OCR)</h4>
                         <button class="gradio-button gradio-button-primary" onclick="performOCR()" style="margin-bottom: 1rem;">Extract Text from Page</button>
                         
+                        <!-- START: Preview for Segment Selected from Sidebar Dropdown - MOVED HERE -->
+                        {% if selected_segment %} {# selected_segment is passed from routes.py context #}
+                            <div id="sidebar-selected-segment-preview" style="margin-top: 1rem; margin-bottom: 1rem; padding: 1rem; border: 1px solid #e0e0e0; background-color: #fdfdfd; border-radius: 5px;">
+                                <h5 style="margin-top:0; margin-bottom: 0.5rem; font-size: 1em; color: #333;">
+                                    Preview of Selected Segment: {{ selected_segment_id_display | default(selected_segment) }}
+                                </h5>
+                                <div style="text-align: center; margin-bottom: 0.5rem;">
+                                    <img src="{{ url_for('app.get_segment_image', user_id=session.get('user_id', 'anonymous'), folder=selected_folder, page_id=request.args.get('selected_png').split('.')[0], segment_id=selected_segment) }}"
+                                         alt="Selected Segment Image"
+                                         style="max-width: 100%; max-height: 200px; border: 1px solid #ccc; object-fit: contain; background-color: #fff;"
+                                         onerror="this.onerror=null; this.alt='Image not found or error loading.'; this.src=''; this.parentElement.innerHTML='<p style=\\\'font-size:0.9em; color:red;\\\'>Image not found: {{ resolved_segment_image_filename }}</p>';">
+                                </div>
+                                {% if segment_data and segment_data.text %}
+                                    <div style="padding: 0.5rem; background-color: #f0f0f0; border-radius: 3px;">
+                                        <p style="font-family: monospace; white-space: pre-wrap; font-size: 0.9em; margin:0; color: #333;">
+                                            {% if segment_data.text is string %}
+                                                {{ segment_data.text }}
+                                            {% elif segment_data.text is iterable and segment_data.text[0] is string %}
+                                                {{ segment_data.text[0] }}
+                                                {% if segment_data.text[1] is number %}
+                                                    (Confidence: {{ "%.3f"|format(segment_data.text[1]) }})
+                                                {% endif %}
+                                            {% else %}
+                                                {{ segment_data.text | tojson }}
+                                            {% endif %}
+                                        </p>
+                                    </div>
+                                {% elif segment_data %}
+                                    <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">(No text data available for this segment in the JSON)</p>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                        <!-- END: Preview for Segment Selected from Sidebar Dropdown -->
+
                         <!-- Line Segments Navigation - Initially hidden -->
                         <div id="line-segments-container" style="display: none; margin-bottom: 1rem;">
                             <h5>Line Segments</h5>
-                            <div class="line-segments-nav" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; max-height: 200px; overflow-y: auto;">
+                            <div class="line-segments-nav" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; max-height: 200px; overflow-y: auto; justify-content: flex-start;">
                                 <!-- Line segments will be added here dynamically by loadLineSegments JS function -->
                             </div>
                             
@@ -181,7 +189,7 @@
         </main>
     </div>
 
-    <script>
+     <script>
         // Global variables to store segment context for navigation
         let currentSegmentsList = [];
         let currentSegmentFolderGlobal = '';
@@ -226,6 +234,9 @@
 
             prevBtn.disabled = (currentSegmentDisplayIndex <= 0);
             nextBtn.disabled = (currentSegmentDisplayIndex >= currentSegmentsList.length - 1);
+            // UX: Add a visual cue for disabled state if not handled by CSS
+            prevBtn.style.opacity = prevBtn.disabled ? 0.6 : 1;
+            nextBtn.style.opacity = nextBtn.disabled ? 0.6 : 1;
         }
 
         function displaySegmentByIndex(index) {
@@ -244,6 +255,22 @@
                         btn.style.backgroundColor = '#f1f3f5'; btn.style.borderColor = '#dee2e6'; btn.style.fontWeight = 'normal';
                     }
                 });
+
+                // Update the sidebar dropdown to reflect the current segment
+                const segmentSelectDropdown = document.getElementById('segment-select');
+                if (segmentSelectDropdown) {
+                    // Check if the dropdown's current value is different from the new index
+                    // to prevent re-triggering change event if already correctly set (e.g., on page load by checkForExistingSegments)
+                    if (segmentSelectDropdown.value !== String(index)) {
+                        segmentSelectDropdown.value = index;
+                        // Trigger the onchange event to submit the form and reload the page
+                        // This will re-render the sidebar preview server-side
+                        console.log(`[displaySegmentByIndex] Dropdown value changed to ${index}, dispatching change event to submit form.`);
+                        segmentSelectDropdown.dispatchEvent(new Event('change'));
+                    } else {
+                        console.log(`[displaySegmentByIndex] Dropdown value already ${index}, no change event dispatched.`);
+                    }
+                }
             }
         }
         
@@ -253,7 +280,7 @@
             
             if (!segmentLoading || !segmentSelect) return;
             
-            segmentLoading.textContent = "Checking for existing segments...";
+            segmentLoading.innerHTML = '<span class="loading-dots">Checking for existing segments</span>'; // UX: Use innerHTML for potential styling
             
             while (segmentSelect.options.length > 1) {
                 segmentSelect.remove(1);
@@ -301,7 +328,7 @@
                             segmentSelect.appendChild(option);
                         });
                         
-                        segmentLoading.textContent = `${data.segments.length} segments available`;
+                        segmentLoading.textContent = `${data.segments.length} segments available.`;
                         
                         const urlParams = new URLSearchParams(window.location.search);
                         const selectedSegmentFromUrl = urlParams.get('selected_segment'); // This should be an index
@@ -328,7 +355,7 @@
                 })
                 .catch(error => {
                     console.error('[checkForExistingSegments] Error loading segments:', error);
-                    segmentLoading.textContent = "Error loading segments. Run OCR to detect segments.";
+                    segmentLoading.innerHTML = '<span style="color:red;">Error loading segments.</span> Run OCR to detect segments.'; // UX: Clearer error
                     // Ensure the main segment navigation area is hidden on error
                     const lineSegmentsContainer = document.getElementById('line-segments-container');
                     if (lineSegmentsContainer) {
@@ -376,7 +403,7 @@
                     option.textContent = displayText;
                     segmentSelect.appendChild(option);
                 });
-                if (segmentLoading) segmentLoading.textContent = `${segments.length} segments detected`;
+                if (segmentLoading) segmentLoading.textContent = `${segments.length} segments detected.`;
 
                 const urlParams = new URLSearchParams(window.location.search);
                 const selectedSegmentFromUrl = urlParams.get('selected_segment'); // This should be an index
@@ -398,9 +425,10 @@
 
             ocrButton.disabled = true;
             ocrButton.textContent = "Processing...";
-            resultArea.value = "OCR processing in progress. Please wait...";
+            ocrButton.style.opacity = 0.6; // UX: Visual cue for disabled
+            resultArea.value = "Initializing text recognition..."; // UX: Initial message
             if(lineSegmentsContainer) lineSegmentsContainer.style.display = 'none';
-            if (segmentLoading) segmentLoading.textContent = "Processing segments...";
+            if (segmentLoading) segmentLoading.innerHTML = '<span class="loading-dots">Processing segments</span>'; // UX: Loading state
 
             const selectedPng = "{{ request.args.get('selected_png') }}";
             const selectedFolder = "{{ selected_folder }}";
@@ -411,6 +439,7 @@
                 body: JSON.stringify({ folder: selectedFolder, filename: selectedPng })
             })
             .then(response => {
+                resultArea.value = "Analyzing page content, please wait..."; // UX: Intermediate message
                 if (!response.ok) {
                     throw new Error(`OCR server returned status ${response.status}`);
                 }
@@ -421,24 +450,24 @@
                 if (data.success) {
                     // Safely set the main OCR text result
                     if (typeof data.text === 'string') {
-                        resultArea.value = data.text;
+                        resultArea.value = data.text.trim() || "(No text content recognized)"; // UX: Handle empty string
                     } else if (data.segments && data.segments.length > 0) {
                         let fullText = data.segments.map(s => {
                             if (typeof s.text === 'string') return s.text;
                             if (Array.isArray(s.text) && typeof s.text[0] === 'string') return s.text[0];
                             return '';
                         }).join('\n');
-                        resultArea.value = fullText.trim() || "Segments processed. See details below.";
+                        resultArea.value = fullText.trim() || "Segments processed. See details below or select a segment."; // UX: Clearer message
                     } else if (data.status) {
                          resultArea.value = `OCR Status: ${data.status}${data.file ? '\nFile: ' + data.file : ''}`;
                     } else {
-                        resultArea.value = "OCR processing complete. View segments below.";
+                        resultArea.value = "OCR processing complete. No text content found or segments detected."; // UX: More specific
                     }
 
                     // Update the sidebar segments dropdown
                     if (data.page_id && data.segments && data.segments.length > 0) {
                         populateSegmentsDropdown(selectedFolder, data.page_id, data.segments);
-                        if (segmentLoading) segmentLoading.textContent = `${data.segments.length} segments detected`;
+                        if (segmentLoading) segmentLoading.textContent = `${data.segments.length} segments detected.`;
                     } else {
                         if (segmentLoading) segmentLoading.textContent = "No segments detected by OCR.";
                     }
@@ -452,19 +481,20 @@
                          if(lineSegmentsContainer) lineSegmentsContainer.style.display = 'none';
                     }
                 } else {
-                    resultArea.value = "Error performing OCR: " + (data.error || "Unknown error");
-                    if (segmentLoading) segmentLoading.textContent = "OCR failed. Please try again.";
+                    resultArea.value = "Error performing OCR: " + (data.error || "Unknown error. Please check console."); // UX: Suggest console
+                    if (segmentLoading) segmentLoading.innerHTML = '<span style="color:red;">OCR failed.</span> Please try again.'; // UX: Clearer error
                     console.error('performOCR - OCR Error:', data.error);
                 }
             })
             .catch(error => {
-                resultArea.value = "Error performing OCR: " + error.message;
+                resultArea.value = "Error performing OCR: " + error.message + " (Check network connection and console)."; // UX: Suggest console
                 console.error('performOCR - Fetch/Network Error:', error);
-                if (segmentLoading) segmentLoading.textContent = "OCR error. Please try again.";
+                if (segmentLoading) segmentLoading.innerHTML = '<span style="color:red;">OCR error.</span> Please try again.'; // UX: Clearer error
             })
             .finally(() => {
                 ocrButton.disabled = false;
                 ocrButton.textContent = "Extract Text from Page";
+                ocrButton.style.opacity = 1; // UX: Reset opacity
             });
         }
         
@@ -481,10 +511,10 @@
                 return;
             }
 
-            lineSegmentsNav.innerHTML = ''; 
+            lineSegmentsNav.innerHTML = '<p style="font-size:0.9em; color:#6c757d; padding:10px;" class="loading-dots">Loading line segments</p>'; // UX: Loading message
             selectedLineImageEl.innerHTML = ''; 
             selectedLineTextEl.innerText = ''; 
-            lineSegmentsContainer.style.display = 'none'; 
+            lineSegmentsContainer.style.display = 'block'; // UX: Show container to display loading/message
             currentSegmentsList = []; // Reset global list
             currentSegmentDisplayIndex = -1; // Reset index
             currentSegmentFolderGlobal = folder; // Store for use by displaySegmentByIndex
@@ -511,11 +541,12 @@
                 })
                 .then(data => {
                     console.log('[loadLineSegments] Segments data received:', JSON.stringify(data, null, 2)); 
-                    
+                    lineSegmentsNav.innerHTML = ''; // Clear loading message
+
                     if (data && data.success === true && data.segments && Array.isArray(data.segments) && data.segments.length > 0) {
                         currentSegmentsList = data.segments; // Store fetched segments globally
                         console.log(`[loadLineSegments] ${currentSegmentsList.length} segments found. Displaying container.`);
-                        lineSegmentsContainer.style.display = 'block'; 
+                        // lineSegmentsContainer.style.display = 'block'; // Already set to block
 
                         currentSegmentsList.forEach((segment, index) => {
                             if (!segment || typeof segment !== 'object') {
@@ -527,8 +558,8 @@
                             segmentBtn.className = 'segment-btn';
                             segmentBtn.style.cssText = `
                                 padding: 5px 10px; background-color: #f1f3f5; border: 1px solid #dee2e6;
-                                border-radius: 4px; cursor: pointer; min-width: 60px;
-                                text-align: center; font-size: 0.9em; margin: 2px;`;
+                                border-radius: 4px; cursor: pointer; min-width: 100px; /* Increased min-width */
+                                text-align: center; font-size: 0.9em; margin: 2px; transition: background-color 0.2s, border-color 0.2s;`; // UX: Added transition
                             
                             let btnText = `L${index + 1}`;
                             let segmentFullText = `Segment ${index + 1}`;
@@ -547,7 +578,7 @@
                                 }
                             }
                             segmentBtn.textContent = btnText;
-                            segmentBtn.title = segmentFullText;
+                            segmentBtn.title = segmentFullText; // UX: Tooltip for full text
                             segmentBtn.dataset.segmentIndex = index; // Store index for easy access
 
                             segmentBtn.onclick = function(e) {
@@ -559,13 +590,30 @@
                         });
 
                         if (currentSegmentsList.length > 0) {
-                            displaySegmentByIndex(0); // Display the first segment
-                        } else {
-                             updateNavigationButtons(); // Ensure buttons are disabled if no segments
+                            // Determine which segment to display initially
+                            const urlParams = new URLSearchParams(window.location.search);
+                            const segmentIndexFromUrl = urlParams.get('selected_segment');
+                            let initialIndexToDisplay = 0; // Default to the first segment
+
+                            if (segmentIndexFromUrl !== null) {
+                                const parsedIndex = parseInt(segmentIndexFromUrl, 10);
+                                if (!isNaN(parsedIndex) && parsedIndex >= 0 && parsedIndex < currentSegmentsList.length) {
+                                    initialIndexToDisplay = parsedIndex;
+                                    console.log(`[loadLineSegments] Initial segment index from URL: ${initialIndexToDisplay}`);
+                                } else {
+                                    console.warn(`[loadLineSegments] Invalid segment index from URL: ${segmentIndexFromUrl}. Defaulting to 0.`);
+                                }
+                            }
+                            displaySegmentByIndex(initialIndexToDisplay); // Display the segment from URL or the first one
+                        } else { 
+                             updateNavigationButtons(); 
+                             lineSegmentsNav.innerHTML = '<p style="font-size:0.9em; color:#6c757d; padding:10px;">No line segments found.</p>';
                         }
                     } else {
-                        console.log('[loadLineSegments] No valid segments found. Segment navigation will remain hidden.');
-                        lineSegmentsContainer.style.display = 'none';
+                        console.log('[loadLineSegments] No valid segments found.');
+                        lineSegmentsNav.innerHTML = '<p style="font-size:0.9em; color:#6c757d; padding:10px;">No line segments were detected for this page.</p>';
+                        selectedLineImageEl.innerHTML = '';
+                        selectedLineTextEl.innerText = '';
                         currentSegmentsList = [];
                         currentSegmentDisplayIndex = -1;
                         updateNavigationButtons();
@@ -574,7 +622,9 @@
                 })
                 .catch(error => {
                     console.error('[loadLineSegments] Fetch/Processing Error for segments:', error);
-                    lineSegmentsContainer.style.display = 'none';
+                    lineSegmentsNav.innerHTML = `<p style="font-size:0.9em; color:red; padding:10px;">Error loading line segments: ${error.message}</p>`;
+                    selectedLineImageEl.innerHTML = '';
+                    selectedLineTextEl.innerText = '';
                     currentSegmentsList = [];
                     currentSegmentDisplayIndex = -1;
                     updateNavigationButtons();
@@ -602,11 +652,11 @@
                 const imageUrl = `/uploads/{{ session.get('user_id', 'anonymous') }}/${encodeURIComponent(folder)}/TOOCR/${encodeURIComponent(pageId)}/${encodeURIComponent(segmentIdStr)}.png`;
                 console.log('[showSelectedSegment] Image URL:', imageUrl);
                 selectedLineImageContainer.innerHTML = `
-                    <img src="${imageUrl}" alt="Line segment ${segmentIdStr}" style="max-width: 100%; max-height:150px; border: 1px solid #dee2e6; object-fit: contain;"
-                         onerror="this.onerror=null; this.alt='Image not found or error loading.'; this.src=''; this.parentElement.innerHTML='<p style=\\'font-size:0.9em; color:red;\\'>Image not found: ${segmentIdStr}.png</p>';">`;
+                    <img src="${imageUrl}" alt="Line segment ${segmentIdStr}" style="max-width: 100%; max-height:150px; border: 1px solid #dee2e6; object-fit: contain; background-color: #fff;"
+                         onerror="this.onerror=null; this.alt='Image not found or error loading.'; this.src=''; this.parentElement.innerHTML='<p style=\\'font-size:0.9em; color:red;\\'>Image not found: ${segmentIdStr}.png (Path: ${imageUrl})</p>';">`; // UX: Added path to onerror
             } else {
                 console.log(`[showSelectedSegment] No image for this segment. has_image: ${segment.has_image}, id: ${segment.id}`);
-                selectedLineImageContainer.innerHTML = `<p style="font-size:0.9em; color:#6c757d;">(No image available for this segment)</p>`;
+                selectedLineImageContainer.innerHTML = `<p style="font-size:0.9em; color:#6c757d; padding: 10px 0;">(No image available for this segment)</p>`; // UX: Added padding
             }
             
             let displayText = '(No text recognized for this segment)';
@@ -619,7 +669,7 @@
                     }
                 } else displayText = JSON.stringify(segment.text); 
             } else if (segment.coords && Array.isArray(segment.coords)) {
-                 displayText = `Coordinates: [${segment.coords.join(', ')}]`;
+                 displayText = `Coordinates: [${segment.coords.join(', ')}] (No text recognized)`; // UX: Clarify no text
             }
             
             selectedLineTextContainer.innerText = displayText;

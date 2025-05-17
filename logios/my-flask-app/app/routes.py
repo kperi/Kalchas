@@ -1073,3 +1073,89 @@ def get_segment_image(user_id, folder, page_id, segment_id):
     except Exception as e:
         current_app.logger.error(f"Error serving segment image: {str(e)}")
         return f"Error serving segment image: {str(e)}", 500
+
+
+@app.route("/get_segments/<user_id>/<folder>/<page_id>")
+def get_segments(user_id, folder, page_id):
+    """Return segments for a specific page"""
+    try:
+        # First try to find the combined JSON file (stored at the parent level)
+
+        # Then check for a directory of individual segment files
+        segments_dir = os.path.join(
+            current_app.config["UPLOAD_FOLDER"],
+            user_id,
+            folder,
+            "TOOCR",
+            page_id,
+        )
+
+        import glob
+
+        pngs = glob.glob(segments_dir + "/*.png")
+        pngs = sorted(pngs)
+        for png in pngs:
+            logger.info(f"PNG FILE IS {png}")
+
+        logger.info(f"Segments path = {segments_dir}")
+        # Try the directory of individual segment files
+        if os.path.exists(segments_dir) and os.path.isdir(segments_dir):
+            segments_data = []
+            json_files = [f for f in os.listdir(segments_dir) if f.endswith(".json")]
+            json_files.sort()  # Sort to maintain order
+
+            for json_file in json_files:
+                try:
+                    with open(os.path.join(segments_dir, json_file), "r") as f:
+                        segment_data = json.load(f)
+                    segments_data.append(segment_data)
+                except Exception as e:
+                    current_app.logger.error(
+                        f"Error loading segment file {json_file}: {str(e)}"
+                    )
+
+            current_app.logger.info(
+                f"Found {len(segments_data)} individual segment files"
+            )
+            return jsonify({"success": True, "segments": segments_data})
+
+    except Exception as e:
+        current_app.logger.error(f"Error retrieving segments: {str(e)}")
+        import traceback
+
+        current_app.logger.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({"success": False, "error": str(e)})
+
+
+@app.route("/get_segment_json/<user_id>/<folder>/<page_id>/<segment_id>")
+def get_segment_json(user_id, folder, page_id, segment_id):
+    """Serve a specific segment image"""
+    # Corrected path: remove the extra "segments" directory
+    segments_dir = os.path.join(
+        current_app.config["UPLOAD_FOLDER"],
+        user_id,
+        folder,
+        "TOOCR",
+        page_id,  # Segment images are directly under the page_id directory
+    )
+
+    logger.info(f"SEGMENTS DIR: {segments_dir}")
+
+    json_path = os.path.join(segments_dir, f"{int(segment_id):03d}.json")
+    current_app.logger.info(f"Attempting to serve segment image: {json_path}")
+
+    if not os.path.exists(segments_dir):
+        current_app.logger.error(
+            f"Segments directory for page not found: {segments_dir}"
+        )
+        return "Page segments directory not found", 404
+
+    if not os.path.exists(json_path):
+        current_app.logger.error(f"Segment image file not found: {json_path}")
+        return "Segment image not found", 404
+
+    try:
+        return send_from_directory(segments_dir, f"{int(segment_id):03d}.json")
+    except Exception as e:
+        current_app.logger.error(f"Error serving segment json: {str(e)}")
+        return f"Error serving segment json: {str(e)}", 500
