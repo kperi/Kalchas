@@ -9,3 +9,21 @@ class Config:
     @staticmethod
     def init_app(app):
         pass
+
+class DevelopmentConfig(Config):
+    DEBUG = True
+    FLASK_ENV = 'development'
+    
+    @staticmethod
+    def init_app(app):
+        Config.init_app(app)
+
+class ProductionConfig(Config):
+    DEBUG = False
+    FLASK_ENV = 'production'
+
+config = {
+    'development': DevelopmentConfig,
+    'production': ProductionConfig,
+    'default': DevelopmentConfig
+}

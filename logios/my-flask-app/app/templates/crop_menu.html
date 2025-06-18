@@ -50,6 +50,87 @@
             transition: all 0.3s ease-in-out;
         }
         
+        /* Stable image preview container for centered, height-filling display */
+        #cropping-area {
+            position: relative;
+            width: 100%;
+            height: 600px;             /* Fixed height for consistent display */
+            overflow: hidden;          /* Hide overflow to maintain clean appearance */
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            background-color: #f9fafb;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        /* Cropper container fills the entire preview area */
+        #cropping-area .cropper-container {
+            width: 100% !important;
+            height: 100% !important;
+            max-width: none !important;
+            max-height: none !important;
+        }
+        
+        /* Image sized to fill height while maintaining aspect ratio */
+        #image_to_crop_element {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: 100%;              /* Fill height, width auto for aspect ratio */
+            display: block;
+            margin: 0 auto;
+            object-fit: contain;       /* Maintain aspect ratio while filling space */
+        }
+        
+        /* Ensure cropper canvas fills the container */
+        .cropper-canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+        
+        .cropper-canvas > img {
+            width: auto !important;
+            height: 100% !important;   /* Fill height */
+            max-width: none !important;
+            max-height: none !important;
+            object-fit: contain !important;
+        }
+        
+        /* Cropper container fills the preview window */
+        .cropper-container {
+            width: 100% !important;
+            height: 100% !important;
+            position: relative !important;
+        }
+        
+        /* Ensure crop box stays within reasonable bounds */
+        .cropper-crop-box {
+            max-width: 90% !important;
+            max-height: 90% !important;
+        }
+        
+        /* Prevent layout shifts during cropper initialization */
+        .cropper-container {
+            direction: ltr !important;
+            font-size: 0 !important;
+            line-height: 0 !important;
+            position: relative !important;
+            touch-action: none !important;
+            user-select: none !important;
+        }
+        
+        /* Override cropper responsive behavior */
+        .cropper-canvas,
+        .cropper-crop-box {
+            position: absolute !important;
+        }
+        
+        /* Prevent scroll-triggered zoom */
+        .cropper-container img {
+            pointer-events: auto !important;
+        }
+        
         /* Improved select styling */
         select {
             transition: border-color 0.3s ease;
@@ -79,69 +160,207 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
+        
+        /* Sidebar Layout Styles */
+        .page-layout {
+            display: flex;
+            min-height: 100vh;
+            gap: 0;
+        }
+        
+        .sidebar {
+            width: 300px;
+            background-color: #f8fafc;
+            border-right: 1px solid #e2e8f0;
+            padding: 1rem;
+            overflow-y: auto;
+            max-height: 100vh;
+            flex-shrink: 0;
+        }
+        
+        .main-content {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+        }
+        
+        .sidebar-section {
+            margin-bottom: 1.5rem;
+        }
+        
+        .sidebar-section h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 0.75rem;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 0.5rem;
+        }
+        
+        .document-item {
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            background-color: #ffffff;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .document-item:hover {
+            background-color: #f1f5f9;
+            border-color: #cbd5e1;
+            transform: translateX(2px);
+        }
+        
+        .document-item.selected {
+            background-color: #e0f2fe;
+            border-color: #0ea5e9;
+            border-left: 4px solid #0ea5e9;
+        }
+        
+        .document-name {
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 0.25rem;
+        }
+        
+        .document-meta {
+            font-size: 0.75rem;
+            color: #6b7280;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .document-status {
+            padding: 0.125rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.625rem;
+            font-weight: 500;
+        }
+        
+        .status-completed {
+            background-color: #dcfce7;
+            color: #166534;
+        }
+        
+        .status-progress {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        
+        .sidebar-loading {
+            text-align: center;
+            padding: 1rem;
+            color: #6b7280;
+        }
+        
+        /* Crop status styles */
+        .crop-status-success {
+            background-color: #dcfce7;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+        
+        .crop-status-error {
+            background-color: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+        
+        .crop-status-processing {
+            background-color: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fed7aa;
+        }
+        
+        /* Button loading state */
+        .button-loading {
+            pointer-events: none;
+            opacity: 0.7;
+        }
+        
+        /* Responsive behavior */
+        @media (max-width: 768px) {
+            .page-layout {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                max-height: 300px;
+                border-right: none;
+                border-bottom: 1px solid #e2e8f0;
+            }
+        }
     </style>
     {% endblock %}
 </head>
 <body>
     {% include 'layout.html' %}
-    <div class="container">
-        {% block content %}
-        <div class="gradio-component-group" style="max-width: 1000px; margin-left: auto; margin-right: auto;">
-            <h1>Image Cropping Tool</h1>
-
-            <div class="gradio-component-group" style="background-color: #f0f4f8; padding: 1rem; margin-bottom: 1.5rem; border-left: 4px solid #3b82f6;">
-                <h3 style="margin-top: 0; color: #1f2937;">User Workspace</h3>
-                <p style="font-family: monospace; background-color: #ffffff; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 4px; margin: 0; word-break: break-all;">
-                    User: {{ session.get('user_id', 'anonymous') }} | Documents: {{ documents|length }}
+    <div class="page-layout">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <h3>User Workspace</h3>
+                <p style="font-family: monospace; background-color: #ffffff; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; margin: 0; word-break: break-all; font-size: 0.75rem;">
+                    User: {{ session.get('user_id', 'anonymous') }}
                 </p>
-                
-                {% if documents %}
-                <h4 style="margin-top: 1rem; margin-bottom: 0.5rem; color: #1f2937;">Your Documents:</h4>
-                <div style="background-color: #ffffff; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 4px; max-height: 300px; overflow-y: auto;">
-                    {% for doc in documents %}
-                        <div style="margin-bottom: 0.5rem; padding: 0.5rem; background-color: {% if doc.name == selected_folder %}#e0f2fe{% else %}#f9fafb{% endif %}; border-radius: 3px; border-left: 3px solid {% if doc.is_completed %}#4caf50{% else %}#ff9800{% endif %};">
-                            <div style="display: flex; justify-content: between; align-items: center;">
-                                <strong>{{ doc.name }}</strong>
-                                <span style="margin-left: auto; font-size: 0.8em; color: #666;">
-                                    {% if doc.is_completed %}✅ Completed{% else %}🔄 In Progress{% endif %}
-                                    | {{ doc.total_png_count }} images
-                                </span>
-                            </div>
-                            {% if doc.pdf_files %}
-                                <div style="margin-top: 0.25rem; font-size: 0.85em; color: #666;">
-                                    PDF: {{ doc.pdf_files|join(', ') }}
-                                </div>
-                            {% endif %}
-                            {% if doc.name == selected_folder and png_files_in_selected_folder %}
-                                <ul style="margin: 0.5rem 0 0 1rem; font-family: monospace; font-size: 0.9em;">
-                                    {% for png_file in png_files_in_selected_folder %}
-                                        <li style="margin-bottom: 0.25rem;">{{ png_file }}</li>
-                                    {% endfor %}
-                                </ul>
-                            {% endif %}
-                        </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div style="text-align: center; padding: 2rem; color: #666;">
-                    <p>No documents found. <a href="{{ url_for('app.show_upload_page') }}" class="gradio-button gradio-button-primary" style="text-decoration: none; display: inline-block; margin-top: 1rem;">Upload your first document</a></p>
-                </div>
-                {% endif %}
             </div>
+            
+            <div class="sidebar-section">
+                <h3>Documents</h3>
+                <div id="sidebar-documents-container">
+                    <div id="sidebar-loading" class="sidebar-loading" style="display: none;">
+                        <span class="loading-spinner"></span>
+                        <div>Loading documents...</div>
+                    </div>
+                    <div id="sidebar-documents-list">
+                        {% if documents %}
+                            {% for doc in documents %}
+                                <div class="document-item {% if doc.name == selected_folder %}selected{% endif %}" 
+                                     data-document-name="{{ doc.name }}">
+                                    <div class="document-name">{{ doc.name }}</div>
+                                    <div class="document-meta">
+                                        <span>{{ doc.total_png_count }} images</span>
+                                        <span class="document-status {% if doc.is_completed %}status-completed{% else %}status-progress{% endif %}">
+                                            {% if doc.is_completed %}Completed{% else %}In Progress{% endif %}
+                                        </span>
+                                    </div>
+                                    {% if doc.pdf_files %}
+                                        <div style="font-size: 0.625rem; color: #9ca3af; margin-top: 0.25rem;">
+                                            PDF: {{ doc.pdf_files|join(', ') }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div style="text-align: center; padding: 1rem; color: #666; font-size: 0.875rem;">
+                                <p>No documents found.</p>
+                                <a href="{{ url_for('app.show_upload_page') }}" class="gradio-button gradio-button-primary" style="text-decoration: none; display: inline-block; margin-top: 0.5rem; font-size: 0.75rem; padding: 0.5rem 0.75rem;">Upload Document</a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            {% block content %}
+            <div class="gradio-component-group" style="max-width: 1000px; margin-left: auto; margin-right: auto;">
+                <h1>Image Cropping Tool</h1>
 
             {% if documents %}
             <div class="gradio-component-group" style="background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
                 <div style="margin-bottom: 1rem;">
-                    <label for="folder-select">Select Document:</label>
-                    <select name="selected_folder" id="folder-select">
-                        <option value="">-- Select a Document --</option>
-                        {% for folder in folders %}
-                            <option value="{{ folder }}" {% if folder == selected_folder %}selected{% endif %}>{{ folder }}</option>
-                        {% endfor %}
-                    </select>
-                    <div id="folder-loading" style="display: none; margin-left: 10px; color: #666;">
+                    <div id="folder-loading" style="display: none; margin-bottom: 10px; color: #666;">
                         <span class="loading-spinner"></span>
                         <span>Loading images...</span>
+                    </div>
+                    <div id="selected-document-info" style="{% if not selected_folder %}display: none;{% endif %}">
+                        <h3 style="margin-top: 0; color: #1f2937;">Selected Document: <span id="current-document-name">{{ selected_folder or '' }}</span></h3>
                     </div>
                 </div>
                 
@@ -207,7 +426,20 @@
                 </div>
 
                 <div id="crop-controls" class="fade-in smooth-transition" style="text-align: center; margin-top: 1.5rem; {% if not (selected_folder and image_to_crop_filename) %}display: none;{% endif %}">
-                    <button id="crop-button-action" class="gradio-button gradio-button-primary">Crop Selected Area</button>
+                    <button id="crop-button-action" class="gradio-button gradio-button-primary">
+                        <span id="crop-button-text">Crop Selected Area</span>
+                        <span id="crop-loading" style="display: none;">
+                            <span class="loading-spinner"></span>
+                            Processing...
+                        </span>
+                    </button>
+                    
+                    <!-- Crop status messages -->
+                    <div id="crop-status" style="margin-top: 1rem; padding: 0.75rem; border-radius: 6px; display: none;">
+                        <div id="crop-status-message"></div>
+                    </div>
+                    
+                    <!-- Hidden form for fallback (kept for compatibility) -->
                     <form id="crop-result-form" method="POST" action="{{ url_for('app.process_cropped_image') }}" style="display:none;">
                         <input type="hidden" name="original_folder" id="crop-form-folder" value="{{ selected_folder or '' }}">
                         <input type="hidden" name="original_filename" id="crop-form-filename" value="{{ image_to_crop_filename or '' }}">
@@ -220,7 +452,6 @@
         <script>
             document.addEventListener('DOMContentLoaded', function () {
                 // AJAX functionality variables
-                const folderSelect = document.getElementById('folder-select');
                 const fileSelect = document.getElementById('file-select');
                 const folderLoading = document.getElementById('folder-loading');
                 const fileLoading = document.getElementById('file-loading');
@@ -232,6 +463,10 @@
                 const cropControls = document.getElementById('crop-controls');
                 const debugPathInfo = document.getElementById('debug-path-info');
                 const croppingArea = document.getElementById('cropping-area');
+                const selectedDocumentInfo = document.getElementById('selected-document-info');
+                const currentDocumentName = document.getElementById('current-document-name');
+                const sidebarDocumentsList = document.getElementById('sidebar-documents-list');
+                const sidebarLoading = document.getElementById('sidebar-loading');
                 
                 // Cropper variables
                 let cropperInstance;
@@ -241,32 +476,98 @@
                 const cropFormFolder = document.getElementById('crop-form-folder');
                 const cropFormFilename = document.getElementById('crop-form-filename');
                 
+                // Crop status elements
+                const cropButtonText = document.getElementById('crop-button-text');
+                const cropLoadingSpinner = document.getElementById('crop-loading');
+                const cropStatus = document.getElementById('crop-status');
+                const cropStatusMessage = document.getElementById('crop-status-message');
+                
                 // Current state
                 let currentFolder = '{{ selected_folder or "" }}';
                 let currentImage = '{{ image_to_crop_filename or "" }}';
                 const userId = '{{ session.get("user_id", "anonymous") }}';
 
-                // Initialize with current state if available
-                if (currentFolder && currentImage) {
-                    initializeCropperForImage();
+                // Set stable container dimensions for height-filling display
+                function setStableContainerDimensions() {
+                    if (croppingArea) {
+                        const viewportWidth = window.innerWidth;
+                        const viewportHeight = window.innerHeight;
+                        
+                        // Calculate optimal height based on viewport
+                        const containerHeight = Math.min(600, Math.max(400, viewportHeight * 0.7));
+                        
+                        // Set fixed dimensions for consistent display
+                        croppingArea.style.width = '100%';
+                        croppingArea.style.height = containerHeight + 'px';
+                        croppingArea.style.overflow = 'hidden'; // Hide overflow for clean appearance
+                        croppingArea.style.display = 'flex';
+                        croppingArea.style.justifyContent = 'center';
+                        croppingArea.style.alignItems = 'center';
+                        
+                        console.log(`Set container dimensions: ${croppingArea.offsetWidth}x${containerHeight}`);
+                    }
                 }
 
-                // Document selection handler
-                if (folderSelect) {
-                    folderSelect.addEventListener('change', function() {
-                        const selectedFolder = this.value;
-                        currentFolder = selectedFolder;
-                        currentImage = '';
-                        
-                        if (selectedFolder) {
-                            loadDocumentImages(selectedFolder);
-                        } else {
-                            hideImageSelection();
-                            hideImageDisplay();
-                            hideCrops();
-                        }
+                // Set initial stable dimensions
+                setStableContainerDimensions();
+
+                // Initialize with current state if available
+                if (currentFolder && currentImage) {
+                    setTimeout(() => {
+                        initializeCropperForImage();
+                    }, 100);
+                } else if (!currentFolder) {
+                    // Hide image-related UI if no document is selected
+                    hideImageSelection();
+                    hideImageDisplay();
+                    hideCrops();
+                    if (selectedDocumentInfo) {
+                        selectedDocumentInfo.style.display = 'none';
+                    }
+                }
+
+                // Sidebar document selection handler
+                function setupSidebarDocumentSelection() {
+                    const documentItems = document.querySelectorAll('.document-item');
+                    documentItems.forEach(item => {
+                        item.addEventListener('click', function() {
+                            const documentName = this.getAttribute('data-document-name');
+                            if (documentName && documentName !== currentFolder) {
+                                selectDocument(documentName);
+                            }
+                        });
                     });
                 }
+                
+                // Function to select a document
+                function selectDocument(documentName) {
+                    // Update current state
+                    currentFolder = documentName;
+                    currentImage = '';
+                    
+                    // Update sidebar selection
+                    document.querySelectorAll('.document-item').forEach(item => {
+                        item.classList.remove('selected');
+                    });
+                    const selectedItem = document.querySelector(`[data-document-name="${documentName}"]`);
+                    if (selectedItem) {
+                        selectedItem.classList.add('selected');
+                    }
+                    
+                    // Update main content
+                    if (currentDocumentName) {
+                        currentDocumentName.textContent = documentName;
+                    }
+                    if (selectedDocumentInfo) {
+                        selectedDocumentInfo.style.display = 'block';
+                    }
+                    
+                    // Load document images
+                    loadDocumentImages(documentName);
+                }
+                
+                // Initialize sidebar selection
+                setupSidebarDocumentSelection();
 
                 // Image selection handler
                 if (fileSelect) {
@@ -339,11 +640,12 @@
                     // Update cropping area
                     croppingArea.innerHTML = `<img id="image_to_crop_element" src="${imageUrl}" alt="Image to crop">`;
                     
-                    // Initialize cropper for new image
+                    // Initialize cropper for new image with height-filling
                     setTimeout(() => {
+                        setStableContainerDimensions(); // Set consistent container dimensions
                         initializeCropperForImage();
                         hideFileLoading();
-                        updateDebugMessage('Image loaded successfully');
+                        updateDebugMessage('Image loaded - filling height and centered');
                         showImageDisplay();
                         showCropControls();
                         
@@ -353,7 +655,7 @@
                         } else {
                             hideCrops();
                         }
-                    }, 100);
+                    }, 150); // Slightly longer delay for height calculation
                 }
 
                 // Function to load crops for a page
@@ -400,8 +702,10 @@
                     });
                 }
 
-                function showFolderLoading() { if (folderLoading) folderLoading.style.display = 'inline'; }
+                function showFolderLoading() { if (folderLoading) folderLoading.style.display = 'block'; }
                 function hideFolderLoading() { if (folderLoading) folderLoading.style.display = 'none'; }
+                function showSidebarLoading() { if (sidebarLoading) sidebarLoading.style.display = 'block'; }
+                function hideSidebarLoading() { if (sidebarLoading) sidebarLoading.style.display = 'none'; }
                 function showFileLoading() { if (fileLoading) fileLoading.style.display = 'inline'; }
                 function hideFileLoading() { if (fileLoading) fileLoading.style.display = 'none'; }
                 function updateDebugMessage(message) { if (debugMessage) debugMessage.textContent = message; }
@@ -454,7 +758,7 @@
                     }
                 }
 
-                // Cropper initialization function
+                // Cropper initialization function for height-filling display
                 function initializeCropperForImage() {
                     const imageElement = document.getElementById('image_to_crop_element');
                     
@@ -465,8 +769,15 @@
 
                     if (imageElement && imageElement.getAttribute('src')) {
                         imageElement.onload = function() {
-                            console.log("Image loaded successfully");
-                            initializeCropper();
+                            console.log("Image loaded successfully - preparing for height-fill display");
+                            console.log(`Image dimensions: ${imageElement.naturalWidth}x${imageElement.naturalHeight}`);
+                            
+                            // Ensure container dimensions are stable
+                            setStableContainerDimensions();
+                            
+                            setTimeout(() => {
+                                initializeCropper();
+                            }, 100); // Delay to ensure container is ready
                         };
                         
                         imageElement.onerror = function() {
@@ -476,8 +787,12 @@
                         
                         // Check if image is already loaded
                         if (imageElement.complete && imageElement.naturalWidth > 0) {
-                            console.log("Image already loaded, initializing cropper");
-                            initializeCropper();
+                            console.log("Image already loaded, initializing cropper for height-fill display");
+                            console.log(`Image dimensions: ${imageElement.naturalWidth}x${imageElement.naturalHeight}`);
+                            setStableContainerDimensions();
+                            setTimeout(() => {
+                                initializeCropper();
+                            }, 100);
                         }
                     }
                 }
@@ -493,32 +808,237 @@
                     console.log("Initializing Cropper.js");
                     cropperInstance = new Cropper(imageElement, {
                         aspectRatio: NaN, 
-                        viewMode: 1,    
-                        autoCropArea: 0.85, 
-                        responsive: true,
-                        background: false, 
-                        modal: false, 
+                        viewMode: 1,        // Restrict crop box to canvas size for better control
+                        autoCropArea: 0.7,  // Initial crop area
+                        responsive: false,  // Disable responsive behavior to prevent resize on scroll
+                        restore: false,     // Disable restore on window resize
+                        background: true,   // Show background to see full image
+                        modal: true,        // Show modal to darken areas outside crop box
                         guides: true,
                         center: true,
-                        highlight: false, 
+                        highlight: true,    // Highlight the crop box area
                         cropBoxMovable: true,
                         cropBoxResizable: true,
                         checkCrossOrigin: false,
+                        scalable: false,    // Disable manual scaling - we control this
+                        zoomable: true,     // Keep zoom functionality
+                        zoomOnTouch: false, // Disable touch zoom that might interfere
+                        zoomOnWheel: false, // Disable wheel zoom that triggers on scroll
+                        toggleDragModeOnDblclick: false, // Disable double-click drag mode toggle
+                        ready: function() {
+                            // Configure cropper to fill height and center horizontally
+                            const cropper = this.cropper;
+                            const containerData = cropper.getContainerData();
+                            const imageData = cropper.getImageData();
+                            
+                            console.log('Container:', containerData);
+                            console.log('Image:', imageData);
+                            
+                            // Calculate scale to fill height while maintaining aspect ratio
+                            const heightScale = containerData.height / imageData.naturalHeight;
+                            
+                            // Apply the scale to fill height
+                            cropper.zoomTo(heightScale);
+                            
+                            // Center the image horizontally if it's wider than container
+                            const scaledWidth = imageData.naturalWidth * heightScale;
+                            const centerOffsetX = (containerData.width - scaledWidth) / 2;
+                            
+                            if (centerOffsetX > 0) {
+                                // Image is narrower than container, center it
+                                cropper.move(centerOffsetX, 0);
+                            } else {
+                                // Image is wider than container, center it
+                                cropper.move(centerOffsetX / heightScale, 0);
+                            }
+                            
+                            console.log(`Applied height scale: ${heightScale}, centered with offset: ${centerOffsetX}`);
+                        }
                     });
                 }
 
-                // Crop button handler
+                // Crop button handler - AJAX version
                 if (cropButtonAction) {
                     cropButtonAction.addEventListener('click', function () {
                         if (cropperInstance) {
-                            const canvas = cropperInstance.getCroppedCanvas({});
-                            if (canvas) {
-                                croppedImageDataInput.value = canvas.toDataURL('image/png');
-                                cropResultForm.submit();
-                            } else {
-                                alert('Could not get cropped canvas.');
+                            processCropAjax();
+                        }
+                    });
+                }
+                
+                // AJAX crop processing function
+                function processCropAjax() {
+                    const canvas = cropperInstance.getCroppedCanvas({});
+                    if (!canvas) {
+                        showCropStatus('error', 'Could not get cropped canvas. Please try again.');
+                        return;
+                    }
+                    
+                    // Show loading state
+                    showCropLoading(true);
+                    hideCropStatus();
+                    
+                    // Prepare form data
+                    const formData = new FormData();
+                    formData.append('original_folder', currentFolder);
+                    formData.append('original_filename', currentImage);
+                    formData.append('cropped_image_data', canvas.toDataURL('image/png'));
+                    
+                    // Send AJAX request
+                    fetch('/api/process_crop', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        showCropLoading(false);
+                        
+                        if (data.success) {
+                            showCropStatus('success', data.message);
+                            
+                            // Add new crop to the gallery if it exists
+                            if (cropGallery && data.crop_url && data.crop_display_name) {
+                                addCropToGallery(data.crop_url, data.crop_display_name);
+                            }
+                            
+                            // Show crops container if it was hidden
+                            if (cropsContainer && cropsContainer.style.display === 'none') {
+                                showCrops();
+                            }
+                        } else {
+                            showCropStatus('error', data.message || 'Failed to save cropped image');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Crop processing error:', error);
+                        showCropLoading(false);
+                        showCropStatus('error', 'Network error occurred while processing crop');
+                    });
+                }
+                
+                // Helper functions for crop status
+                function showCropLoading(show) {
+                    if (cropButtonText && cropLoadingSpinner) {
+                        if (show) {
+                            cropButtonText.style.display = 'none';
+                            cropLoadingSpinner.style.display = 'inline';
+                            cropButtonAction.classList.add('button-loading');
+                        } else {
+                            cropButtonText.style.display = 'inline';
+                            cropLoadingSpinner.style.display = 'none';
+                            cropButtonAction.classList.remove('button-loading');
+                        }
+                    }
+                }
+                
+                function showCropStatus(type, message) {
+                    if (cropStatus && cropStatusMessage) {
+                        cropStatus.className = `crop-status-${type}`;
+                        cropStatusMessage.textContent = message;
+                        cropStatus.style.display = 'block';
+                        
+                        // Auto-hide success messages after 5 seconds
+                        if (type === 'success') {
+                            setTimeout(() => {
+                                hideCropStatus();
+                            }, 5000);
+                        }
+                    }
+                }
+                
+                function hideCropStatus() {
+                    if (cropStatus) {
+                        cropStatus.style.display = 'none';
+                    }
+                }
+                
+                function addCropToGallery(cropUrl, displayName) {
+                    const cropDiv = document.createElement('div');
+                    cropDiv.className = 'crop-thumbnail';
+                    cropDiv.style.cssText = 'border: 1px solid #ddd; border-radius: 4px; padding: 10px; text-align: center;';
+                    cropDiv.innerHTML = `
+                        <img src="${cropUrl}" alt="Cropped section" 
+                             style="max-width: 100%; max-height: 120px; margin-bottom: 8px;">
+                        <div style="font-size: 0.8em; word-break: break-all;">${displayName}</div>
+                    `;
+                    
+                    // Add with animation
+                    cropDiv.style.opacity = '0';
+                    cropDiv.style.transform = 'scale(0.8)';
+                    cropGallery.appendChild(cropDiv);
+                    
+                    // Animate in
+                    setTimeout(() => {
+                        cropDiv.style.transition = 'all 0.3s ease';
+                        cropDiv.style.opacity = '1';
+                        cropDiv.style.transform = 'scale(1)';
+                    }, 10);
+                }
+
+                // Prevent scroll events from affecting the cropper
+                let preventCropperResize = false;
+                let resizeTimeout;
+                let isScrolling = false;
+                
+                // Disable window resize handler for cropper during scroll
+                window.addEventListener('scroll', function() {
+                    isScrolling = true;
+                    preventCropperResize = true;
+                    
+                    clearTimeout(resizeTimeout);
+                    resizeTimeout = setTimeout(() => {
+                        isScrolling = false;
+                        preventCropperResize = false;
+                    }, 200);
+                });
+
+                // Debounced resize handler that only applies to actual window resize (not scroll)
+                let actualResizeTimeout;
+                window.addEventListener('resize', function(e) {
+                    if (preventCropperResize || isScrolling) {
+                        e.stopImmediatePropagation();
+                        return false;
+                    }
+                    
+                    // Debounce actual resize events for height-filling display
+                    clearTimeout(actualResizeTimeout);
+                    actualResizeTimeout = setTimeout(() => {
+                        if (!isScrolling && !preventCropperResize) {
+                            console.log('Window resized - adjusting container for height-fill display');
+                            setStableContainerDimensions();
+                            // Only reinitialize cropper if we have an active image
+                            if (currentFolder && currentImage && cropperInstance) {
+                                console.log('Reinitializing cropper after resize');
+                                setTimeout(() => {
+                                    initializeCropperForImage();
+                                }, 150);
                             }
                         }
+                    }, 400); // Longer delay for resize to prevent excessive calls
+                }, true);
+
+                // Prevent wheel events on the cropper area from causing issues
+                const croppingAreaElement = document.getElementById('cropping-area');
+                if (croppingAreaElement) {
+                    // Prevent wheel zoom but allow scrolling within the container if needed
+                    croppingAreaElement.addEventListener('wheel', function(e) {
+                        // Allow scrolling within the container if content overflows
+                        if (croppingAreaElement.scrollHeight > croppingAreaElement.clientHeight ||
+                            croppingAreaElement.scrollWidth > croppingAreaElement.clientWidth) {
+                            // Allow natural scroll if content is larger than container
+                            return;
+                        }
+                        
+                        // Only prevent default if not zooming with ctrl/cmd key
+                        if (!e.ctrlKey && !e.metaKey) {
+                            e.preventDefault();
+                        }
+                    }, { passive: false });
+                    
+                    // Prevent the cropper from being affected by any container scroll
+                    croppingAreaElement.addEventListener('scroll', function(e) {
+                        // This ensures that if the container scrolls, it doesn't affect the cropper
+                        e.stopPropagation();
                     });
                 }
             });
@@ -564,7 +1084,9 @@
             </form>
         </div>
         {% endif %}
-        {% endblock %}
+            </div>
+            {% endblock %}
+        </div>
     </div>
 </body>
 </html>
