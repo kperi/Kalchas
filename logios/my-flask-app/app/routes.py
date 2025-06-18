@@ -437,26 +437,71 @@ def uploaded_toocr_file(user_id, folder, filename):
 def admin():
     # Check if user has admin privileges - implement your authentication logic here
     upload_root = current_app.config["UPLOAD_FOLDER"]
-    users = []
+    users_data = []
     total_storage = 0
 
     if os.path.exists(upload_root):
-        users = [
+        user_dirs = [
             name
             for name in os.listdir(upload_root)
             if os.path.isdir(os.path.join(upload_root, name))
         ]
-        for user in users:
-            user_path = os.path.join(upload_root, user)
-            user_size = sum(
-                os.path.getsize(os.path.join(dirpath, filename))
-                for dirpath, _, filenames in os.walk(user_path)
-                for filename in filenames
-            )
-            total_storage += user_size
+        
+        for user_id in user_dirs:
+            try:
+                # Get user documents and info
+                documents_data = file_operations.get_user_documents_list(
+                    current_app.config, user_id, include_completed=True, include_in_progress=True
+                )
+                
+                # Calculate user storage
+                user_path = os.path.join(upload_root, user_id)
+                user_size = sum(
+                    os.path.getsize(os.path.join(dirpath, filename))
+                    for dirpath, _, filenames in os.walk(user_path)
+                    for filename in filenames
+                )
+                total_storage += user_size
+                
+                # Get document details
+                user_documents = []
+                for doc_name in documents_data.get("all", []):
+                    doc_info = file_operations.get_document_info(
+                        current_app.config, user_id, doc_name
+                    )
+                    if doc_info:
+                        user_documents.append(doc_info)
+                
+                users_data.append({
+                    "user_id": user_id,
+                    "documents": user_documents,
+                    "total_documents": len(user_documents),
+                    "completed_documents": len(documents_data.get("completed", [])),
+                    "in_progress_documents": len(documents_data.get("in_progress", [])),
+                    "storage_size": user_size,
+                    "storage_size_mb": round(user_size / (1024 * 1024), 2)
+                })
+                
+            except Exception as e:
+                current_app.logger.error(f"Error processing user {user_id}: {str(e)}")
+                # Add user with basic info even if detailed info fails
+                users_data.append({
+                    "user_id": user_id,
+                    "documents": [],
+                    "total_documents": 0,
+                    "completed_documents": 0,
+                    "in_progress_documents": 0,
+                    "storage_size": 0,
+                    "storage_size_mb": 0,
+                    "error": str(e)
+                })
 
     return render_template(
-        "admin.html", users=users, total_storage=total_storage, total_users=len(users)
+        "admin.html", 
+        users_data=users_data, 
+        total_storage=total_storage, 
+        total_storage_mb=round(total_storage / (1024 * 1024), 2),
+        total_users=len(users_data)
     )
 
 
@@ -1055,6 +1100,153 @@ def api_process_crop():
         return jsonify({
             "success": False,
             "message": f"Error: {str(e)}"
+        }), 500
+
+
+@app.route("/api/admin/user_documents/<user_id>")
+def api_admin_get_user_documents(user_id):
+    """
+    AJAX endpoint to get documents for a specific user in admin interface.
+    Returns JSON data with user's documents and metadata.
+    """
+    try:
+        # Get user documents
+        documents_data = file_operations.get_user_documents_list(
+            current_app.config, user_id, include_completed=True, include_in_progress=True
+        )
+        
+        # Get detailed info for each document
+        detailed_documents = []
+        for doc_name in documents_data.get("all", []):
+            doc_info = file_operations.get_document_info(
+                current_app.config, user_id, doc_name
+            )
+            if doc_info:
+                detailed_documents.append(doc_info)
+        
+        # Calculate user storage
+        upload_root = current_app.config["UPLOAD_FOLDER"]
+        user_path = os.path.join(upload_root, user_id)
+        user_size = 0
+        if os.path.exists(user_path):
+            user_size = sum(
+                os.path.getsize(os.path.join(dirpath, filename))
+                for dirpath, _, filenames in os.walk(user_path)
+                for filename in filenames
+            )
+        
+        return jsonify({
+            "success": True,
+            "user_id": user_id,
+            "documents": detailed_documents,
+            "total_documents": len(detailed_documents),
+            "completed_documents": len(documents_data.get("completed", [])),
+            "in_progress_documents": len(documents_data.get("in_progress", [])),
+            "storage_size": user_size,
+            "storage_size_mb": round(user_size / (1024 * 1024), 2)
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting documents for user {user_id}: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": f"Error: {str(e)}"
+        }), 500
+
+
+@app.route("/api/admin/delete_document", methods=["POST"])
+def api_admin_delete_document():
+    """
+    AJAX endpoint to delete a specific document folder.
+    Returns JSON data with success/error information.
+    """
+    try:
+        user_id = request.form.get("user_id")
+        document_name = request.form.get("document_name")
+        
+        if not user_id or not document_name:
+            return jsonify({
+                "success": False,
+                "message": "Missing user_id or document_name"
+            }), 400
+        
+        # Get document path
+        upload_root = current_app.config["UPLOAD_FOLDER"]
+        document_path = os.path.join(upload_root, user_id, document_name)
+        
+        if not os.path.exists(document_path):
+            return jsonify({
+                "success": False,
+                "message": f"Document '{document_name}' not found for user '{user_id}'"
+            }), 404
+        
+        # Delete document folder
+        shutil.rmtree(document_path)
+        
+        current_app.logger.info(f"Admin deleted document '{document_name}' for user '{user_id}'")
+        
+        return jsonify({
+            "success": True,
+            "message": f"Document '{document_name}' deleted successfully"
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error deleting document: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": f"Error deleting document: {str(e)}"
+        }), 500
+
+
+@app.route("/api/admin/delete_user", methods=["POST"])
+def api_admin_delete_user():
+    """
+    AJAX endpoint to delete an entire user and all their documents.
+    Returns JSON data with success/error information.
+    """
+    try:
+        user_id = request.form.get("user_id")
+        
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "message": "Missing user_id"
+            }), 400
+        
+        # Get user path
+        upload_root = current_app.config["UPLOAD_FOLDER"]
+        user_path = os.path.join(upload_root, user_id)
+        
+        if not os.path.exists(user_path):
+            return jsonify({
+                "success": False,
+                "message": f"User '{user_id}' not found"
+            }), 404
+        
+        # Count documents before deletion for logging
+        try:
+            documents_data = file_operations.get_user_documents_list(
+                current_app.config, user_id, include_completed=True, include_in_progress=True
+            )
+            document_count = len(documents_data.get("all", []))
+        except:
+            document_count = "unknown"
+        
+        # Delete entire user folder
+        shutil.rmtree(user_path)
+        
+        current_app.logger.warning(f"Admin deleted user '{user_id}' with {document_count} documents")
+        
+        return jsonify({
+            "success": True,
+            "message": f"User '{user_id}' and all their documents deleted successfully"
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error deleting user: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": f"Error deleting user: {str(e)}"
         }), 500
 
 

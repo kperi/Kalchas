@@ -2,37 +2,599 @@
 
 {% block title %}Admin Dashboard - Logios App{% endblock %}
 
+{% block head_extra %}
+<style>
+    /* Admin-specific styles */
+    .admin-layout {
+        display: flex;
+        gap: 2rem;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+    
+    .admin-sidebar {
+        width: 300px;
+        background-color: #f8fafc;
+        border-radius: 8px;
+        padding: 1.5rem;
+        height: fit-content;
+        position: sticky;
+        top: 2rem;
+    }
+    
+    .admin-main {
+        flex: 1;
+        background-color: #ffffff;
+        border-radius: 8px;
+        padding: 1.5rem;
+        border: 1px solid #e2e8f0;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .stat-card {
+        background-color: #f9fafb;
+        padding: 1rem;
+        border-radius: 6px;
+        border: 1px solid #e2e8f0;
+        text-align: center;
+    }
+    
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 0.25rem;
+    }
+    
+    .stat-label {
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
+    
+    .user-item {
+        padding: 1rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        margin-bottom: 0.75rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        background-color: #ffffff;
+    }
+    
+    .user-item:hover {
+        background-color: #f1f5f9;
+        border-color: #cbd5e1;
+    }
+    
+    .user-item.selected {
+        background-color: #dbeafe;
+        border-color: #3b82f6;
+        border-left: 4px solid #3b82f6;
+    }
+    
+    .user-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+    
+    .user-id {
+        font-weight: 600;
+        color: #1f2937;
+    }
+    
+    .user-stats {
+        font-size: 0.75rem;
+        color: #6b7280;
+        display: flex;
+        gap: 1rem;
+    }
+    
+    .document-item {
+        padding: 0.75rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 4px;
+        margin-bottom: 0.5rem;
+        background-color: #fafafa;
+    }
+    
+    .document-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+    
+    .document-name {
+        font-weight: 600;
+        color: #1f2937;
+    }
+    
+    .document-meta {
+        font-size: 0.75rem;
+        color: #6b7280;
+        display: flex;
+        gap: 1rem;
+    }
+    
+    .status-badge {
+        padding: 0.125rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.625rem;
+        font-weight: 500;
+    }
+    
+    .status-completed {
+        background-color: #dcfce7;
+        color: #166534;
+    }
+    
+    .status-progress {
+        background-color: #fef3c7;
+        color: #92400e;
+    }
+    
+    .delete-btn {
+        background-color: #dc2626;
+        color: white;
+        border: none;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+    
+    .delete-btn:hover {
+        background-color: #b91c1c;
+    }
+    
+    .delete-btn:disabled {
+        background-color: #9ca3af;
+        cursor: not-allowed;
+    }
+    
+    .loading-indicator {
+        text-align: center;
+        padding: 2rem;
+        color: #6b7280;
+    }
+    
+    .loading-spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid #f3f3f3;
+        border-top: 2px solid #3b82f6;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-right: 0.5rem;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .alert {
+        padding: 0.75rem;
+        border-radius: 6px;
+        margin-bottom: 1rem;
+    }
+    
+    .alert-success {
+        background-color: #dcfce7;
+        color: #166534;
+        border: 1px solid #bbf7d0;
+    }
+    
+    .alert-error {
+        background-color: #fef2f2;
+        color: #dc2626;
+        border: 1px solid #fecaca;
+    }
+    
+    .confirmation-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+    }
+    
+    .modal-content {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        padding: 2rem;
+        border-radius: 8px;
+        max-width: 400px;
+        width: 90%;
+    }
+    
+    .modal-buttons {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1.5rem;
+        justify-content: flex-end;
+    }
+    
+    .btn-cancel {
+        background-color: #6b7280;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    
+    .btn-confirm {
+        background-color: #dc2626;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    
+    .btn-cancel:hover {
+        background-color: #4b5563;
+    }
+    
+    .btn-confirm:hover {
+        background-color: #b91c1c;
+    }
+    
+    /* Responsive design */
+    @media (max-width: 768px) {
+        .admin-layout {
+            flex-direction: column;
+        }
+        
+        .admin-sidebar {
+            width: 100%;
+            position: static;
+        }
+        
+        .user-stats {
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        
+        .document-meta {
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="gradio-component-group" style="max-width: 1000px; margin-left:auto; margin-right:auto;">
-    <h1>Admin Dashboard</h1>
-
-    <div class="gradio-component-group" style="background-color: #f9fafb;">
-        <h3>User Management</h3>
-        <p>View and manage user accounts.</p>
-        <div style="margin-top: 1rem;">
-            <a href="{{ url_for('app.admin') }}" class="gradio-button gradio-button-primary">View Users</a>
+<div class="admin-layout">
+    <!-- Sidebar -->
+    <div class="admin-sidebar">
+        <h2 style="margin-top: 0; color: #1f2937; font-size: 1.25rem;">System Overview</h2>
+        
+        <div class="stats-grid" style="grid-template-columns: 1fr;">
+            <div class="stat-card">
+                <div class="stat-value">{{ total_users }}</div>
+                <div class="stat-label">Total Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ total_storage_mb }}</div>
+                <div class="stat-label">Storage (MB)</div>
+            </div>
         </div>
-        <!-- Placeholder for a user table or list -->
-    </div>
-
-    <div class="gradio-component-group" style="background-color: #f9fafb;">
-        <h3>System Settings</h3>
-        <p>Configure application settings.</p>
-        <ul style="list-style: disc; margin-left: 1.5rem; margin-bottom: 1rem;">
-            <li>Setting 1: Value</li>
-            <li>Setting 2: Value</li>
-        </ul>
-        <div style="margin-top: 1rem;">
-            <button class="gradio-button gradio-button-primary">Modify Settings</button>
+        
+        <h3 style="color: #1f2937; font-size: 1rem; margin-bottom: 1rem;">Users</h3>
+        
+        <div id="users-list">
+            {% for user in users_data %}
+            <div class="user-item" data-user-id="{{ user.user_id }}">
+                <div class="user-header">
+                    <div class="user-id">{{ user.user_id }}</div>
+                    <button class="delete-btn" onclick="confirmDeleteUser('{{ user.user_id }}')">
+                        🗑️ Delete User
+                    </button>
+                </div>
+                <div class="user-stats">
+                    <span>{{ user.total_documents }} docs</span>
+                    <span>{{ user.storage_size_mb }} MB</span>
+                    {% if user.error %}
+                    <span style="color: #dc2626;">Error</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
         </div>
     </div>
-
-    <div class="gradio-component-group" style="background-color: #f9fafb;">
-        <h3>Content Management</h3>
-        <p>Manage uploaded documents and OCR data. This section could include statistics on uploaded files, tools for batch processing, or data cleanup utilities.</p>
-        <div style="margin-top: 1rem;">
-            <a href="#" class="gradio-button gradio-button-primary">View All Documents</a>
+    
+    <!-- Main Content -->
+    <div class="admin-main">
+        <h1 style="margin-top: 0; color: #1f2937;">Admin Dashboard</h1>
+        
+        <!-- Alert Area -->
+        <div id="alert-area"></div>
+        
+        <!-- User Documents Section -->
+        <div id="user-documents-section" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h2 id="selected-user-title" style="margin: 0; color: #1f2937;">User Documents</h2>
+                <button id="refresh-user-data" class="gradio-button gradio-button-secondary">
+                    🔄 Refresh
+                </button>
+            </div>
+            
+            <div id="user-loading" class="loading-indicator" style="display: none;">
+                <span class="loading-spinner"></span>
+                Loading user documents...
+            </div>
+            
+            <div id="user-documents-list"></div>
+        </div>
+        
+        <!-- Default Message -->
+        <div id="default-message" class="loading-indicator">
+            <p>Select a user from the sidebar to view their documents and manage their data.</p>
         </div>
     </div>
 </div>
+
+<!-- Confirmation Modal -->
+<div id="confirmation-modal" class="confirmation-modal">
+    <div class="modal-content">
+        <h3 id="modal-title">Confirm Action</h3>
+        <p id="modal-message">Are you sure you want to proceed?</p>
+        <div class="modal-buttons">
+            <button class="btn-cancel" onclick="closeConfirmationModal()">Cancel</button>
+            <button class="btn-confirm" id="confirm-button">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Variables
+    let currentUserId = null;
+    const usersList = document.getElementById('users-list');
+    const userDocumentsSection = document.getElementById('user-documents-section');
+    const defaultMessage = document.getElementById('default-message');
+    const selectedUserTitle = document.getElementById('selected-user-title');
+    const userDocumentsList = document.getElementById('user-documents-list');
+    const userLoading = document.getElementById('user-loading');
+    const refreshButton = document.getElementById('refresh-user-data');
+    const alertArea = document.getElementById('alert-area');
+    
+    // User selection
+    usersList.addEventListener('click', function(e) {
+        const userItem = e.target.closest('.user-item');
+        if (userItem && !e.target.classList.contains('delete-btn')) {
+            const userId = userItem.getAttribute('data-user-id');
+            selectUser(userId);
+        }
+    });
+    
+    // Refresh button
+    refreshButton.addEventListener('click', function() {
+        if (currentUserId) {
+            loadUserDocuments(currentUserId);
+        }
+    });
+    
+    function selectUser(userId) {
+        // Update UI selection
+        document.querySelectorAll('.user-item').forEach(item => {
+            item.classList.remove('selected');
+        });
+        document.querySelector(`[data-user-id="${userId}"]`).classList.add('selected');
+        
+        currentUserId = userId;
+        selectedUserTitle.textContent = `Documents for ${userId}`;
+        
+        // Show user documents section
+        defaultMessage.style.display = 'none';
+        userDocumentsSection.style.display = 'block';
+        
+        // Load user documents
+        loadUserDocuments(userId);
+    }
+    
+    function loadUserDocuments(userId) {
+        userLoading.style.display = 'block';
+        userDocumentsList.innerHTML = '';
+        
+        fetch(`/api/admin/user_documents/${userId}`)
+            .then(response => response.json())
+            .then(data => {
+                userLoading.style.display = 'none';
+                
+                if (data.success) {
+                    displayUserDocuments(data);
+                } else {
+                    showAlert('error', data.message || 'Failed to load user documents');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading user documents:', error);
+                userLoading.style.display = 'none';
+                showAlert('error', 'Network error occurred while loading user documents');
+            });
+    }
+    
+    function displayUserDocuments(userData) {
+        if (userData.documents.length === 0) {
+            userDocumentsList.innerHTML = `
+                <div class="loading-indicator">
+                    <p>No documents found for this user.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Create stats summary
+        const statsHtml = `
+            <div class="stats-grid" style="margin-bottom: 1.5rem;">
+                <div class="stat-card">
+                    <div class="stat-value">${userData.total_documents}</div>
+                    <div class="stat-label">Total Documents</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${userData.completed_documents}</div>
+                    <div class="stat-label">Completed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${userData.in_progress_documents}</div>
+                    <div class="stat-label">In Progress</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${userData.storage_size_mb}</div>
+                    <div class="stat-label">Storage (MB)</div>
+                </div>
+            </div>
+        `;
+        
+        // Create documents list
+        const documentsHtml = userData.documents.map(doc => `
+            <div class="document-item">
+                <div class="document-header">
+                    <div class="document-name">${doc.name}</div>
+                    <button class="delete-btn" onclick="confirmDeleteDocument('${userData.user_id}', '${doc.name}')">
+                        🗑️ Delete
+                    </button>
+                </div>
+                <div class="document-meta">
+                    <span class="status-badge ${doc.is_completed ? 'status-completed' : 'status-progress'}">
+                        ${doc.is_completed ? 'Completed' : 'In Progress'}
+                    </span>
+                    <span>${doc.total_png_count} images</span>
+                    <span>${doc.crop_count} crops</span>
+                    ${doc.pdf_files ? `<span>PDF: ${doc.pdf_files.join(', ')}</span>` : ''}
+                    ${doc.creation_date ? `<span>Created: ${doc.creation_date}</span>` : ''}
+                </div>
+            </div>
+        `).join('');
+        
+        userDocumentsList.innerHTML = statsHtml + '<h3>Documents</h3>' + documentsHtml;
+    }
+    
+    function showAlert(type, message) {
+        alertArea.innerHTML = `
+            <div class="alert alert-${type}">
+                ${message}
+            </div>
+        `;
+        
+        // Auto-hide success alerts
+        if (type === 'success') {
+            setTimeout(() => {
+                alertArea.innerHTML = '';
+            }, 5000);
+        }
+    }
+    
+    // Global functions for deletion
+    window.confirmDeleteUser = function(userId) {
+        showConfirmationModal(
+            'Delete User',
+            `Are you sure you want to delete user "${userId}" and ALL their documents? This action cannot be undone.`,
+            () => deleteUser(userId)
+        );
+    };
+    
+    window.confirmDeleteDocument = function(userId, documentName) {
+        showConfirmationModal(
+            'Delete Document',
+            `Are you sure you want to delete document "${documentName}" for user "${userId}"? This action cannot be undone.`,
+            () => deleteDocument(userId, documentName)
+        );
+    };
+    
+    function deleteUser(userId) {
+        const formData = new FormData();
+        formData.append('user_id', userId);
+        
+        fetch('/api/admin/delete_user', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('success', data.message);
+                // Remove user from sidebar and reload page
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                showAlert('error', data.message || 'Failed to delete user');
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting user:', error);
+            showAlert('error', 'Network error occurred while deleting user');
+        });
+    }
+    
+    function deleteDocument(userId, documentName) {
+        const formData = new FormData();
+        formData.append('user_id', userId);
+        formData.append('document_name', documentName);
+        
+        fetch('/api/admin/delete_document', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('success', data.message);
+                // Reload user documents
+                loadUserDocuments(userId);
+            } else {
+                showAlert('error', data.message || 'Failed to delete document');
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting document:', error);
+            showAlert('error', 'Network error occurred while deleting document');
+        });
+    }
+    
+    function showConfirmationModal(title, message, confirmCallback) {
+        document.getElementById('modal-title').textContent = title;
+        document.getElementById('modal-message').textContent = message;
+        document.getElementById('confirmation-modal').style.display = 'block';
+        
+        // Set up confirm button
+        const confirmButton = document.getElementById('confirm-button');
+        confirmButton.onclick = function() {
+            closeConfirmationModal();
+            confirmCallback();
+        };
+    }
+    
+    window.closeConfirmationModal = function() {
+        document.getElementById('confirmation-modal').style.display = 'none';
+    };
+    
+    // Close modal when clicking outside
+    document.getElementById('confirmation-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeConfirmationModal();
+        }
+    });
+});
+</script>
 {% endblock %}
