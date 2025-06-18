@@ -10,6 +10,7 @@ from flask import (
     flash,
     send_from_directory,
 )
+from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
 # pdf2image and shutil are no longer directly used here, they are in file_operations
@@ -41,6 +42,7 @@ def index():
 
 
 @app.route("/show_upload_page", methods=["POST", "GET"])
+@login_required
 def show_upload_page():
     if request.method == "POST":
         if "file" not in request.files:
@@ -53,7 +55,7 @@ def show_upload_page():
             return redirect(request.url)
 
         if uploaded_file_storage and allowed_file(uploaded_file_storage.filename):
-            user_id = str(session.get("user_id", "anonymous"))
+            user_id = current_user.get_user_folder_name()
 
             # Task 1: Handle PDF Upload and Folder Creation with automatic folder name
             doc_folder_path, saved_pdf_path, doc_folder_name = (
@@ -116,8 +118,9 @@ def show_upload_page():
 
 
 @app.route("/crop_image", methods=["GET"])
+@login_required
 def crop_image():
-    user_id = str(session.get("user_id", "anonymous"))
+    user_id = current_user.get_user_folder_name()
 
     user_workspace_info = file_operations.get_user_workspace_info(
         current_app.config, user_id
@@ -198,8 +201,9 @@ def crop_image():
 
 
 @app.route("/image_preview")
+@login_required
 def image_preview():
-    user_id = str(session.get("user_id", "anonymous"))
+    user_id = current_user.get_user_folder_name()
 
     # Get only completed documents for OCR/preview
     documents_data = file_operations.get_user_documents_list(
@@ -258,7 +262,7 @@ def documents_dashboard():
     """
     New route to show all documents with their status and details.
     """
-    user_id = str(session.get("user_id", "anonymous"))
+    user_id = current_user.get_user_folder_name()
 
     # Get all documents
     documents_data = file_operations.get_user_documents_list(
@@ -286,7 +290,7 @@ def documents_dashboard():
     "/crop_1", methods=["GET"]
 )  # Assuming GET for now, POST would handle crop submission
 def crop_image_1():
-    user_id = str(session.get("user_id", "anonymous"))
+    user_id = current_user.get_user_folder_name()
 
     # Get all document folders for the user for the dropdown
     user_upload_dir = file_operations.get_user_upload_dir(current_app.config, user_id)
@@ -434,8 +438,12 @@ def uploaded_toocr_file(user_id, folder, filename):
 
 
 @app.route("/admin")
+@login_required
 def admin():
-    # Check if user has admin privileges - implement your authentication logic here
+    # Check if user has admin privileges
+    if not current_user.is_admin:
+        flash("You do not have permission to access the admin panel.", "danger")
+        return redirect(url_for("app.index"))
     upload_root = current_app.config["UPLOAD_FOLDER"]
     users_data = []
     total_storage = 0
@@ -550,7 +558,7 @@ def process_cropped_image():
         flash("Missing required crop parameters.", "danger")
         return redirect(url_for("app.crop_image"))
 
-    user_id = str(session.get("user_id", "anonymous"))
+    user_id = current_user.get_user_folder_name()
     original_page_filename_base = os.path.splitext(original_filename)[
         0
     ]  # e.g., page_001
@@ -689,7 +697,7 @@ def process_ocr():
     ):  # folder is document_folder_name
         return jsonify({"error": "Missing folder or filename"}), 400
 
-    user_id = str(session.get("user_id", "anonymous"))
+    user_id = current_user.get_user_folder_name()
     document_folder_name = data.get("folder")
     page_image_to_ocr = data.get(
         "filename"
@@ -1039,6 +1047,7 @@ def api_get_user_documents(user_id):
 
 
 @app.route("/api/process_crop", methods=["POST"])
+@login_required
 def api_process_crop():
     """
     AJAX endpoint to process cropped image without page reload.
@@ -1056,7 +1065,7 @@ def api_process_crop():
                 "message": "Missing required crop parameters"
             }), 400
 
-        user_id = str(session.get("user_id", "anonymous"))
+        user_id = current_user.get_user_folder_name()
         original_page_filename_base = os.path.splitext(original_filename)[0]
 
         # Save cropped image
@@ -1104,11 +1113,16 @@ def api_process_crop():
 
 
 @app.route("/api/admin/user_documents/<user_id>")
+@login_required
 def api_admin_get_user_documents(user_id):
     """
     AJAX endpoint to get documents for a specific user in admin interface.
     Returns JSON data with user's documents and metadata.
     """
+    # Check admin privileges
+    if not current_user.is_admin:
+        return jsonify({"success": False, "message": "Access denied"}), 403
+    
     try:
         # Get user documents
         documents_data = file_operations.get_user_documents_list(
@@ -1155,11 +1169,16 @@ def api_admin_get_user_documents(user_id):
 
 
 @app.route("/api/admin/delete_document", methods=["POST"])
+@login_required
 def api_admin_delete_document():
     """
     AJAX endpoint to delete a specific document folder.
     Returns JSON data with success/error information.
     """
+    # Check admin privileges
+    if not current_user.is_admin:
+        return jsonify({"success": False, "message": "Access denied"}), 403
+    
     try:
         user_id = request.form.get("user_id")
         document_name = request.form.get("document_name")
@@ -1199,11 +1218,16 @@ def api_admin_delete_document():
 
 
 @app.route("/api/admin/delete_user", methods=["POST"])
+@login_required
 def api_admin_delete_user():
     """
     AJAX endpoint to delete an entire user and all their documents.
     Returns JSON data with success/error information.
     """
+    # Check admin privileges
+    if not current_user.is_admin:
+        return jsonify({"success": False, "message": "Access denied"}), 403
+    
     try:
         user_id = request.form.get("user_id")
         
@@ -1261,7 +1285,7 @@ def mark_editing_completed():
         # Redirect to a relevant page, perhaps the document listing or crop_menu
         return redirect(url_for("app.crop_image"))
 
-    user_id = str(session.get("user_id", "anonymous"))
+    user_id = current_user.get_user_folder_name()
 
     # Task 4: Mark Editing as Completed
     # This moves content from /<user_id>/<document_folder_name>/ into /<user_id>/<document_folder_name>/TOOCR/

@@ -3,9 +3,11 @@ from config import config
 from wtforms.validators import DataRequired, Length
 from flask_wtf.file import FileAllowed, FileRequired
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager
 import os
 
 db = SQLAlchemy()
+login_manager = LoginManager()
 
 
 def create_app(config_name=None):
@@ -26,11 +28,30 @@ def create_app(config_name=None):
 
     config[config_name].init_app(app)
     db.init_app(app)
+    
+    # Initialize Flask-Login
+    login_manager.init_app(app)
+    login_manager.login_view = 'auth.login'
+    login_manager.login_message = 'Please log in to access this page.'
+    login_manager.login_message_category = 'info'
+    
+    # User loader callback
+    @login_manager.user_loader
+    def load_user(user_id):
+        from app.models import User
+        return User.query.get(int(user_id))
 
     from app.routes import app as main_blueprint
     from app.auth import auth as auth_blueprint
 
     app.register_blueprint(main_blueprint)
     app.register_blueprint(auth_blueprint)
+    
+    # Initialize database tables
+    with app.app_context():
+        db.create_all()
+        # Create default admin user
+        from app.models import create_admin_user
+        create_admin_user()
 
     return app
