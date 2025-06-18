@@ -473,7 +473,7 @@
                         {% else %}
                             <div style="text-align: center; padding: 1rem; color: #666; font-size: 0.875rem;">
                                 <p>No documents found.</p>
-                                <a href="{{ url_for('app.show_upload_page') }}" class="gradio-button gradio-button-primary" style="text-decoration: none; display: inline-block; margin-top: 0.5rem; font-size: 0.75rem; padding: 0.5rem 0.75rem;">Upload Document</a>
+                                <button onclick="navigateToUpload()" class="gradio-button gradio-button-primary" style="display: inline-block; margin-top: 0.5rem; font-size: 0.75rem; padding: 0.5rem 0.75rem; border: none; cursor: pointer;">Upload Document</button>
                             </div>
                         {% endif %}
                     </div>
@@ -527,13 +527,10 @@
                     </div>
                 </div>
                 
-                <!-- Fallback for users without JavaScript -->
+                <!-- JavaScript Required Notice (shown only if JS is disabled) -->
                 <noscript>
                     <div style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 1rem; border-radius: 4px; margin-top: 1rem;">
-                        <strong>⚠️ JavaScript Required:</strong> This page works best with JavaScript enabled. 
-                        <form method="GET" action="{{ url_for('app.crop_image') }}" style="display: inline;">
-                            <button type="submit" class="gradio-button gradio-button-secondary">Reload Page</button>
-                        </form>
+                        <strong>⚠️ JavaScript Required:</strong> This page requires JavaScript for full functionality. Please enable JavaScript in your browser.
                     </div>
                 </noscript>
             </div>
@@ -574,7 +571,7 @@
                         <div id="crop-status-message"></div>
                     </div>
                     
-                    <!-- Hidden form for fallback (kept for compatibility) -->
+                    <!-- Hidden form for fallback (kept for compatibility but not used in AJAX mode) -->
                     <form id="crop-result-form" method="POST" action="{{ url_for('app.process_cropped_image') }}" style="display:none;">
                         <input type="hidden" name="original_folder" id="crop-form-folder" value="{{ selected_folder or '' }}">
                         <input type="hidden" name="original_filename" id="crop-form-filename" value="{{ image_to_crop_filename or '' }}">
@@ -622,6 +619,59 @@
                 let currentFolder = '{{ selected_folder or "" }}';
                 let currentImage = '{{ image_to_crop_filename or "" }}';
                 const userId = '{{ session.get("user_id", "anonymous") }}';
+                
+                // URL state management without page reloads
+                function updateBrowserURL(folder, image) {
+                    const url = new URL(window.location);
+                    if (folder) {
+                        url.searchParams.set('selected_folder', folder);
+                    } else {
+                        url.searchParams.delete('selected_folder');
+                    }
+                    if (image) {
+                        url.searchParams.set('image_file', image);
+                    } else {
+                        url.searchParams.delete('image_file');
+                    }
+                    
+                    // Update URL without page reload
+                    window.history.pushState({
+                        folder: folder,
+                        image: image
+                    }, '', url.toString());
+                }
+                
+                // Handle browser back/forward navigation
+                window.addEventListener('popstate', function(event) {
+                    if (event.state) {
+                        const { folder, image } = event.state;
+                        
+                        if (folder !== currentFolder) {
+                            // Navigate to different folder
+                            if (folder) {
+                                selectDocument(folder);
+                            } else {
+                                // Clear selection
+                                currentFolder = '';
+                                currentImage = '';
+                                hideImageSelection();
+                                hideImageDisplay();
+                                hideCrops();
+                                if (selectedDocumentInfo) {
+                                    selectedDocumentInfo.style.display = 'none';
+                                }
+                            }
+                        }
+                        
+                        if (image !== currentImage && folder) {
+                            // Navigate to different image
+                            if (image) {
+                                fileSelect.value = image;
+                                loadImage(folder, image);
+                            }
+                        }
+                    }
+                });
 
                 // Set stable container dimensions for height-filling display
                 function setStableContainerDimensions() {
@@ -647,6 +697,14 @@
                 // Set initial stable dimensions
                 setStableContainerDimensions();
 
+                // Set initial browser history state
+                if (currentFolder || currentImage) {
+                    window.history.replaceState({
+                        folder: currentFolder,
+                        image: currentImage
+                    }, '', window.location.href);
+                }
+                
                 // Initialize with current state if available
                 if (currentFolder && currentImage) {
                     setTimeout(() => {
@@ -687,6 +745,9 @@
                     currentFolder = documentName;
                     currentImage = '';
                     
+                    // Update browser URL
+                    updateBrowserURL(documentName, '');
+                    
                     // Update sidebar selection
                     document.querySelectorAll('.document-item').forEach(item => {
                         item.classList.remove('selected');
@@ -716,6 +777,9 @@
                     fileSelect.addEventListener('change', function() {
                         const selectedImage = this.value;
                         currentImage = selectedImage;
+                        
+                        // Update browser URL
+                        updateBrowserURL(currentFolder, selectedImage);
                         
                         if (selectedImage && currentFolder) {
                             loadImage(currentFolder, selectedImage);
@@ -1253,7 +1317,7 @@
                                         documentsList.innerHTML = `
                                             <div style="text-align: center; padding: 1rem; color: #666; font-size: 0.875rem;">
                                                 <p>No documents found.</p>
-                                                <a href="/show_upload_page" class="gradio-button gradio-button-primary" style="text-decoration: none; display: inline-block; margin-top: 0.5rem; font-size: 0.75rem; padding: 0.5rem 0.75rem;">Upload Document</a>
+                                                <button onclick="navigateToUpload()" class="gradio-button gradio-button-primary" style="display: inline-block; margin-top: 0.5rem; font-size: 0.75rem; padding: 0.5rem 0.75rem; border: none; cursor: pointer;">Upload Document</button>
                                             </div>
                                         `;
                                     }
@@ -1300,6 +1364,117 @@
                         closeDeleteConfirmationModal();
                     }
                 });
+                
+                // Show/hide OCR section when document is selected
+                function updateOCRSection() {
+                    const ocrSection = document.getElementById('move-to-ocr-section');
+                    if (ocrSection) {
+                        if (currentFolder) {
+                            ocrSection.style.display = 'block';
+                        } else {
+                            ocrSection.style.display = 'none';
+                        }
+                    }
+                }
+                
+                // Update the selectDocument function to show/hide OCR section
+                const originalSelectDocument = selectDocument;
+                selectDocument = function(documentName) {
+                    originalSelectDocument(documentName);
+                    updateOCRSection();
+                };
+                
+                // Global navigation functions
+                window.navigateToUpload = function() {
+                    // Use programmatic navigation - this will still cause a page load
+                    // but it's intentional as we're navigating to a different page
+                    window.location.href = '/show_upload_page';
+                };
+                
+                // Move to OCR function
+                window.moveToOCR = function() {
+                    if (!currentFolder) {
+                        showMoveToOCRStatus('error', 'No document selected');
+                        return;
+                    }
+                    
+                    showMoveToOCRLoading(true);
+                    hideMoveToOCRStatus();
+                    
+                    const formData = new FormData();
+                    formData.append('folder', currentFolder);
+                    
+                    fetch('/api/move_to_ocr', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        showMoveToOCRLoading(false);
+                        
+                        if (data.success) {
+                            showMoveToOCRStatus('success', data.message);
+                            
+                            // Optionally navigate to preview page
+                            if (data.redirect_url) {
+                                setTimeout(() => {
+                                    window.location.href = data.redirect_url;
+                                }, 2000);
+                            }
+                        } else {
+                            showMoveToOCRStatus('error', data.message || 'Failed to move images to OCR folder');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Move to OCR error:', error);
+                        showMoveToOCRLoading(false);
+                        showMoveToOCRStatus('error', 'Network error occurred while moving images to OCR');
+                    });
+                };
+                
+                // Helper functions for Move to OCR status
+                function showMoveToOCRLoading(show) {
+                    const textElement = document.getElementById('move-to-ocr-text');
+                    const loadingElement = document.getElementById('move-to-ocr-loading');
+                    const buttonElement = document.getElementById('move-to-ocr-btn');
+                    
+                    if (textElement && loadingElement && buttonElement) {
+                        if (show) {
+                            textElement.style.display = 'none';
+                            loadingElement.style.display = 'inline';
+                            buttonElement.classList.add('button-loading');
+                        } else {
+                            textElement.style.display = 'inline';
+                            loadingElement.style.display = 'none';
+                            buttonElement.classList.remove('button-loading');
+                        }
+                    }
+                }
+                
+                function showMoveToOCRStatus(type, message) {
+                    const statusElement = document.getElementById('move-to-ocr-status');
+                    const messageElement = document.getElementById('move-to-ocr-status-message');
+                    
+                    if (statusElement && messageElement) {
+                        statusElement.className = `crop-status-${type}`;
+                        messageElement.textContent = message;
+                        statusElement.style.display = 'block';
+                        
+                        // Auto-hide success messages after 5 seconds
+                        if (type === 'success') {
+                            setTimeout(() => {
+                                hideMoveToOCRStatus();
+                            }, 5000);
+                        }
+                    }
+                }
+                
+                function hideMoveToOCRStatus() {
+                    const statusElement = document.getElementById('move-to-ocr-status');
+                    if (statusElement) {
+                        statusElement.style.display = 'none';
+                    }
+                }
             });
         </script>
 
@@ -1339,22 +1514,30 @@
             </div>
         </div>
 
-        {% if selected_folder %}
-        <div class="gradio-component-group" style="margin-top: 2rem; text-align: center;">
-            <h3>Prepare Images for OCR</h3>
-            <p style="margin-bottom: 15px;">Copy all cropped images from this document to the OCR processing folder.</p>
-            <form action="{{ url_for('app.move_to_ocr') }}" method="POST">
-                <input type="hidden" name="folder" value="{{ selected_folder }}">
-                <button type="submit" class="gradio-button gradio-button-primary" style="padding: 12px 20px; font-size: 1.1em;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 8px; vertical-align: text-bottom;">
-                        <path d="M4.406 1.342A5.53 5.53 0 0 1 8 0c2.69 0 4.923 2 5.166 4.579C14.758 4.804 16 6.137 16 7.773 16 9.569 14.502 11 12.687 11H10a.5.5 0 0 1 0-1h2.688C13.979 10 15 8.988 15 7.773c0-1.216-1.02-2.228-2.313-2.228h-.5v-.5C12.188 2.825 10.328 1 8 1a4.53 4.53 0 0 0-2.941 1.1c-.757.652-1.153 1.438-1.153 2.055v.448l-.445.049C2.064 4.805 1 5.952 1 7.318 1 8.785 2.23 10 3.781 10H6a.5.5 0 0 1 0 1H3.781C1.708 11 0 9.366 0 7.318c0-1.763 1.266-3.223 2.942-3.593.143-.863.698-1.723 1.464-2.383z"/>
-                        <path d="M7.646 15.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 14.293V5.5a.5.5 0 0 0-1 0v8.793l-2.146-2.147a.5.5 0 0 0-.708.708l3 3z"/>
-                    </svg>
-                    Move to OCR
+        <div id="move-to-ocr-section" style="margin-top: 2rem; text-align: center; {% if not selected_folder %}display: none;{% endif %}">
+            <div class="gradio-component-group">
+                <h3>Prepare Images for OCR</h3>
+                <p style="margin-bottom: 15px;">Copy all cropped images from this document to the OCR processing folder.</p>
+                <button id="move-to-ocr-btn" onclick="moveToOCR()" class="gradio-button gradio-button-primary" style="padding: 12px 20px; font-size: 1.1em; border: none; cursor: pointer;">
+                    <span id="move-to-ocr-text">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 8px; vertical-align: text-bottom;">
+                            <path d="M4.406 1.342A5.53 5.53 0 0 1 8 0c2.69 0 4.923 2 5.166 4.579C14.758 4.804 16 6.137 16 7.773 16 9.569 14.502 11 12.687 11H10a.5.5 0 0 1 0-1h2.688C13.979 10 15 8.988 15 7.773c0-1.216-1.02-2.228-2.313-2.228h-.5v-.5C12.188 2.825 10.328 1 8 1a4.53 4.53 0 0 0-2.941 1.1c-.757.652-1.153 1.438-1.153 2.055v.448l-.445.049C2.064 4.805 1 5.952 1 7.318 1 8.785 2.23 10 3.781 10H6a.5.5 0 0 1 0-1H3.781C1.708 11 0 9.366 0 7.318c0-1.763 1.266-3.223 2.942-3.593.143-.863.698-1.723 1.464-2.383z"/>
+                            <path d="M7.646 15.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 14.293V5.5a.5.5 0 0 0-1 0v8.793l-2.146-2.147a.5.5 0 0 0-.708.708l3 3z"/>
+                        </svg>
+                        Move to OCR
+                    </span>
+                    <span id="move-to-ocr-loading" style="display: none;">
+                        <span class="loading-spinner"></span>
+                        Processing...
+                    </span>
                 </button>
-            </form>
+                
+                <!-- OCR Move Status -->
+                <div id="move-to-ocr-status" style="margin-top: 1rem; padding: 0.75rem; border-radius: 6px; display: none;">
+                    <div id="move-to-ocr-status-message"></div>
+                </div>
+            </div>
         </div>
-        {% endif %}
             </div>
             {% endblock %}
         </div>

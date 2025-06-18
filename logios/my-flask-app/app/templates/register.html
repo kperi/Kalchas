@@ -1,0 +1,69 @@
+<!-- filepath: /Users/konstantinosperifanos/code/projects/logios/Kalchas/logios/my-flask-app/app/templates/register.html -->
+{% extends "layout.html" %}
+
+{% block title %}Register - Logios App{% endblock %}
+
+{% block content %}
+<div class="gradio-component-group" style="max-width: 450px; margin: 3rem auto;">
+    <h1 style="font-size: 1.6em; margin-bottom: 1.5rem;">Create Your Account</h1>
+    <form method="POST" action="{{ url_for('auth.register') }}">
+        {{ form.hidden_tag() }}
+        
+        <div style="margin-bottom: 1rem;">
+            {{ form.username.label }}
+            {{ form.username(class="form-control") }}
+            {% for error in form.username.errors %}
+                <span style="color: red; font-size: 0.8em;">{{ error }}</span>
+            {% endfor %}
+        </div>
+        
+        <div style="margin-bottom: 1rem;">
+            {{ form.email.label }}
+            {{ form.email(class="form-control") }}
+            {% for error in form.email.errors %}
+                <span style="color: red; font-size: 0.8em;">{{ error }}</span>
+            {% endfor %}
+        </div>
+        
+        <div style="margin-bottom: 1rem;">
+            {{ form.first_name.label }}
+            {{ form.first_name(class="form-control") }}
+            {% for error in form.first_name.errors %}
+                <span style="color: red; font-size: 0.8em;">{{ error }}</span>
+            {% endfor %}
+        </div>
+        
+        <div style="margin-bottom: 1rem;">
+            {{ form.last_name.label }}
+            {{ form.last_name(class="form-control") }}
+            {% for error in form.last_name.errors %}
+                <span style="color: red; font-size: 0.8em;">{{ error }}</span>
+            {% endfor %}
+        </div>
+        
+        <div style="margin-bottom: 1rem;">
+            {{ form.password.label }}
+            {{ form.password(class="form-control") }}
+            {% for error in form.password.errors %}
+                <span style="color: red; font-size: 0.8em;">{{ error }}</span>
+            {% endfor %}
+        </div>
+        
+        <div style="margin-bottom: 1.5rem;">
+            {{ form.password_confirm.label }}
+            {{ form.password_confirm(class="form-control") }}
+            {% for error in form.password_confirm.errors %}
+                <span style="color: red; font-size: 0.8em;">{{ error }}</span>
+            {% endfor %}
+        </div>
+        
+        <div style="margin-bottom: 1rem;">
+            {{ form.submit(class="gradio-button gradio-button-primary gradio-button-fullwidth") }}
+        </div>
+    </form>
+    
+    <p style="text-align: center; font-size: 0.9em; margin-top: 1.5rem;">
+        Already have an account? <a href="{{ url_for('auth.login') }}" style="color: #2563eb; text-decoration: none;">Sign in here</a>
+    </p>
+</div>
+{% endblock %}

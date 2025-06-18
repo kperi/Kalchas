@@ -1,0 +1,63 @@
+<!-- filepath: /Users/konstantinosperifanos/code/projects/logios/Kalchas/logios/my-flask-app/app/templates/profile.html -->
+{% extends "layout.html" %}
+
+{% block title %}Profile - Logios App{% endblock %}
+
+{% block content %}
+<div class="gradio-component-group" style="max-width: 600px; margin: 3rem auto;">
+    <h1 style="font-size: 1.6em; margin-bottom: 1.5rem;">User Profile</h1>
+    
+    <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;">
+        <div style="margin-bottom: 1rem;">
+            <strong>Username:</strong> {{ user.username }}
+        </div>
+        
+        <div style="margin-bottom: 1rem;">
+            <strong>Email:</strong> {{ user.email }}
+        </div>
+        
+        {% if user.first_name or user.last_name %}
+        <div style="margin-bottom: 1rem;">
+            <strong>Full Name:</strong> {{ user.full_name }}
+        </div>
+        {% endif %}
+        
+        <div style="margin-bottom: 1rem;">
+            <strong>Account Type:</strong> 
+            {% if user.is_admin %}
+                <span style="color: #dc3545; font-weight: bold;">Administrator</span>
+            {% else %}
+                <span style="color: #28a745;">User</span>
+            {% endif %}
+        </div>
+        
+        <div style="margin-bottom: 1rem;">
+            <strong>Member Since:</strong> {{ user.created_at.strftime('%B %d, %Y') }}
+        </div>
+        
+        {% if user.last_login %}
+        <div style="margin-bottom: 1rem;">
+            <strong>Last Login:</strong> {{ user.last_login.strftime('%B %d, %Y at %I:%M %p') }}
+        </div>
+        {% endif %}
+        
+        <div style="margin-bottom: 1rem;">
+            <strong>Account Status:</strong> 
+            {% if user.is_active %}
+                <span style="color: #28a745;">Active</span>
+            {% else %}
+                <span style="color: #dc3545;">Inactive</span>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div style="text-align: center; margin-top: 2rem;">
+        <a href="{{ url_for('app.index') }}" class="gradio-button gradio-button-secondary" style="margin-right: 1rem;">
+            Back to Home
+        </a>
+        <a href="{{ url_for('auth.logout') }}" class="gradio-button gradio-button-outline">
+            Logout
+        </a>
+    </div>
+</div>
+{% endblock %}

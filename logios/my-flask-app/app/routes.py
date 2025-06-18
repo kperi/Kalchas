@@ -2010,6 +2010,56 @@ def convert_pdf_with_progress_tracking(app_config, user_id, document_folder_name
         return False, str(e)
 
 
+@app.route("/api/move_to_ocr", methods=["POST"])
+@login_required
+def api_move_to_ocr():
+    """
+    AJAX endpoint to move cropped images to OCR processing folder.
+    Returns JSON response with success/error information.
+    """
+    try:
+        folder_name = request.form.get("folder")
+        
+        if not folder_name:
+            return jsonify({
+                "success": False,
+                "message": "No folder specified"
+            }), 400
+        
+        user_id = current_user.get_user_folder_name()
+        
+        # Call the existing move_to_ocr function
+        success, message = file_operations.mark_document_editing_completed(
+            current_app.config, user_id, folder_name
+        )
+        
+        if success:
+            current_app.logger.info(f"User {user_id} moved document {folder_name} to OCR via AJAX")
+            
+            # Generate redirect URL for preview page
+            redirect_url = url_for("app.image_preview", selected_folder=folder_name)
+            
+            return jsonify({
+                "success": True,
+                "message": message,
+                "redirect_url": redirect_url,
+                "document_folder": folder_name
+            })
+        else:
+            current_app.logger.error(f"Failed to move document {folder_name} to OCR for user {user_id}: {message}")
+            return jsonify({
+                "success": False,
+                "message": message
+            }), 500
+    
+    except Exception as e:
+        current_app.logger.error(f"Error in api_move_to_ocr: {str(e)}", exc_info=True)
+        return jsonify({
+            "success": False,
+            "message": f"Error moving files to OCR: {str(e)}"
+        }), 500
+
+
 @app.route("/mark_editing_completed", methods=["POST"])  # Renamed for clarity
 def mark_editing_completed():
     document_folder_name = request.form.get(
