@@ -10,7 +10,10 @@ COPY . .
 
 ENV FLASK_APP=run.py
 ENV FLASK_DEBUG=true
+ENV FLASK_ENV=development
+ENV PYTHONUNBUFFERED=1
 
-EXPOSE 5000
+EXPOSE 5001
 
-CMD ["flask", "run", "--host=0.0.0.0", "--port=5001", "--reload"]
+# Use python run.py instead of flask run for better control
+CMD ["python", "run.py"]
