@@ -9,6 +9,7 @@
         <div class="form-group" style="margin-bottom: 1rem;">
             <label for="file">Choose an Image or PDF file (Max 100MB):</label>
             <input type="file" name="file" id="file" accept="image/*,.pdf" required>
+            <small class="form-text text-muted">Folder name will be automatically created based on the filename (max 20 characters, spaces replaced with underscores)</small>
         </div>
         <button type="submit" class="gradio-button gradio-button-primary gradio-button-fullwidth">Upload Document</button>
     </form>
@@ -69,5 +70,6 @@
             });
         }
     });
+
 </script>
 {% endblock %}

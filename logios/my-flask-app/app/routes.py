@@ -11,23 +11,23 @@ from flask import (
     send_from_directory,
 )
 from werkzeug.utils import secure_filename
-from pdf2image import convert_from_path
-import os
-import base64
-import re
-import shutil
-from collections import defaultdict
-import requests
-import json
 
+# pdf2image and shutil are no longer directly used here, they are in file_operations
+import os
+import re  # Still used in process_ocr for data from OCR service
+
+# from collections import defaultdict # No longer used directly here
+import requests
 
 from loguru import logger
+from collections import defaultdict
+import shutil
 
-app = Blueprint(
-    "app", __name__
-)  # Assuming you renamed 'app' to 'main' or vice-versa consistently
+from . import file_operations
 
-UPLOAD_FOLDER = "uploads"
+app = Blueprint("app", __name__)
+
+# ALLOWED_EXTENSIONS can remain or be moved to app config
 ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg"}
 
 
@@ -46,329 +46,303 @@ def show_upload_page():
         if "file" not in request.files:
             flash("No file part in the request.", "danger")
             return redirect(request.url)
-        file = request.files["file"]
-        if file.filename == "":
+
+        uploaded_file_storage = request.files["file"]
+        if uploaded_file_storage.filename == "":
             flash("No selected file.", "warning")
             return redirect(request.url)
 
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
+        if uploaded_file_storage and allowed_file(uploaded_file_storage.filename):
             user_id = str(session.get("user_id", "anonymous"))
 
-            # Create a folder name from the original filename (without extension)
-            original_filename_basename = os.path.splitext(filename)[0]
-
-            # Define the base path for this specific upload
-            # e.g., /app/uploads/user_id/original_pdf_name/
-            specific_upload_path = os.path.join(
-                current_app.config["UPLOAD_FOLDER"],
-                user_id,
-                original_filename_basename,
+            # Task 1: Handle PDF Upload and Folder Creation with automatic folder name
+            doc_folder_path, saved_pdf_path, doc_folder_name = (
+                file_operations.handle_pdf_upload_with_auto_folder(
+                    current_app.config,
+                    user_id,
+                    uploaded_file_storage,
+                )
             )
 
-            try:
-                os.makedirs(specific_upload_path, exist_ok=True)
-                current_app.logger.info(f"Created directory: {specific_upload_path}")
+            if not doc_folder_path:
+                flash(
+                    "Error saving uploaded file or creating document folder.", "danger"
+                )
+                return redirect(request.url)
 
-                # Save the original file (e.g., mydocument.pdf)
-                original_file_path = os.path.join(specific_upload_path, filename)
-                file.save(original_file_path)
-                current_app.logger.info(f"Saved original file to: {original_file_path}")
+            current_app.logger.info(
+                f"File uploaded to {saved_pdf_path} in document folder {doc_folder_name}"
+            )
 
-                # If it's a PDF, convert to PNGs
-                if filename.lower().endswith(".pdf"):
+            # Task 2: PDF to PNG Conversion (if it's a PDF)
+            if uploaded_file_storage.filename.lower().endswith(".pdf"):
+                current_app.logger.info(
+                    f"Starting PDF to PNG conversion for: {saved_pdf_path}"
+                )
+                success_conversion, png_message_or_paths = (
+                    file_operations.convert_pdf_to_png_pages(
+                        current_app.config, user_id, doc_folder_name, saved_pdf_path
+                    )
+                )
+                if success_conversion:
                     current_app.logger.info(
-                        f"Starting PDF to PNG conversion for: {original_file_path}"
+                        f"Successfully converted PDF to {len(png_message_or_paths)} PNGs for document {doc_folder_name}."
                     )
-                    try:
-                        images = convert_from_path(
-                            original_file_path, dpi=200
-                        )  # Adjust DPI as needed
-                        for i, image in enumerate(images):
-                            image_filename = f"{i+1:03d}.png"  # e.g., 001.png, 002.png
-                            image_save_path = os.path.join(
-                                specific_upload_path, image_filename
-                            )
-                            image.save(image_save_path, "PNG")
-                            current_app.logger.info(
-                                f"Saved PNG page: {image_save_path}"
-                            )
-                        flash(
-                            f"'{filename}' uploaded and processed successfully!",
-                            "success",
-                        )
-                    except Exception as e:
-                        current_app.logger.error(f"Error converting PDF to PNG: {e}")
-                        flash(
-                            f"File uploaded, but error during PDF to PNG conversion: {e}",
-                            "danger",
-                        )
-                        # Optionally, clean up the original file if conversion fails critically
-                        # os.remove(original_file_path)
-                        # shutil.rmtree(specific_upload_path)
-                        return redirect(request.url)
+                    flash(
+                        f"'{uploaded_file_storage.filename}' uploaded and converted to PNGs successfully!",
+                        "success",
+                    )
                 else:
-                    # If it's an image, it's already "processed" in a way
-                    # You might want to rename it to a standard format like 001.png if it's a single image upload
-                    # For now, we assume PDF is the primary multi-page document
-                    flash(f"Image '{filename}' uploaded successfully!", "success")
-
-                # Redirect to the image preview page for the newly created folder
-                return redirect(
-                    url_for(
-                        "app.image_preview", selected_folder=original_filename_basename
+                    current_app.logger.error(
+                        f"Error converting PDF to PNG for {doc_folder_name}: {png_message_or_paths}"
                     )
+                    flash(
+                        f"File uploaded, but error during PDF to PNG conversion: {png_message_or_paths}",
+                        "danger",
+                    )
+                    return redirect(request.url)
+            else:
+                flash(
+                    f"Image '{uploaded_file_storage.filename}' uploaded successfully!",
+                    "success",
                 )
 
-            except OSError as e:
-                current_app.logger.error(f"OSError during file upload processing: {e}")
-                flash(f"Error creating directory or saving file: {e}", "danger")
-                return redirect(request.url)
-            except Exception as e:
-                current_app.logger.error(
-                    f"General error during file upload processing: {e}"
-                )
-                flash(f"An unexpected error occurred: {e}", "danger")
-                return redirect(request.url)
-
+            return redirect(url_for("app.crop_image", selected_folder=doc_folder_name))
         else:
             flash("File type not allowed.", "warning")
             return redirect(request.url)
 
-    # For GET request, just render the upload page
     return render_template("show_upload_page.html")
+
+
+@app.route("/crop_image", methods=["GET"])
+def crop_image():
+    user_id = str(session.get("user_id", "anonymous"))
+
+    user_workspace_info = file_operations.get_user_workspace_info(
+        current_app.config, user_id
+    )
+    logger.info(user_workspace_info)
+
+    # Get all documents for the user (both in-progress and completed can be cropped)
+    documents_data = file_operations.get_user_documents_list(
+        current_app.config, user_id, include_completed=True, include_in_progress=True
+    )
+    
+    # Get all documents with their detailed info
+    documents_with_info = []
+    for doc_name in documents_data["all"]:
+        doc_info = file_operations.get_document_info(
+            current_app.config, user_id, doc_name
+        )
+        documents_with_info.append(doc_info)
+
+    selected_document_folder = request.args.get("selected_folder")
+    image_to_crop_filename = request.args.get("image_file")
+
+    available_png_files = []
+    selected_doc_info = None
+    cropped_images = []
+
+    if selected_document_folder:
+        # Get the info for the selected document
+        for doc_info in documents_with_info:
+            if doc_info["name"] == selected_document_folder:
+                selected_doc_info = doc_info
+                break
+        
+        if selected_doc_info:
+            # PNGs are in PNG subfolder for all documents
+            current_png_dir = file_operations.get_document_png_dir(
+                current_app.config, user_id, selected_document_folder
+            )
+            if os.path.exists(current_png_dir):
+                try:
+                    all_files_in_png_dir = os.listdir(current_png_dir)
+                    available_png_files = [
+                        f for f in all_files_in_png_dir if f.lower().endswith(".png")
+                    ]
+                    available_png_files.sort()
+                    current_app.logger.info(f"Found {len(available_png_files)} PNG files in {current_png_dir}")
+                    
+                    # If a specific image is selected, find crops for that page
+                    if image_to_crop_filename:
+                        # Extract base page name (e.g., "page_001" from "page_001.png")
+                        page_base = os.path.splitext(image_to_crop_filename)[0]
+                        if not '_crop_' in image_to_crop_filename:  # Only for original pages
+                            cropped_images = [
+                                f for f in available_png_files 
+                                if f.startswith(f"{page_base}_crop_") and f.endswith(".png")
+                            ]
+                            current_app.logger.info(f"Found {len(cropped_images)} crops for {page_base}")
+                        
+                except Exception as e:
+                    current_app.logger.error(
+                        f"Error listing PNG files from {current_png_dir}: {str(e)}"
+                    )
+            else:
+                current_app.logger.warning(f"PNG directory does not exist: {current_png_dir}")
+
+    return render_template(
+        "crop_menu.html",
+        documents=documents_with_info,
+        folders=[doc["name"] for doc in documents_with_info],  # For compatibility
+        selected_folder=selected_document_folder,
+        selected_doc_info=selected_doc_info,
+        available_png_files=available_png_files,
+        png_files_in_selected_folder=available_png_files,  # For compatibility
+        image_to_crop_filename=image_to_crop_filename,
+        cropped_images=cropped_images,
+        user_workspace_info=user_workspace_info,
+    )
 
 
 @app.route("/image_preview")
 def image_preview():
-    user_id = session.get("user_id", "anonymous")
-    upload_root = os.path.join(current_app.config["UPLOAD_FOLDER"], str(user_id))
+    user_id = str(session.get("user_id", "anonymous"))
 
-    # Initialize variables
-    all_folders = []
-    ocr_ready_folders = []
-    png_files = []
-    selected_folder = request.args.get("selected_folder")
-    selected_png = request.args.get("selected_png")
-    selected_segment = request.args.get("selected_segment")
+    # Get only completed documents for OCR/preview
+    documents_data = file_operations.get_user_documents_list(
+        current_app.config, user_id, include_completed=True, include_in_progress=False
+    )
+    completed_document_folders = documents_data["completed"]
 
-    # Get OCR-ready folders
-    if os.path.exists(upload_root):
-        all_folders = [
-            name
-            for name in os.listdir(upload_root)
-            if os.path.isdir(os.path.join(upload_root, name))
-        ]
+    selected_document_folder = request.args.get("selected_folder")
+    selected_png_filename = request.args.get("selected_png")
 
-        # Filter for folders that have a TOOCR subdirectory
-        for folder in all_folders:
-            toocr_path = os.path.join(upload_root, folder, "TOOCR")
-            if os.path.exists(toocr_path) and os.path.isdir(toocr_path):
-                ocr_ready_folders.append(folder)
+    png_files_in_completed_doc = []
 
-        ocr_ready_folders.sort()
-
-    # Get PNG files if a folder is selected
-    if selected_folder and selected_folder in ocr_ready_folders:
-        toocr_path = os.path.join(upload_root, selected_folder, "TOOCR")
-
-        if os.path.exists(toocr_path):
-            # Get all PNG files in the TOOCR folder
-            png_files = [
-                f for f in os.listdir(toocr_path) if f.lower().endswith(".png")
-            ]
-            png_files.sort()
-
-    # Get segment data if a PNG and segment are selected
-    segment_data = None
-    if selected_folder and selected_png and selected_segment:
-        # Get the base filename without extension for finding segments
-        base_filename = os.path.splitext(selected_png)[0]
-
-        # Check if segment exists and get its data
-        segment_json_path = os.path.join(
-            upload_root,
-            selected_folder,
-            "TOOCR",
-            "segments",
-            base_filename,
-            f"{selected_segment}.json",
+    if (
+        selected_document_folder
+        and selected_document_folder in completed_document_folders
+    ):
+        # Get document info to verify it's completed
+        doc_info = file_operations.get_document_info(
+            current_app.config, user_id, selected_document_folder
         )
 
-        if os.path.exists(segment_json_path):
-            try:
-                with open(segment_json_path, "r") as f:
-                    segment_data = json.load(f)
-            except Exception as e:
-                current_app.logger.error(f"Error loading segment data: {str(e)}")
-
-    # New logic to determine image filename using selected_segment as an INDEX
-    resolved_segment_image_filename = None
-    selected_segment_id_display = selected_segment  # What to show in the H5 tag
-
-    if selected_segment is not None:  # selected_segment is from the dropdown
-        page_id = request.args.get("selected_png").split(".")[0]
-
-        # Logic to load segment_data (JSON) - this might use actual_segment_data_to_load
-        # ... ensure segment_data is loaded ...
-
-        segment_image_directory = os.path.join(
-            current_app.config["UPLOAD_FOLDER"],
-            session.get("user_id", "anonymous"),
-            selected_folder,
-            "TOOCR",
-            page_id,
-        )
-        if os.path.isdir(segment_image_directory):
-            try:
-                # Ensure PNGs are sorted consistently (e.g., numerically if names are "0.png", "1.png", "10.png")
-                # A natural sort function might be needed for robust sorting of names like "1.png", "2.png", "10.png".
-                # For simple "0.png", "1.png" ... "9.png", "10.png", basic sort is fine.
-                png_filenames = sorted(
-                    [
+        if doc_info["is_completed"]:
+            # PNGs for completed documents are in /<user_id>/<selected_folder>/TOOCR/PNG/
+            completed_png_dir = os.path.join(
+                file_operations.get_document_completed_dir(
+                    current_app.config, user_id, selected_document_folder
+                ),
+                "PNG",
+            )
+            if os.path.exists(completed_png_dir):
+                try:
+                    all_files_in_completed_png_dir = os.listdir(completed_png_dir)
+                    png_files_in_completed_doc = [
                         f
-                        for f in os.listdir(segment_image_directory)
+                        for f in all_files_in_completed_png_dir
                         if f.lower().endswith(".png")
                     ]
-                )
-
-                segment_index_from_dropdown = int(
-                    selected_segment
-                )  # Assumes selected_segment is a 0-based index string
-
-                if 0 <= segment_index_from_dropdown < len(png_filenames):
-                    resolved_segment_image_filename = png_filenames[
-                        segment_index_from_dropdown
-                    ]
-                    # If you also want to display the original ID (if it was different from index)
-                    # selected_segment_id_display = os.path.splitext(resolved_segment_image_filename)[0]
-                else:
-                    current_app.logger.warning(
-                        f"Segment index {segment_index_from_dropdown} out of bounds."
+                    png_files_in_completed_doc.sort()
+                except Exception as e:
+                    current_app.logger.error(
+                        f"Error listing PNG files from {completed_png_dir}: {str(e)}"
                     )
-                    # Fallback: try to use selected_segment as a direct name if index fails
-                    if f"{selected_segment}.png" in png_filenames:
-                        resolved_segment_image_filename = f"{selected_segment}.png"
-                    else:
-                        resolved_segment_image_filename = (
-                            "error_image_not_found.png"  # Placeholder
-                        )
-            except ValueError:
-                current_app.logger.error(
-                    f"Could not convert selected_segment '{selected_segment}' to an integer index. Trying as direct filename."
-                )
-                # Fallback: treat selected_segment as a direct filename base
-                if os.path.exists(
-                    os.path.join(segment_image_directory, f"{selected_segment}.png")
-                ):
-                    resolved_segment_image_filename = f"{selected_segment}.png"
-                else:
-                    resolved_segment_image_filename = (
-                        "error_filename_invalid.png"  # Placeholder
-                    )
-            except Exception as e:
-                current_app.logger.error(f"Error resolving segment image filename: {e}")
-                resolved_segment_image_filename = (
-                    "error_processing_image_list.png"  # Placeholder
-                )
-        else:
-            current_app.logger.warning(
-                f"Segment image directory not found: {segment_image_directory}"
-            )
-            resolved_segment_image_filename = (
-                "error_directory_not_found.png"  # Placeholder
-            )
 
     return render_template(
         "image_preview.html",
-        folders=ocr_ready_folders,
-        selected_folder=selected_folder,
-        png_files=png_files,
-        selected_segment=selected_segment,
-        segment_data=segment_data,
-        resolved_segment_image_filename=resolved_segment_image_filename,
-        selected_segment_id_display=selected_segment_id_display,
+        folders=completed_document_folders,
+        selected_folder=selected_document_folder,
+        png_files=png_files_in_completed_doc,
+        selected_png=selected_png_filename,
+        selected_segment=request.args.get("selected_segment"),
+    )
+
+
+@app.route("/documents_dashboard")
+def documents_dashboard():
+    """
+    New route to show all documents with their status and details.
+    """
+    user_id = str(session.get("user_id", "anonymous"))
+
+    # Get all documents
+    documents_data = file_operations.get_user_documents_list(
+        current_app.config, user_id, include_completed=True, include_in_progress=True
+    )
+
+    # Get detailed info for each document
+    documents_with_info = []
+    for doc_name in documents_data["all"]:
+        doc_info = file_operations.get_document_info(
+            current_app.config, user_id, doc_name
+        )
+        documents_with_info.append(doc_info)
+
+    return render_template(
+        "documents_dashboard.html",
+        documents=documents_with_info,
+        completed_count=len(documents_data["completed"]),
+        in_progress_count=len(documents_data["in_progress"]),
+        total_count=len(documents_data["all"]),
     )
 
 
 @app.route(
-    "/crop", methods=["GET"]
+    "/crop_1", methods=["GET"]
 )  # Assuming GET for now, POST would handle crop submission
-def crop_image():
-    user_id = session.get("user_id", "anonymous")
-    upload_root = os.path.join(current_app.config["UPLOAD_FOLDER"], str(user_id))
+def crop_image_1():
+    user_id = str(session.get("user_id", "anonymous"))
 
-    # Get folders
-    folders = []
-    if os.path.exists(upload_root):
-        folders = [
+    # Get all document folders for the user for the dropdown
+    user_upload_dir = file_operations.get_user_upload_dir(current_app.config, user_id)
+    document_folders = []
+    if os.path.exists(user_upload_dir):
+        document_folders = [
             name
-            for name in os.listdir(upload_root)
-            if os.path.isdir(os.path.join(upload_root, name))
+            for name in os.listdir(user_upload_dir)
+            if os.path.isdir(os.path.join(user_upload_dir, name))
+            and not os.path.exists(
+                os.path.join(user_upload_dir, name, "TOOCR")
+            )  # List only non-completed folders
         ]
-        folders.sort()
+        document_folders.sort()
 
-    # Get selected folder from query parameters
-    selected_folder = request.args.get("selected_folder")
-    image_to_crop_filename = request.args.get("image_file")
+    selected_document_folder = request.args.get("selected_folder")
+    image_to_crop_filename = request.args.get("image_file")  # e.g., page_001.png
 
-    # Initialize png_files list and cropped_images list
-    png_files_in_selected_folder = []
-    cropped_images = []
+    original_pngs_for_cropping = []  # PNGs from <selected_document_folder>/PNG/
+    # Cropped images are also in <selected_document_folder>/PNG/ but named like page_00X_crop_YYY.png
+    # The template might need to distinguish these or list all and allow selection.
+    # For simplicity, let's list all PNGs from the PNG subfolder.
 
-    # If a folder is selected, get the PNG files in that folder
-    if selected_folder:
-        folder_path = os.path.join(upload_root, selected_folder)
-
-        if os.path.exists(folder_path):
+    if selected_document_folder:
+        # PNGs for a document *before* completion are in <user_id>/<selected_document_folder>/PNG/
+        current_png_dir = file_operations.get_document_png_dir(
+            current_app.config, user_id, selected_document_folder
+        )
+        if os.path.exists(current_png_dir):
             try:
-                # List all files in the folder
-                all_files = os.listdir(folder_path)
-
-                # Filter for PNG files only (exclude cropped subfolder)
-                png_files_in_selected_folder = [
-                    f for f in all_files if f.lower().endswith(".png")
+                all_files_in_png_dir = os.listdir(current_png_dir)
+                original_pngs_for_cropping = [
+                    f for f in all_files_in_png_dir if f.lower().endswith(".png")
                 ]
-
-                # Sort the files by filename
-                png_files_in_selected_folder.sort(
-                    key=lambda x: (
-                        int(os.path.splitext(x)[0])
-                        if os.path.splitext(x)[0].isdigit()
-                        else 0
-                    )
+                # A natural sort might be better if page numbers can exceed 999 or have inconsistent padding
+                original_pngs_for_cropping.sort()
+            except Exception as e:
+                current_app.logger.error(
+                    f"Error listing PNG files from {current_png_dir}: {str(e)}"
                 )
 
-                # Check for cropped images if an image is selected
-                if image_to_crop_filename:
-                    cropped_dir = os.path.join(folder_path, "cropped")
-                    original_page_base = os.path.splitext(image_to_crop_filename)[0]
-
-                    if os.path.exists(cropped_dir):
-                        # Get all cropped images for the selected page
-                        cropped_images = [
-                            f
-                            for f in os.listdir(cropped_dir)
-                            if f.startswith(f"{original_page_base}_cropped_")
-                            and f.endswith(".png")
-                        ]
-                        cropped_images.sort()
-
-            except Exception as e:
-                current_app.logger.error(f"Error listing files: {str(e)}")
+    # The `cropped_images` list in the old template was for a separate `cropped` dir.
+    # Now, crops are mixed in the `PNG` dir. The template needs to handle this.
+    # We can pass `original_pngs_for_cropping` which contains both originals and their crops.
 
     return render_template(
-        "crop_menu.html",
-        folders=folders,
-        selected_folder=selected_folder,
-        png_files_in_selected_folder=png_files_in_selected_folder,
+        "crop_menu.html",  # Assuming crop_menu.html is adapted
+        document_folders=document_folders,
+        selected_folder=selected_document_folder,
+        # Pass all PNGs (originals and crops) from the PNG subfolder
+        available_png_files=original_pngs_for_cropping,
         image_to_crop_filename=image_to_crop_filename,
-        cropped_images=cropped_images,
     )
 
 
 @app.route("/uploads/<user_id>/<folder>/<filename>")
-@app.route("/s/<user_id>/<folder>/<filename>")  # Add this for the malformed URL
 def uploaded_file(user_id, folder, filename):
     # First log exactly what we received
     current_app.logger.info(
@@ -521,80 +495,50 @@ def fs_check():
 
 @app.route("/process_cropped_image", methods=["POST"])
 def process_cropped_image():
-    # Get form data
-    original_folder = request.form.get("original_folder")
-    original_filename = request.form.get("original_filename")
-    cropped_image_data = request.form.get("cropped_image_data")
+    original_folder = request.form.get(
+        "original_folder"
+    )  # This is document_folder_name
+    original_filename = request.form.get("original_filename")  # e.g., page_001.png
+    cropped_image_data_url = request.form.get("cropped_image_data")
 
-    # Validate input
-    if not all([original_folder, original_filename, cropped_image_data]):
-        flash("Missing required crop parameters", "danger")
+    if not all([original_folder, original_filename, cropped_image_data_url]):
+        flash("Missing required crop parameters.", "danger")
         return redirect(url_for("app.crop_image"))
 
-    # Get the user ID (or use anonymous)
-    user_id = session.get("user_id", "anonymous")
+    user_id = str(session.get("user_id", "anonymous"))
+    original_page_filename_base = os.path.splitext(original_filename)[
+        0
+    ]  # e.g., page_001
 
-    # Define the directory where the original file is stored
-    original_dir = os.path.join(
-        current_app.config["UPLOAD_FOLDER"],
-        str(user_id),
-        original_folder,
+    # Task 3: Save Cropped Image
+    # This saves to /<user_id>/<original_folder>/PNG/page_00X_crop_YYY.png
+    success, new_crop_filename_or_error = file_operations.save_cropped_page_image(
+        current_app.config,
+        user_id,
+        original_folder,  # document_folder_name
+        original_page_filename_base,
+        cropped_image_data_url,
     )
 
-    # Create a 'cropped' subfolder if it doesn't exist
-    cropped_dir = os.path.join(original_dir, "cropped")
-    os.makedirs(cropped_dir, exist_ok=True)
+    if success:
+        current_app.logger.info(
+            f"Saved cropped image as {new_crop_filename_or_error} in {original_folder}/PNG"
+        )
+        flash(
+            f"Successfully saved cropped image as {new_crop_filename_or_error}",
+            "success",
+        )
+    else:
+        current_app.logger.error(
+            f"Error saving cropped image: {new_crop_filename_or_error}"
+        )
+        flash(f"Error saving cropped image: {new_crop_filename_or_error}", "danger")
 
-    # Get the base filename without extension (e.g., "001" from "001.png")
-    original_page_base = os.path.splitext(original_filename)[0]
-
-    # Find existing cropped images to determine the next number
-    existing_crops = [
-        f
-        for f in os.listdir(cropped_dir)
-        if f.startswith(f"{original_page_base}_cropped_")
-    ]
-
-    # Extract numbers from existing crop files using regex
-    crop_numbers = []
-    for crop_file in existing_crops:
-        match = re.search(r"_cropped_(\d{3})\.png$", crop_file)
-        if match:
-            crop_numbers.append(int(match.group(1)))
-
-    # Determine the next crop number
-    next_crop_num = 1
-    if crop_numbers:
-        next_crop_num = max(crop_numbers) + 1
-
-    # Format the new filename: original_page_cropped_XXX.png
-    cropped_filename = f"{original_page_base}_cropped_{next_crop_num:03d}.png"
-    cropped_file_path = os.path.join(cropped_dir, cropped_filename)
-
-    try:
-        # Remove the data:image/png;base64, part from the data URL
-        image_data = re.sub(r"^data:image/\w+;base64,", "", cropped_image_data)
-
-        # Decode the base64 data
-        binary_data = base64.b64decode(image_data)
-
-        # Save the cropped image
-        with open(cropped_file_path, "wb") as f:
-            f.write(binary_data)
-
-        current_app.logger.info(f"Saved cropped image to {cropped_file_path}")
-        flash(f"Successfully saved cropped image as {cropped_filename}", "success")
-
-    except Exception as e:
-        current_app.logger.error(f"Error saving cropped image: {str(e)}")
-        flash(f"Error saving cropped image: {str(e)}", "danger")
-
-    # Redirect back to the crop page with the same folder and file selected
     return redirect(
         url_for(
             "app.crop_image",
             selected_folder=original_folder,
-            image_file=original_filename,
+            image_file=original_filename,  # Keep the original page selected for further cropping
         )
     )
 
@@ -694,523 +638,417 @@ def move_to_ocr():
 
 @app.route("/process_ocr", methods=["POST"])
 def process_ocr():
-    """Proxy request to OCR service and return the results"""
     data = request.json
-
-    if not data or not data.get("folder") or not data.get("filename"):
+    if (
+        not data or not data.get("folder") or not data.get("filename")
+    ):  # folder is document_folder_name
         return jsonify({"error": "Missing folder or filename"}), 400
 
-    # Get the file path
-    user_id = session.get("user_id", "anonymous")
-    folder = data.get("folder")
-    filename = data.get("filename")
+    user_id = str(session.get("user_id", "anonymous"))
+    document_folder_name = data.get("folder")
+    page_image_to_ocr = data.get(
+        "filename"
+    )  # e.g., page_001.png or page_001_crop_001.png
 
-    # Get the base filename (without extension) for directory structure
-    base_filename = os.path.splitext(filename)[0]
-
-    # Construct the full path to the image file
-    full_path = os.path.join(
-        "/app/uploads",  # This is the path inside both containers
-        str(user_id),
-        folder,
-        "TOOCR",
-        filename,
+    # Image for OCR is from the "completed" structure: /<user_id>/<doc_folder_name>/TOOCR/PNG/
+    # The `is_completed` flag for path helpers should be True.
+    ocr_source_png_directory = file_operations.get_ocr_source_png_dir(
+        current_app.config, user_id, document_folder_name, is_completed=True
+    )
+    full_image_path_for_ocr_service = os.path.join(
+        ocr_source_png_directory, page_image_to_ocr
     )
 
-    current_app.logger.info(f"Processing OCR request for file: {full_path}")
+    current_app.logger.info(
+        f"Processing OCR request for file: {full_image_path_for_ocr_service}"
+    )
+    if not os.path.exists(full_image_path_for_ocr_service):
+        current_app.logger.error(
+            f"OCR source image not found: {full_image_path_for_ocr_service}"
+        )
+        return jsonify({"success": False, "error": "OCR source image not found"}), 404
 
     try:
-        # Call the OCR service
         ocr_service_url = current_app.config.get("OCR_SERVICE_URL", "http://ocr:8000")
-
-        # Use the /process_image/ endpoint of the OCR service
         response = requests.post(
-            f"{ocr_service_url}/process_image/", json={"value": full_path}
+            f"{ocr_service_url}/process_image/",
+            json={"value": full_image_path_for_ocr_service},
         )
+        response.raise_for_status()  # Raise an exception for HTTP errors
 
-        # Log the response status
-        current_app.logger.info(f"OCR service response status: {response.status_code}")
-
-        # Debug the raw response
-        raw_response = response.text
+        ocr_payload_from_service = response.json()
         current_app.logger.info(
-            f"OCR service raw response: {raw_response[:500]}..."
-        )  # Log first 500 chars
+            f"OCR service raw response: {str(ocr_payload_from_service)[:500]}..."
+        )
 
-        # Check for successful response
-        if response.status_code == 200:
-            try:
-                ocr_result = response.json()
-                current_app.logger.info(f"OCR result keys: {list(ocr_result.keys())}")
+        # The actual OCR result is often in a nested key like 'ret'
+        actual_ocr_result_data = ocr_payload_from_service.get(
+            "ret", ocr_payload_from_service
+        )
 
-                # Process the result - handling different structures
-                if "ret" in ocr_result:
-                    ret_value = ocr_result["ret"]
+        page_image_filename_base = os.path.splitext(page_image_to_ocr)[0]
 
-                    # Handle the nested dictionary case with 'status' and 'file' keys
-                    if isinstance(ret_value, dict) and "status" in ret_value:
-                        # Handle the dictionary response format
-                        status = ret_value.get("status")
-                        file_path = ret_value.get("file", "")
-
-                        current_app.logger.info(
-                            f"OCR returned status: {status} for file: {file_path}"
-                        )
-
-                        # Create segments parent directory
-                        segments_parent_dir = os.path.join(
-                            current_app.config["UPLOAD_FOLDER"],
-                            str(user_id),
-                            folder,
-                            "TOOCR",
-                            "segments",
-                        )
-                        os.makedirs(segments_parent_dir, exist_ok=True)
-
-                        # Create a single segment with the file info
-                        segment = {
-                            "id": "000",
-                            "text": f"OCR status: {status}",
-                            "has_image": False,
-                            "file": file_path,
-                        }
-
-                        # Save combined segments JSON
-                        combined_json_path = os.path.join(
-                            segments_parent_dir, f"{base_filename}.json"
-                        )
-                        with open(combined_json_path, "w") as f:
-                            json.dump([segment], f)
-
-                        return jsonify(
-                            {
-                                "success": True,
-                                "status": status,
-                                "file": file_path,
-                                "segments": [segment],
-                                "page_id": base_filename,
-                            }
-                        )
-
-                    # Handle list of segments (your existing logic)
-                    elif isinstance(ret_value, list):
-                        # Format the result for display
-                        result_text = ""
-                        segments = ret_value
-
-                        # Your existing code for handling segment list
-                        current_app.logger.info(f"Found {len(segments)} segments")
-
-                        # Create parent segments directory if it doesn't exist
-                        segments_parent_dir = os.path.join(
-                            current_app.config["UPLOAD_FOLDER"],
-                            str(user_id),
-                            folder,
-                            "TOOCR",
-                            "segments",
-                        )
-                        os.makedirs(segments_parent_dir, exist_ok=True)
-
-                        # Create the page-specific segments directory
-                        segments_dir = os.path.join(segments_parent_dir, base_filename)
-                        os.makedirs(segments_dir, exist_ok=True)
-
-                        # Create a combined segments JSON file at the parent level for the page
-                        all_segments = []
-
-                        # Save segment info and line images
-                        for idx, segment in enumerate(segments):
-                            if not isinstance(segment, dict):
-                                current_app.logger.warning(
-                                    f"Segment {idx} is not a dictionary: {type(segment)}"
-                                )
-                                continue
-
-                            segment_text = segment.get("text", "")
-                            result_text += f"{segment_text}\n"
-                            segment_id = f"{idx:03d}"
-
-                            # Add ID to the segment for future reference
-                            segment["id"] = segment_id
-                            segment["has_image"] = (
-                                "image_data" in segment
-                            )  # Flag to indicate image exists
-
-                            all_segments.append(segment)
-
-                            # Save individual segment info to JSON file in page directory
-                            segment_info = {
-                                "id": segment_id,
-                                "coords": segment.get("coords", []),
-                                "text": segment_text,
-                                "has_image": "image_data" in segment,
-                            }
-                            json_path = os.path.join(segments_dir, f"{segment_id}.json")
-                            with open(json_path, "w") as f:
-                                json.dump(segment_info, f)
-
-                            # Save segment image if available
-                            if "image_data" in segment and segment["image_data"]:
-                                try:
-                                    # Convert base64 to image and save
-                                    img_data = re.sub(
-                                        r"^data:image/\w+;base64,",
-                                        "",
-                                        segment["image_data"],
-                                    )
-                                    img_bytes = base64.b64decode(img_data)
-                                    img_path = os.path.join(
-                                        segments_dir, f"{segment_id}.png"
-                                    )
-                                    with open(img_path, "wb") as img_file:
-                                        img_file.write(img_bytes)
-                                    current_app.logger.info(
-                                        f"Saved segment image: {img_path}"
-                                    )
-                                except Exception as img_error:
-                                    current_app.logger.error(
-                                        f"Error saving segment image: {str(img_error)}"
-                                    )
-                                    segment["has_image"] = False
-
-                        # Save combined segments JSON for the page
-                        combined_json_path = os.path.join(
-                            segments_parent_dir, f"{base_filename}.json"
-                        )
-                        with open(combined_json_path, "w") as f:
-                            json.dump(all_segments, f)
-
-                        current_app.logger.info(
-                            f"Saved combined segments JSON: {combined_json_path}"
-                        )
-
-                        return jsonify(
-                            {
-                                "success": True,
-                                "text": result_text,
-                                "segments": all_segments,
-                                "page_id": base_filename,
-                            }
-                        )
-
-                    # Handle string result
-                    elif isinstance(ret_value, str):
-                        # Handle case where "ret" is a string (e.g., plain text OCR without segments)
-                        current_app.logger.info(
-                            "OCR returned plain text without segments"
-                        )
-                        result_text = ret_value
-
-                        # Create an artificial segment for the whole page
-                        segments_parent_dir = os.path.join(
-                            current_app.config["UPLOAD_FOLDER"],
-                            str(user_id),
-                            folder,
-                            "TOOCR",
-                            "segments",
-                        )
-                        os.makedirs(segments_parent_dir, exist_ok=True)
-
-                        # Create a single segment
-                        segment = {"id": "000", "text": result_text, "has_image": False}
-
-                        # Save combined segments JSON
-                        combined_json_path = os.path.join(
-                            segments_parent_dir, f"{base_filename}.json"
-                        )
-                        with open(combined_json_path, "w") as f:
-                            json.dump([segment], f)
-
-                        return jsonify(
-                            {
-                                "success": True,
-                                "text": result_text,
-                                "segments": [segment],
-                                "page_id": base_filename,
-                            }
-                        )
-
-                    else:
-                        # Unknown format
-                        current_app.logger.error(
-                            f"Unhandled OCR response type: {type(ret_value)}"
-                        )
-                        return (
-                            jsonify(
-                                {
-                                    "error": f"Unhandled OCR response type: {type(ret_value)}"
-                                }
-                            ),
-                            500,
-                        )
-                else:
-                    # No "ret" key
-                    current_app.logger.error(
-                        f"OCR response missing 'ret' key: {ocr_result}"
-                    )
-                    return (
-                        jsonify(
-                            {"error": "OCR response missing expected data structure"}
-                        ),
-                        500,
-                    )
-
-            except Exception as parse_error:
-                current_app.logger.error(
-                    f"Error parsing OCR JSON response: {str(parse_error)}"
-                )
-                import traceback
-
-                current_app.logger.error(f"Traceback: {traceback.format_exc()}")
-                return (
-                    jsonify(
-                        {"error": f"Error parsing OCR response: {str(parse_error)}"}
-                    ),
-                    500,
-                )
-        else:
-            # Non-200 response
-            current_app.logger.error(f"OCR service error: {response.text}")
-            return (
-                jsonify(
-                    {"error": f"OCR service returned status {response.status_code}"}
-                ),
-                response.status_code,
-            )
-
-    except requests.RequestException as e:
-        current_app.logger.error(f"Error connecting to OCR service: {str(e)}")
-        return jsonify({"error": f"Error connecting to OCR service: {str(e)}"}), 500
-    except Exception as e:
-        current_app.logger.error(f"Unexpected error during OCR processing: {str(e)}")
-        import traceback
-
-        current_app.logger.error(f"Traceback: {traceback.format_exc()}")
-        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
-
-
-@app.route("/get_segments/<user_id>/<folder>/<page_id>")
-def get_segments(user_id, folder, page_id):
-    """Return segments for a specific page"""
-    try:
-        # First try to find the combined JSON file (stored at the parent level)
-
-        # Then check for a directory of individual segment files
-        segments_dir = os.path.join(
-            current_app.config["UPLOAD_FOLDER"],
+        # Save the processed OCR data using the new file_operations function
+        # This will save segments to /<user_id>/<doc_folder_name>/TOOCR/PNG/<page_image_filename_base>_ocr_segments/
+        # And combined summary to /<user_id>/<doc_folder_name>/TOOCR/PNG_ocr_segments_summary/
+        text_summary, saved_segments_data = file_operations.save_ocr_processed_data(
+            current_app.config,
             user_id,
-            folder,
-            "TOOCR",
-            page_id,
-        )
-
-        import glob
-
-        pngs = glob.glob(segments_dir + "/*.png")
-        pngs = sorted(pngs)
-        for png in pngs:
-            logger.info(f"PNG FILE IS {png}")
-
-        logger.info(f"Segments path = {segments_dir}")
-        # Try the directory of individual segment files
-        if os.path.exists(segments_dir) and os.path.isdir(segments_dir):
-            segments_data = []
-            json_files = [f for f in os.listdir(segments_dir) if f.endswith(".json")]
-            json_files.sort()  # Sort to maintain order
-
-            for json_file in json_files:
-                try:
-                    with open(os.path.join(segments_dir, json_file), "r") as f:
-                        segment_data = json.load(f)
-                    segments_data.append(segment_data)
-                except Exception as e:
-                    current_app.logger.error(
-                        f"Error loading segment file {json_file}: {str(e)}"
-                    )
-
-            current_app.logger.info(
-                f"Found {len(segments_data)} individual segment files"
-            )
-            return jsonify({"success": True, "segments": segments_data})
-
-    except Exception as e:
-        current_app.logger.error(f"Error retrieving segments: {str(e)}")
-        import traceback
-
-        current_app.logger.error(f"Traceback: {traceback.format_exc()}")
-        return jsonify({"success": False, "error": str(e)})
-
-
-@app.route("/get_segment_image/<user_id>/<folder>/<page_id>/<segment_id>")
-def get_segment_image(user_id, folder, page_id, segment_id):
-    """Serve a specific segment image"""
-    # Corrected path: remove the extra "segments" directory
-    segments_dir = os.path.join(
-        current_app.config["UPLOAD_FOLDER"],
-        user_id,
-        folder,
-        "TOOCR",
-        page_id,  # Segment images are directly under the page_id directory
-    )
-
-    logger.info(f"SEGMENTS DIR: {segments_dir}")
-
-    image_path = os.path.join(segments_dir, f"{int(segment_id):03d}.png")
-    current_app.logger.info(f"Attempting to serve segment image: {image_path}")
-
-    if not os.path.exists(segments_dir):
-        current_app.logger.error(
-            f"Segments directory for page not found: {segments_dir}"
-        )
-        return "Page segments directory not found", 404
-
-    if not os.path.exists(image_path):
-        current_app.logger.error(f"Segment image file not found: {image_path}")
-        return "Segment image not found", 404
-
-    try:
-        return send_from_directory(segments_dir, f"{int(segment_id):03d}.png")
-    except Exception as e:
-        current_app.logger.error(f"Error serving segment image: {str(e)}")
-        return f"Error serving segment image: {str(e)}", 500
-
-
-@app.route("/get_segments_1/<user_id>/<folder>/<page_id>")
-def get_segments_1(user_id, folder, page_id):
-    """Return segments for a specific page"""
-    try:
-        # First try to find the combined JSON file (stored at the parent level)
-
-        # Then check for a directory of individual segment files
-        segments_dir = os.path.join(
-            current_app.config["UPLOAD_FOLDER"],
-            user_id,
-            folder,
-            "TOOCR",
-            page_id,
-        )
-
-        import glob
-
-        pngs = glob.glob(segments_dir + "/*.png")
-        pngs = sorted(pngs)
-        for png in pngs:
-            logger.info(f"PNG FILE IS {png}")
-
-        logger.info(f"Segments path = {segments_dir}")
-        # Try the directory of individual segment files
-        if os.path.exists(segments_dir) and os.path.isdir(segments_dir):
-            segments_data = []
-            json_files = [f for f in os.listdir(segments_dir) if f.endswith(".json")]
-            json_files.sort()  # Sort to maintain order
-
-            for json_file in json_files:
-                try:
-                    with open(os.path.join(segments_dir, json_file), "r") as f:
-                        segment_data = json.load(f)
-                    segments_data.append(segment_data)
-                except Exception as e:
-                    current_app.logger.error(
-                        f"Error loading segment file {json_file}: {str(e)}"
-                    )
-
-            current_app.logger.info(
-                f"Found {len(segments_data)} individual segment files"
-            )
-            return jsonify({"success": True, "segments": segments_data})
-
-    except Exception as e:
-        current_app.logger.error(f"Error retrieving segments: {str(e)}")
-        import traceback
-
-        current_app.logger.error(f"Traceback: {traceback.format_exc()}")
-        return jsonify({"success": False, "error": str(e)})
-
-
-@app.route("/get_segment_json/<user_id>/<folder>/<page_id>/<segment_id>")
-def get_segment_json(user_id, folder, page_id, segment_id):
-    """Serve a specific segment image"""
-    # Corrected path: remove the extra "segments" directory
-    segments_dir = os.path.join(
-        current_app.config["UPLOAD_FOLDER"],
-        user_id,
-        folder,
-        "TOOCR",
-        page_id,  # Segment images are directly under the page_id directory
-    )
-
-    logger.info(f"SEGMENTS DIR: {segments_dir}")
-
-    json_path = os.path.join(segments_dir, f"{int(segment_id):03d}.json")
-    current_app.logger.info(f"Attempting to serve segment image: {json_path}")
-
-    if not os.path.exists(segments_dir):
-        current_app.logger.error(
-            f"Segments directory for page not found: {segments_dir}"
-        )
-        return "Page segments directory not found", 404
-
-    if not os.path.exists(json_path):
-        current_app.logger.error(f"Segment image file not found: {json_path}")
-        return "Segment image not found", 404
-
-    try:
-        return send_from_directory(segments_dir, f"{int(segment_id):03d}.json")
-    except Exception as e:
-        current_app.logger.error(f"Error serving segment json: {str(e)}")
-        return f"Error serving segment json: {str(e)}", 500
-
-
-@app.route("/get_segment_preview/<user_id>/<folder>/<page_id>/<segment_index>")
-def get_segment_preview(user_id, folder, page_id, segment_index):
-    try:
-        segments_dir = os.path.join(
-            current_app.config["UPLOAD_FOLDER"], user_id, folder, "TOOCR", page_id
-        )
-
-        if not os.path.exists(segments_dir):
-            return (
-                jsonify({"success": False, "error": "Segments directory not found"}),
-                404,
-            )
-
-        segment_files = sorted(
-            [f for f in os.listdir(segments_dir) if f.endswith(".json")]
-        )
-        segment_idx = int(segment_index)
-
-        if not (0 <= segment_idx < len(segment_files)):
-            return (
-                jsonify({"success": False, "error": "Segment index out of bounds"}),
-                404,
-            )
-
-        json_filename = segment_files[segment_idx]
-        with open(os.path.join(segments_dir, json_filename), "r") as f:
-            segment_data = json.load(f)
-
-        # Generate image URL
-        image_url = url_for(
-            "app.get_segment_image",
-            user_id=user_id,
-            folder=folder,
-            page_id=page_id,
-            segment_id=segment_data.get("id", segment_idx),
+            document_folder_name,
+            page_image_filename_base,
+            actual_ocr_result_data,  # Pass the actual data part
+            is_document_completed=True,
         )
 
         return jsonify(
             {
                 "success": True,
-                "data": {
-                    "text": segment_data.get("text", ""),
-                    "imageUrl": image_url,
-                    "confidence": segment_data.get("confidence"),
-                    "id": segment_data.get("id"),
-                    "coords": segment_data.get("coords", []),
-                },
+                "text": text_summary,
+                "segments": saved_segments_data,  # This is the list of segment dicts suitable for client
+                "page_id": page_image_filename_base,
             }
         )
 
+    except requests.RequestException as e:
+        current_app.logger.error(f"Error connecting to OCR service: {str(e)}")
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "error": f"Error connecting to OCR service: {str(e)}",
+                }
+            ),
+            500,
+        )
     except Exception as e:
-        current_app.logger.error(f"Error getting segment preview: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        current_app.logger.error(f"Unexpected error during OCR processing: {str(e)}")
+        import traceback
+
+        current_app.logger.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({"success": False, "error": f"Unexpected error: {str(e)}"}), 500
+
+
+@app.route("/get_segments/<user_id>/<document_folder_name>/<page_image_filename_base>")
+def get_segments(user_id, document_folder_name, page_image_filename_base):
+    """
+    Return segments for a specific page image that has been OCRd.
+    page_image_filename_base is e.g., "page_001" or "page_001_crop_001".
+    """
+    try:
+        # Assumes document is completed for OCR segments to exist
+        segments_data = file_operations.fetch_page_segments_data(
+            current_app.config,
+            user_id,
+            document_folder_name,
+            page_image_filename_base,
+            is_document_completed=True,
+        )
+        if (
+            segments_data is None
+        ):  # fetch_page_segments_data might return None on error or empty list
+            return jsonify(
+                {
+                    "success": False,
+                    "error": "Segments data not found or error fetching.",
+                    "segments": [],
+                }
+            )
+        return jsonify({"success": True, "segments": segments_data})
+    except Exception as e:
+        current_app.logger.error(
+            f"Error retrieving segments for {page_image_filename_base}: {str(e)}"
+        )
+        return jsonify({"success": False, "error": str(e)})
+
+
+@app.route(
+    "/get_segment_image/<user_id>/<document_folder_name>/<page_image_filename_base>/<segment_id_str>"
+)
+def get_segment_image(
+    user_id, document_folder_name, page_image_filename_base, segment_id_str
+):
+    """Serve a specific segment image."""
+    # Assumes document is completed
+    segment_image_dir, segment_image_filename = (
+        file_operations.get_segment_image_file_details(
+            current_app.config,
+            user_id,
+            document_folder_name,
+            page_image_filename_base,
+            segment_id_str,
+            is_document_completed=True,
+        )
+    )
+
+    if not segment_image_dir or not segment_image_filename:
+        current_app.logger.error(
+            f"Segment image not found for {page_image_filename_base}, segment {segment_id_str}"
+        )
+        return "Segment image not found", 404
+
+    current_app.logger.info(
+        f"Serving segment image {segment_image_filename} from {segment_image_dir}"
+    )
+    return send_from_directory(segment_image_dir, segment_image_filename)
+
+
+@app.route(
+    "/get_segment_json/<user_id>/<document_folder_name>/<page_image_filename_base>/<segment_id_str>"
+)
+def get_segment_json(
+    user_id, document_folder_name, page_image_filename_base, segment_id_str
+):
+    """Serve a specific segment's JSON data."""
+    # Assumes document is completed
+    segments_storage_dir = file_operations.get_ocr_output_segments_base_dir(
+        current_app.config,
+        user_id,
+        document_folder_name,
+        page_image_filename_base,
+        is_document_completed=True,
+    )
+
+    try:
+        # Ensure segment_id_str is formatted if it's an index, or use as is if it's a full name.
+        # The file_operations.save_ocr_processed_data saves JSON as 000.json, 001.json etc.
+        json_filename = f"{int(segment_id_str):03d}.json"
+    except ValueError:
+        # If segment_id_str is not purely numeric, it might be a direct filename (less likely for JSONs here)
+        if segment_id_str.lower().endswith(".json"):
+            json_filename = segment_id_str
+        else:
+            current_app.logger.error(
+                f"Invalid segment_id format for JSON: '{segment_id_str}'."
+            )
+            return "Invalid segment ID format", 400
+
+    json_path = os.path.join(segments_storage_dir, json_filename)
+    current_app.logger.info(f"Attempting to serve segment JSON: {json_path}")
+
+    if not os.path.exists(segments_storage_dir):
+        current_app.logger.error(
+            f"Segments JSON directory for page not found: {segments_storage_dir}"
+        )
+        return "Page segments JSON directory not found", 404
+    if not os.path.exists(json_path):
+        current_app.logger.error(f"Segment JSON file not found: {json_path}")
+        return "Segment JSON not found", 404
+
+    return send_from_directory(segments_storage_dir, json_filename)
+
+
+# Remove get_segments_1 if it's a duplicate or test route.
+# The get_segment_preview route seems to be a client-side helper, ensure its URL generations are correct.
+
+
+@app.route("/api/get_document_images/<user_id>/<document_folder_name>")
+def api_get_document_images(user_id, document_folder_name):
+    """
+    AJAX endpoint to get PNG files for a specific document.
+    Returns JSON data for dynamic loading without page refresh.
+    """
+    try:
+        # Get PNG files for the document
+        current_png_dir = file_operations.get_document_png_dir(
+            current_app.config, user_id, document_folder_name
+        )
+        
+        images_data = {
+            "success": True,
+            "images": [],
+            "message": ""
+        }
+        
+        if os.path.exists(current_png_dir):
+            all_files_in_png_dir = os.listdir(current_png_dir)
+            png_files = [f for f in all_files_in_png_dir if f.lower().endswith(".png")]
+            png_files.sort()
+            
+            for png_file in png_files:
+                # Create display name
+                if '_crop_' in png_file:
+                    display_name = png_file.replace('_crop_', ' (Crop ').replace('.png', ')')
+                else:
+                    display_name = png_file.replace('page_', 'Page ').replace('.png', '')
+                
+                images_data["images"].append({
+                    "filename": png_file,
+                    "display_name": display_name
+                })
+            
+            images_data["message"] = f"Found {len(png_files)} images"
+        else:
+            images_data["message"] = "PNG directory does not exist"
+        
+        return jsonify(images_data)
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting images for document {document_folder_name}: {str(e)}")
+        return jsonify({
+            "success": False,
+            "images": [],
+            "message": f"Error: {str(e)}"
+        }), 500
+
+
+@app.route("/api/get_page_crops/<user_id>/<document_folder_name>/<page_filename>")
+def api_get_page_crops(user_id, document_folder_name, page_filename):
+    """
+    AJAX endpoint to get crop images for a specific page.
+    Returns JSON data for dynamic loading without page refresh.
+    """
+    try:
+        # Get PNG directory
+        current_png_dir = file_operations.get_document_png_dir(
+            current_app.config, user_id, document_folder_name
+        )
+        
+        crops_data = {
+            "success": True,
+            "crops": [],
+            "message": ""
+        }
+        
+        if os.path.exists(current_png_dir):
+            # Extract base page name (e.g., "page_001" from "page_001.png")
+            page_base = os.path.splitext(page_filename)[0]
+            
+            if not '_crop_' in page_filename:  # Only for original pages
+                all_files = os.listdir(current_png_dir)
+                crop_files = [
+                    f for f in all_files 
+                    if f.startswith(f"{page_base}_crop_") and f.endswith(".png")
+                ]
+                crop_files.sort()
+                
+                for crop_file in crop_files:
+                    display_name = crop_file.replace('_crop_', ' Crop ').replace('.png', '')
+                    crops_data["crops"].append({
+                        "filename": crop_file,
+                        "display_name": display_name,
+                        "url": url_for('app.serve_document_png_file', 
+                                     user_id=user_id, 
+                                     document_folder_name=document_folder_name,
+                                     image_filename=crop_file)
+                    })
+                
+                crops_data["message"] = f"Found {len(crop_files)} crops for {page_base}"
+            else:
+                crops_data["message"] = "Crops not shown for crop images"
+        else:
+            crops_data["message"] = "PNG directory does not exist"
+        
+        return jsonify(crops_data)
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting crops for page {page_filename}: {str(e)}")
+        return jsonify({
+            "success": False,
+            "crops": [],
+            "message": f"Error: {str(e)}"
+        }), 500
+
+
+@app.route("/mark_editing_completed", methods=["POST"])  # Renamed for clarity
+def mark_editing_completed():
+    document_folder_name = request.form.get(
+        "document_folder_name"
+    )  # The base folder like 'mydoc' or 'mydoc_X'
+
+    if not document_folder_name:
+        flash("No document folder specified for completion.", "danger")
+        # Redirect to a relevant page, perhaps the document listing or crop_menu
+        return redirect(url_for("app.crop_image"))
+
+    user_id = str(session.get("user_id", "anonymous"))
+
+    # Task 4: Mark Editing as Completed
+    # This moves content from /<user_id>/<document_folder_name>/ into /<user_id>/<document_folder_name>/TOOCR/
+    success, message = file_operations.mark_document_editing_completed(
+        current_app.config, user_id, document_folder_name
+    )
+
+    if success:
+        current_app.logger.info(message)
+        flash(message, "success")
+        # Redirect to image_preview for the now "completed" folder
+        return redirect(
+            url_for("app.image_preview", selected_folder=document_folder_name)
+        )
+    else:
+        current_app.logger.error(message)
+        flash(message, "danger")
+        # Redirect back to where the action was initiated, e.g., crop_menu
+        return redirect(url_for("app.crop_image", selected_folder=document_folder_name))
+
+
+# General file serving from the root of a document folder (e.g., the PDF before completion)
+@app.route("/uploads/<user_id>/<document_folder_name>/<filename>")
+def serve_document_root_file(user_id, document_folder_name, filename):
+    doc_dir = file_operations.get_document_dir(
+        current_app.config, user_id, document_folder_name
+    )
+    current_app.logger.info(f"Attempting to serve root file: {filename} from {doc_dir}")
+    if not os.path.exists(os.path.join(doc_dir, filename)):
+        current_app.logger.error(
+            f"File NOT FOUND at: {os.path.join(doc_dir, filename)}"
+        )
+        return "File not found", 404
+    return send_from_directory(doc_dir, filename)
+
+
+# Serving PNGs (originals/crops) before completion
+@app.route("/uploads/<user_id>/<document_folder_name>/PNG/<image_filename>")
+def serve_document_png_file(user_id, document_folder_name, image_filename):
+    png_dir = file_operations.get_document_png_dir(
+        current_app.config, user_id, document_folder_name
+    )
+    current_app.logger.info(
+        f"Attempting to serve PNG file: {image_filename} from {png_dir}"
+    )
+    if not os.path.exists(os.path.join(png_dir, image_filename)):
+        current_app.logger.error(
+            f"File NOT FOUND at: {os.path.join(png_dir, image_filename)}"
+        )
+        return "File not found", 404
+    return send_from_directory(png_dir, image_filename)
+
+
+# Serving files from the root of TOOCR folder (e.g., PDF after completion)
+@app.route("/uploads/<user_id>/<document_folder_name>/TOOCR/<filename>")
+def serve_completed_document_root_file(user_id, document_folder_name, filename):
+    toocr_dir = file_operations.get_document_completed_dir(
+        current_app.config, user_id, document_folder_name
+    )
+    current_app.logger.info(
+        f"Attempting to serve TOOCR root file: {filename} from {toocr_dir}"
+    )
+    if not os.path.exists(os.path.join(toocr_dir, filename)):
+        current_app.logger.error(
+            f"File NOT FOUND at: {os.path.join(toocr_dir, filename)}"
+        )
+        return "File not found", 404
+    return send_from_directory(toocr_dir, filename)
+
+
+# Serving PNGs (originals/crops) after completion
+@app.route("/uploads/<user_id>/<document_folder_name>/TOOCR/PNG/<image_filename>")
+def serve_completed_document_png_file(user_id, document_folder_name, image_filename):
+    completed_png_dir = os.path.join(
+        file_operations.get_document_completed_dir(
+            current_app.config, user_id, document_folder_name
+        ),
+        "PNG",
+    )
+    current_app.logger.info(
+        f"Attempting to serve TOOCR PNG file: {image_filename} from {completed_png_dir}"
+    )
+    if not os.path.exists(os.path.join(completed_png_dir, image_filename)):
+        current_app.logger.error(
+            f"File NOT FOUND at: {os.path.join(completed_png_dir, image_filename)}"
+        )
+        return "File not found", 404
+    return send_from_directory(completed_png_dir, image_filename)
+
+
+# The old /uploads/<user_id>/<folder>/cropped/<filename> is obsolete.

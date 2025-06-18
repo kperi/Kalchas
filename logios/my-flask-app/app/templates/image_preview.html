@@ -119,15 +119,8 @@
                         <!-- START: Preview for Segment Selected from Sidebar Dropdown - MOVED HERE -->
                         {% if selected_segment %} {# selected_segment is passed from routes.py context #}
                             <div id="sidebar-selected-segment-preview" style="margin-top: 1rem; margin-bottom: 1rem; padding: 1rem; border: 1px solid #e0e0e0; background-color: #fdfdfd; border-radius: 5px;">
-                                <h5 style="margin-top:0; margin-bottom: 0.5rem; font-size: 1em; color: #333;">
-                                    Preview of Selected Segment: {{ selected_segment_id_display | default(selected_segment) }}
-                                </h5>
-                                <div style="text-align: center; margin-bottom: 0.5rem;">
-                                    <img src="{{ url_for('app.get_segment_image', user_id=session.get('user_id', 'anonymous'), folder=selected_folder, page_id=request.args.get('selected_png').split('.')[0], segment_id=selected_segment) }}"
-                                         alt="Selected Segment Image"
-                                         style="max-width: 100%; max-height: 200px; border: 1px solid #ccc; object-fit: contain; background-color: #fff;"
-                                         onerror="this.onerror=null; this.alt='Image not found or error loading.'; this.src=''; this.parentElement.innerHTML='<p style=\\\'font-size:0.9em; color:red;\\\'>Image not found: {{ resolved_segment_image_filename }}</p>';">
-                                </div>
+ 
+                                
                                 {% if segment_data and segment_data.text %}
                                     <div style="padding: 0.5rem; background-color: #f0f0f0; border-radius: 3px;">
                                         <p style="font-family: monospace; white-space: pre-wrap; font-size: 0.9em; margin:0; color: #333;">
@@ -152,23 +145,29 @@
 
                         <!-- Line Segments Navigation - Initially hidden -->
                         <div id="line-segments-container" style="display: none; margin-bottom: 1rem;">
-                            <h5>Line Segments</h5>
-                            <div class="line-segments-nav" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; max-height: 200px; overflow-y: auto; justify-content: flex-start;">
-                                <!-- Line segments will be added here dynamically by loadLineSegments JS function -->
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                                <button id="prev-segment-btn" class="gradio-button gradio-button-secondary" style="padding: 5px 10px; font-size:0.9em;">&lt; Prev</button>
+                                <div style="text-align: center; flex-grow: 1; font-size: 0.9em; color: #666;">
+                                    <span id="segment-counter">Segment 0 of 0</span>
+                                </div>
+                                <button id="next-segment-btn" class="gradio-button gradio-button-secondary" style="padding: 5px 10px; font-size:0.9em;">Next &gt;</button>
                             </div>
-                            
-                            <div class="selected-line-container" style="margin-top: 1rem; border: 1px solid #dee2e6; border-radius: 5px; padding: 10px;">
-                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                                    <button id="prev-segment-btn" class="gradio-button gradio-button-secondary" style="padding: 5px 10px; font-size:0.9em;">&lt; Prev</button>
-                                    <div class="selected-line-image" style="text-align: center; flex-grow: 1; min-height: 50px;">
-                                        <!-- Selected line image will be shown here by showSelectedSegment JS function -->
-                                    </div>
-                                    <button id="next-segment-btn" class="gradio-button gradio-button-secondary" style="padding: 5px 10px; font-size:0.9em;">Next &gt;</button>
+
+                            <!-- Single preview container that will be used for all segment displays -->
+                            <div id="sidebar-selected-segment-preview" style="margin-top: 1rem; margin-bottom: 1rem; padding: 1rem; border: 1px solid #e0e0e0; background-color: #fdfdfd; border-radius: 5px;">
+                                <h5 id="sidebar-segment-title" style="margin-top:0; margin-bottom: 0.5rem; font-size: 1em; color: #333;">
+                                    Preview of Selected Segment
+                                </h5>
+                                <div style="text-align: center; margin-bottom: 0.5rem;">
+                                    <img id="sidebar-segment-image" src="" alt="Selected Segment Image"
+                                         style="max-width: 100%; max-height: 200px; border: 1px solid #ccc; object-fit: contain; background-color: #fff;">
                                 </div>
-                                <div class="selected-line-text" style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; font-family: monospace; min-height: 30px; margin-bottom: 10px;">
-                                    <!-- Selected line text will be shown here by showSelectedSegment JS function -->
+                                <div id="sidebar-segment-text-container" style="padding: 0.5rem; background-color: #f0f0f0; border-radius: 3px;">
+                                    <p id="sidebar-segment-text" style="font-family: monospace; white-space: pre-wrap; font-size: 0.9em; margin:0; color: #333;">
+                                        Select a segment to view text
+                                    </p>
                                 </div>
-                                <button id="view-segment-json-btn" class="gradio-button gradio-button-sm" style="font-size:0.8em; padding: 3px 8px;">View Segment JSON</button>
+                                <button id="view-segment-json-btn" class="gradio-button gradio-button-sm" style="margin-top: 10px; font-size:0.8em; padding: 3px 8px;">View Segment JSON</button>
                             </div>
                         </div>
                         
@@ -200,6 +199,22 @@
     </div>
 
      <script>
+        // Add before DOMContentLoaded event listener
+        function checkForExistingSegments(folder, pageFilename) {
+            if (!folder || !pageFilename) {
+                console.error('[checkForExistingSegments] Missing required parameters:', { folder, pageFilename });
+                return Promise.reject(new Error('Missing parameters for checkForExistingSegments'));
+            }
+            const pageId = pageFilename.split('.')[0];
+            console.log('[checkForExistingSegments] Checking segments for:', { folder, pageId, originalFilename: pageFilename });
+            try {
+                return loadLineSegments(folder, pageId); // loadLineSegments must return a promise
+            } catch (error) {
+                console.error('[checkForExistingSegments] Error calling loadLineSegments:', error);
+                return Promise.reject(error);
+            }
+        }
+
         // Global variables to store segment context for navigation
         let currentSegmentsList = [];
         let currentSegmentFolderGlobal = '';
@@ -386,25 +401,28 @@
             nextBtn.style.opacity = nextBtn.disabled ? 0.6 : 1;
         }
 
+        // Update the displaySegmentByIndex function
         function displaySegmentByIndex(index, updateUrl = true) {
             if (index >= 0 && index < currentSegmentsList.length) {
                 currentSegmentDisplayIndex = index;
+                const segment = currentSegmentsList[index];
+                
+                // Clear existing highlight
+                clearSegmentHighlight();
+                
+                // Update highlight if segment has coordinates
+                if (segment.coords && Array.isArray(segment.coords) && segment.coords.length === 4) {
+                    highlightSegment(segment.coords);
+                }
                 
                 // Update navigation buttons state
                 updateNavigationButtons();
 
-                // Update segment buttons highlighting
-                document.querySelectorAll('.line-segments-nav .segment-btn').forEach((btn, i) => {
-                    if (i === index) {
-                        btn.style.backgroundColor = '#e9ecef';
-                        btn.style.borderColor = '#adb5bd';
-                        btn.style.fontWeight = 'bold';
-                    } else {
-                        btn.style.backgroundColor = '#f1f3f5';
-                        btn.style.borderColor = '#dee2e6';
-                        btn.style.fontWeight = 'normal';
-                    }
-                });
+                // Update segment counter
+                const segmentCounter = document.getElementById('segment-counter');
+                if (segmentCounter) {
+                    segmentCounter.textContent = `Segment ${index + 1} of ${currentSegmentsList.length}`;
+                }
 
                 // Update dropdown without triggering form submit
                 const segmentSelect = document.getElementById('segment-select');
@@ -419,432 +437,240 @@
                     history.pushState({ segmentIndex: index }, '', url);
                 }
 
-                // Fetch and display segment preview
-                const userId = '{{ session.get("user_id", "anonymous") }}';
-                const previewUrl = `/get_segment_preview/${encodeURIComponent(userId)}/${encodeURIComponent(currentSegmentFolderGlobal)}/${encodeURIComponent(currentSegmentPageIdGlobal)}/${index}`;
-                
-                // Show loading state
-                const imageContainer = document.querySelector('.selected-line-image');
-                const textContainer = document.querySelector('.selected-line-text');
-                if (imageContainer) imageContainer.innerHTML = '<p style="text-align:center; color:#6c757d;">Loading image...</p>';
-                if (textContainer) textContainer.innerHTML = '<p style="text-align:center; color:#6c757d;">Loading text...</p>';
+                // Update preview content using sidebar preview elements
+                const previewContainer = document.getElementById('sidebar-selected-segment-preview');
+                const titleEl = document.getElementById('sidebar-segment-title');
+                const imageEl = document.getElementById('sidebar-segment-image');
+                const textEl = document.getElementById('sidebar-segment-text');
 
-                fetch(previewUrl)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`Server returned ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then((data) => {
-                        if (data.success && data.data) {
-                            // Update image
-                            if (imageContainer && data.data.imageUrl) {
-                                imageContainer.innerHTML = `
-                                    <img src="${data.data.imageUrl}" 
-                                         alt="Segment ${index + 1}" 
-                                         style="max-width: 100%; max-height:150px; border: 1px solid #dee2e6; object-fit: contain; background-color: #fff;"
-                                         onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<p style=\\\'color:red;\\\'>Error loading image</p>';">
-                                `;
-                            }
+                if (previewContainer && titleEl && imageEl && textEl) {
+                    // Update title
+                    titleEl.textContent = `Preview of Segment ${index + 1}`;
 
-                            // Update text
-                            if (textContainer) {
-                                let displayText = data.data.text || '(No text available)';
-                                if (data.data.confidence) {
-                                    displayText += ` (Confidence: ${data.data.confidence.toFixed(3)})`;
-                                }
-                                textContainer.textContent = displayText;
+                    // Construct segment image URL
+                    const segmentId = segment.id !== undefined ? String(segment.id) : 
+                                    index.toString().padStart(3, '0');
+            
+                    // OLD URL construction (commented out for reference):
+                    // const imageUrl = `/uploads/{{ session.get('user_id', 'anonymous') }}/${encodeURIComponent(currentSegmentFolderGlobal)}/TOOCR/${encodeURIComponent(currentSegmentPageIdGlobal)}/${encodeURIComponent(segmentId)}.png`;
+
+                    // NEW URL construction using url_for pattern:
+                    // The placeholders like '__USER_ID__' will be replaced by JavaScript.
+                    const imageUrl = `{{ url_for('app.get_segment_image', user_id='__USER_ID__', folder='__FOLDER__', page_id='__PAGE_ID__', segment_id='__SEGMENT_ID__') }}`
+                        .replace('__USER_ID__', encodeURIComponent("{{ session.get('user_id', 'anonymous') }}"))
+                        .replace('__FOLDER__', encodeURIComponent(currentSegmentFolderGlobal))
+                        .replace('__PAGE_ID__', encodeURIComponent(currentSegmentPageIdGlobal))
+                        .replace('__SEGMENT_ID__', encodeURIComponent(segmentId));
+
+                    // Update image
+                    imageEl.src = imageUrl;
+                    imageEl.alt = `Segment ${index + 1}`;
+                    imageEl.onerror = function() {
+                        this.onerror = null;
+                        this.src = '';
+                        this.alt = 'Error loading image';
+                    };
+
+                    // Update text
+                    let displayText = '(No text available)';
+                    if (segment.text) {
+                        if (typeof segment.text === 'string') {
+                            displayText = segment.text;
+                        } else if (Array.isArray(segment.text) && segment.text.length > 0) {
+                            displayText = segment.text[0];
+                            if (segment.text.length > 1 && typeof segment.text[1] === 'number') {
+                                displayText += ` (Confidence: ${segment.text[1].toFixed(3)})`;
                             }
                         } else {
-                            throw new Error(data.error || 'Failed to load segment preview');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error loading segment preview:', error);
-                        if (imageContainer) imageContainer.innerHTML = '<p style="color:red;">Error loading image</p>';
-                        if (textContainer) textContainer.innerHTML = '<p style="color:red;">Error loading text</p>';
-                    });
-            }
-        }
-
-        // Update the segment-select dropdown handler
-        document.getElementById('segment-select').onchange = function() {
-            const selectedIndex = parseInt(this.value, 10);
-            if (!isNaN(selectedIndex)) {
-                displaySegmentByIndex(selectedIndex, true);
-            }
-        };
-        
-        function checkForExistingSegments(folder, pageId) {
-            const segmentLoading = document.getElementById('segment-loading');
-            const segmentSelect = document.getElementById('segment-select');
-            
-            if (!segmentLoading || !segmentSelect) return;
-            
-            segmentLoading.innerHTML = '<span class="loading-dots">Checking for existing segments</span>'; // UX: Use innerHTML for potential styling
-            
-            while (segmentSelect.options.length > 1) {
-                segmentSelect.remove(1);
-            }
-            
-            const segmentsUrl = `{{ url_for('app.get_segments', user_id='USERID', folder='FOLDER', page_id='PAGEID') }}`
-                .replace('USERID', '{{ session.get("user_id", "anonymous") }}')
-                .replace('FOLDER', encodeURIComponent(folder))
-                .replace('PAGEID', encodeURIComponent(pageId));
-            
-            console.log('[checkForExistingSegments] Fetching segments from:', segmentsUrl);
-            
-            fetch(segmentsUrl)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Failed to load segments: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('[checkForExistingSegments] Segments response:', data);
-                    
-                    if (data.success && data.segments && Array.isArray(data.segments) && data.segments.length > 0) {
-                        data.segments.forEach((segment, index) => { // index is 0-based
-                            const option = document.createElement('option');
-                            option.value = index; // Use 0-based index for the option value
-
-                            let displayText = `Segment ${index + 1}`; // Default display text
-                            if (segment.text) {
-                                let textSample = '';
-                                if (typeof segment.text === 'string') {
-                                    textSample = segment.text;
-                                } else if (Array.isArray(segment.text) && typeof segment.text[0] === 'string') {
-                                    textSample = segment.text[0];
-                                }
-                                if (textSample) {
-                                    const truncatedText = textSample.substring(0, 30);
-                                    displayText = `Segment ${index + 1}: ${truncatedText}${textSample.length > 30 ? '...' : ''}`;
-                                }
-                            } else if (segment.id) { // Fallback to segment.id if no text
-                                displayText = `Segment ${index + 1} (ID: ${segment.id})`;
-                            }
-                            
-                            option.textContent = displayText;
-                            segmentSelect.appendChild(option);
-                        });
-                        
-                        segmentLoading.textContent = `${data.segments.length} segments available.`;
-                        
-                        const urlParams = new URLSearchParams(window.location.search);
-                        const selectedSegmentFromUrl = urlParams.get('selected_segment'); // This should be an index
-                        
-                        if (selectedSegmentFromUrl !== null) { // Check for null or undefined explicitly
-                            segmentSelect.value = selectedSegmentFromUrl;
-                        }
-
-                        // If sidebar dropdown is populated, try to load segments into the main navigation area
-                        console.log('[checkForExistingSegments] Sidebar dropdown populated, calling loadLineSegments.');
-                        loadLineSegments(folder, pageId);
-
-                    } else {
-                        segmentLoading.textContent = "No segments found. Run OCR to detect segments.";
-                        if (data.error) {
-                            console.warn(`[checkForExistingSegments] Error from /get_segments: ${data.error}`);
-                        }
-                        // Ensure the main segment navigation area is hidden if no segments for dropdown
-                        const lineSegmentsContainer = document.getElementById('line-segments-container');
-                        if (lineSegmentsContainer) {
-                            lineSegmentsContainer.style.display = 'none';
+                            displayText = JSON.stringify(segment.text);
                         }
                     }
-                })
-                .catch(error => {
-                    console.error('[checkForExistingSegments] Error loading segments:', error);
-                    segmentLoading.innerHTML = '<span style="color:red;">Error loading segments.</span> Run OCR to detect segments.'; // UX: Clearer error
-                    // Ensure the main segment navigation area is hidden on error
-                    const lineSegmentsContainer = document.getElementById('line-segments-container');
-                    if (lineSegmentsContainer) {
-                        lineSegmentsContainer.style.display = 'none';
-                    }
-                });
-        }
-        
-        function populateSegmentsDropdown(folder, pageId, segments) {
-            const segmentSelect = document.getElementById('segment-select');
-            const segmentLoading = document.getElementById('segment-loading'); // Added for consistency
-            if (!segmentSelect) return;
-            
-            console.log('[populateSegmentsDropdown] Populating with segments:', segments);
-            
-            while (segmentSelect.options.length > 1) {
-                segmentSelect.remove(1);
-            }
-            
-            if (segments && Array.isArray(segments) && segments.length > 0) {
-                segments.forEach((segment, index) => { // index is 0-based
-                    const option = document.createElement('option');
-                    option.value = index; // Use 0-based index for the option value
+                    textEl.textContent = displayText;
 
-                    let displayText = `Segment ${index + 1}`; // Default display text
-                    if (segment.text) {
-                        let textSample = '';
-                        if (typeof segment.text === 'string') {
-                            textSample = segment.text;
-                        } else if (Array.isArray(segment.text) && typeof segment.text[0] === 'string') {
-                            textSample = segment.text[0];
-                        } else if (segment.status) { // From OCR service direct status
-                            textSample = `Status: ${segment.status}`;
-                        } else if (segment.file) { // From OCR service direct file
-                             textSample = `File: ${segment.file.split('/').pop()}`;
-                        }
-                        if (textSample) {
-                            const truncatedText = textSample.substring(0, 30);
-                            displayText = `Segment ${index + 1}: ${truncatedText}${textSample.length > 30 ? '...' : ''}`;
-                        }
-                    } else if (segment.id) { // Fallback to segment.id if no text
-                         displayText = `Segment ${index + 1} (ID: ${segment.id})`;
-                    }
-                    
-                    option.textContent = displayText;
-                    segmentSelect.appendChild(option);
-                });
-                if (segmentLoading) segmentLoading.textContent = `${segments.length} segments detected.`;
-
-                const urlParams = new URLSearchParams(window.location.search);
-                const selectedSegmentFromUrl = urlParams.get('selected_segment'); // This should be an index
-                
-                if (selectedSegmentFromUrl !== null) {
-                    segmentSelect.value = selectedSegmentFromUrl;
+                    // Show the preview container
+                    previewContainer.style.display = 'block';
                 }
 
+                // Log preview update
+                console.log('[displaySegmentByIndex] Updated preview for segment:', {
+                    index: index,
+                    segmentId: segment.id,
+                    hasCoords: !!segment.coords,
+                    hasText: !!segment.text
+                });
             } else {
-                 if (segmentLoading) segmentLoading.textContent = "No segments detected by OCR.";
+                console.warn('[displaySegmentByIndex] Invalid segment index:', index);
+                // Clear highlight if index is invalid
+                clearSegmentHighlight();
+                
+                // Hide preview container
+                const previewContainer = document.getElementById('sidebar-selected-segment-preview');
+                if (previewContainer) {
+                    previewContainer.style.display = 'none';
+                }
             }
         }
-        
-        function performOCR() {
-            const resultArea = document.getElementById('ocr-result');
-            const ocrButton = document.querySelector('.ocr-section button');
-            const lineSegmentsContainer = document.getElementById('line-segments-container');
-            const segmentLoading = document.getElementById('segment-loading');
 
-            ocrButton.disabled = true;
-            ocrButton.textContent = "Processing...";
-            ocrButton.style.opacity = 0.6; // UX: Visual cue for disabled
-            resultArea.value = "Initializing text recognition..."; // UX: Initial message
-            if(lineSegmentsContainer) lineSegmentsContainer.style.display = 'none';
-            if (segmentLoading) segmentLoading.innerHTML = '<span class="loading-dots">Processing segments</span>'; // UX: Loading state
-
-            const selectedPng = "{{ request.args.get('selected_png') }}";
-            const selectedFolder = "{{ selected_folder }}";
-
-            fetch('{{ url_for("app.process_ocr") }}', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ folder: selectedFolder, filename: selectedPng })
-            })
-            .then(response => {
-                resultArea.value = "Analyzing page content, please wait..."; // UX: Intermediate message
-                if (!response.ok) {
-                    throw new Error(`OCR server returned status ${response.status}`);
-                }
-                return response.json();
-            })
-            .then((data) => {
-                console.log('performOCR - OCR Response:', data);
-                if (data.success) {
-                    // Safely set the main OCR text result
-                    if (typeof data.text === 'string') {
-                        resultArea.value = data.text.trim() || "(No text content recognized)"; // UX: Handle empty string
-                    } else if (data.segments && data.segments.length > 0) {
-                        let fullText = data.segments.map(s => {
-                            if (typeof s.text === 'string') return s.text;
-                            if (Array.isArray(s.text) && typeof s.text[0] === 'string') return s.text[0];
-                            return '';
-                        }).join('\n');
-                        resultArea.value = fullText.trim() || "Segments processed. See details below or select a segment."; // UX: Clearer message
-                    } else if (data.status) {
-                         resultArea.value = `OCR Status: ${data.status}${data.file ? '\nFile: ' + data.file : ''}`;
-                    } else {
-                        resultArea.value = "OCR processing complete. No text content found or segments detected."; // UX: More specific
-                    }
-
-                    // Update the sidebar segments dropdown
-                    if (data.page_id && data.segments && data.segments.length > 0) {
-                        populateSegmentsDropdown(selectedFolder, data.page_id, data.segments);
-                        if (segmentLoading) segmentLoading.textContent = `${data.segments.length} segments detected.`;
-                    } else {
-                        if (segmentLoading) segmentLoading.textContent = "No segments detected by OCR.";
-                    }
-                    
-                    // Load the main content line segment navigation buttons
-                    if (data.page_id) {
-                        console.log('performOCR - Calling loadLineSegments for page_id:', data.page_id);
-                        loadLineSegments(selectedFolder, data.page_id);
-                    } else {
-                        console.warn('performOCR - No page_id in OCR response, cannot load line segments.');
-                         if(lineSegmentsContainer) lineSegmentsContainer.style.display = 'none';
-                    }
-                } else {
-                    resultArea.value = "Error performing OCR: " + (data.error || "Unknown error. Please check console."); // UX: Suggest console
-                    if (segmentLoading) segmentLoading.innerHTML = '<span style="color:red;">OCR failed.</span> Please try again.'; // UX: Clearer error
-                    console.error('performOCR - OCR Error:', data.error);
-                }
-            })
-            .catch(error => {
-                resultArea.value = "Error performing OCR: " + error.message + " (Check network connection and console)."; // UX: Suggest console
-                console.error('performOCR - Fetch/Network Error:', error);
-                if (segmentLoading) segmentLoading.innerHTML = '<span style="color:red;">OCR error.</span> Please try again.'; // UX: Clearer error
-            })
-            .finally(() => {
-                ocrButton.disabled = false;
-                ocrButton.textContent = "Extract Text from Page";
-                ocrButton.style.opacity = 1; // UX: Reset opacity
-            });
-        }
-        
+        // Update the loadLineSegments function to remove segment buttons creation
         function loadLineSegments(folder, pageId) {
             const lineSegmentsContainer = document.getElementById('line-segments-container');
-            const lineSegmentsNav = document.querySelector('.line-segments-nav');
-            const selectedLineImageEl = document.querySelector('.selected-line-image');
-            const selectedLineTextEl = document.querySelector('.selected-line-text');
+            const selectedLineImageEl = document.getElementById('sidebar-segment-image');
+            const selectedLineTextEl = document.getElementById('sidebar-segment-text');
+            const segmentCounter = document.getElementById('segment-counter');
             
-            console.log(`[loadLineSegments] Called for folder: "${folder}", pageId: "${pageId}"`);
-
-            if (!lineSegmentsContainer || !lineSegmentsNav || !selectedLineImageEl || !selectedLineTextEl) {
-                console.error("[loadLineSegments] Critical HTML elements for segment navigation not found!");
-                return;
+            if (!lineSegmentsContainer || !selectedLineImageEl || !selectedLineTextEl) {
+                console.error("[loadLineSegments] Critical HTML elements not found! Check IDs: line-segments-container, sidebar-segment-image, sidebar-segment-text");
+                return Promise.reject(new Error("Missing critical HTML elements for segment display."));
             }
 
-            lineSegmentsNav.innerHTML = '<p style="font-size:0.9em; color:#6c757d; padding:10px;" class="loading-dots">Loading line segments</p>'; // UX: Loading message
-            selectedLineImageEl.innerHTML = ''; 
-            selectedLineTextEl.innerText = ''; 
-            lineSegmentsContainer.style.display = 'block'; // UX: Show container to display loading/message
-            currentSegmentsList = []; // Reset global list
-            currentSegmentDisplayIndex = -1; // Reset index
-            currentSegmentFolderGlobal = folder; // Store for use by displaySegmentByIndex
-            currentSegmentPageIdGlobal = pageId; // Store for use by displaySegmentByIndex
-            updateNavigationButtons(); // Initially disable buttons
+            if (selectedLineImageEl.tagName === 'IMG') {
+                selectedLineImageEl.src = '';
+                selectedLineImageEl.alt = 'Loading...';
+            }
+            selectedLineTextEl.textContent = '';
+            if (segmentCounter) segmentCounter.textContent = 'Loading segments...';
+            
+            lineSegmentsContainer.style.display = 'block';
+            currentSegmentsList = [];
+            currentSegmentDisplayIndex = -1;
+            currentSegmentFolderGlobal = folder;
+            currentSegmentPageIdGlobal = pageId;
+            updateNavigationButtons();
 
             const segmentsUrl = `{{ url_for('app.get_segments', user_id='USERID', folder='FOLDER', page_id='PAGEID') }}`
                 .replace('USERID', '{{ session.get("user_id", "anonymous") }}')
                 .replace('FOLDER', encodeURIComponent(folder))
                 .replace('PAGEID', encodeURIComponent(pageId));
             
-            console.log('[loadLineSegments] Fetching segments from:', segmentsUrl);
-
-            fetch(segmentsUrl)
+            // Return the fetch promise chain
+            return fetch(segmentsUrl)
                 .then(response => {
-                    console.log(`[loadLineSegments] Fetch response status for "${segmentsUrl}": ${response.status}`);
                     if (!response.ok) {
-                        // Try to get error message from response body if possible
                         return response.text().then(text => {
-                            throw new Error(`Failed to load segments for navigation: ${response.status}. Server response: ${text}`);
+                            throw new Error(`Failed to load segments: ${response.status}. ${text}`);
                         });
                     }
                     return response.json();
                 })
                 .then(data => {
-                    console.log('[loadLineSegments] Segments data received:', JSON.stringify(data, null, 2)); 
-                    lineSegmentsNav.innerHTML = ''; // Clear loading message
-
                     if (data && data.success === true && data.segments && Array.isArray(data.segments) && data.segments.length > 0) {
-                        currentSegmentsList = data.segments; // Store fetched segments globally
-                        console.log(`[loadLineSegments] ${currentSegmentsList.length} segments found. Displaying container.`);
-                        // lineSegmentsContainer.style.display = 'block'; // Already set to block
-
-                        currentSegmentsList.forEach((segment, index) => {
-                            if (!segment || typeof segment !== 'object') {
-                                console.warn(`[loadLineSegments] Segment at index ${index} is not a valid object:`, segment);
-                                return; 
+                        currentSegmentsList = data.segments;
+                        
+                        // Populate the dropdown
+                        const segmentSelect = document.getElementById('segment-select');
+                        const segmentLoading = document.getElementById('segment-loading');
+                        
+                        if (segmentSelect) {
+                            // Clear existing options except the first one (placeholder)
+                            while (segmentSelect.options.length > 1) {
+                                segmentSelect.remove(1);
                             }
-
-                            const segmentBtn = document.createElement('button');
-                            segmentBtn.className = 'segment-btn';
-                            segmentBtn.style.cssText = `
-                                padding: 5px 10px; background-color: #f1f3f5; border: 1px solid #dee2e6;
-                                border-radius: 4px; cursor: pointer; min-width: 100px; /* Increased min-width */
-                                text-align: center; font-size: 0.9em; margin: 2px; transition: background-color 0.2s, border-color 0.2s;`; // UX: Added transition
                             
-                            let btnText = `L${index + 1}`;
-                            let segmentFullText = `Segment ${index + 1}`;
-                            if (segment.text) {
-                                let textSample = '';
-                                if (typeof segment.text === 'string') {
-                                    textSample = segment.text;
-                                } else if (Array.isArray(segment.text) && typeof segment.text[0] === 'string') {
-                                    textSample = segment.text[0];
+                            // Add new options
+                            data.segments.forEach((segment, index) => {
+                                const option = document.createElement('option');
+                                option.value = index;
+                                
+                                // Create display text
+                                let displayText = `Segment ${index + 1}`;
+                                if (segment.text) {
+                                    const textPreview = Array.isArray(segment.text) ? segment.text[0] : segment.text;
+                                    displayText += `: ${String(textPreview).substring(0, 30)}...`;
                                 }
                                 
-                                if (textSample) {
-                                    segmentFullText = textSample; 
-                                    let shortSample = textSample.trim().substring(0,15);
-                                    btnText = `${index + 1}: ${shortSample}${textSample.length > 15 ? '...' : ''}`;
-                                }
+                                option.textContent = displayText;
+                                segmentSelect.appendChild(option);
+                            });
+
+                            if (segmentLoading) {
+                                segmentLoading.textContent = `${data.segments.length} segments available`;
                             }
-                            segmentBtn.textContent = btnText;
-                            segmentBtn.title = segmentFullText; // UX: Tooltip for full text
-                            segmentBtn.dataset.segmentIndex = index; // Store index for easy access
-
-                            segmentBtn.onclick = function(e) {
-                                e.preventDefault();
-                                const clickedIndex = parseInt(this.dataset.segmentIndex, 10);
-                                displaySegmentByIndex(clickedIndex);
-                            };
-                            lineSegmentsNav.appendChild(segmentBtn);
-                        });
-
-                        if (currentSegmentsList.length > 0) {
-                            // Determine which segment to display initially
-                            const urlParams = new URLSearchParams(window.location.search);
-                            const segmentIndexFromUrl = urlParams.get('selected_segment');
-                            let initialIndexToDisplay = 0; // Default to the first segment
-
-                            if (segmentIndexFromUrl !== null) {
-                                const parsedIndex = parseInt(segmentIndexFromUrl, 10);
-                                if (!isNaN(parsedIndex) && parsedIndex >= 0 && parsedIndex < currentSegmentsList.length) {
-                                    initialIndexToDisplay = parsedIndex;
-                                    console.log(`[loadLineSegments] Initial segment index from URL: ${initialIndexToDisplay}`);
-                                } else {
-                                    console.warn(`[loadLineSegments] Invalid segment index from URL: ${segmentIndexFromUrl}. Defaulting to 0.`);
-                                }
-                            }
-                            displaySegmentByIndex(initialIndexToDisplay); // Display the segment from URL or the first one
-                        } else { 
-                             updateNavigationButtons(); 
-                             lineSegmentsNav.innerHTML = '<p style="font-size:0.9em; color:#6c757d; padding:10px;">No line segments found.</p>';
                         }
+                        
+                        // Display initial segment
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const segmentIndexFromUrl = urlParams.get('selected_segment');
+                        let initialIndex = 0;
+
+                        if (segmentIndexFromUrl !== null) {
+                            const parsedIndex = parseInt(segmentIndexFromUrl, 10);
+                            if (!isNaN(parsedIndex) && parsedIndex >= 0 && parsedIndex < data.segments.length) {
+                                initialIndex = parsedIndex;
+                            }
+                        }
+                        
+                        displaySegmentByIndex(initialIndex, false);
                     } else {
-                        console.log('[loadLineSegments] No valid segments found.');
-                        lineSegmentsNav.innerHTML = '<p style="font-size:0.9em; color:#6c757d; padding:10px;">No line segments were detected for this page.</p>';
-                        selectedLineImageEl.innerHTML = '';
-                        selectedLineTextEl.innerText = '';
-                        currentSegmentsList = [];
-                        currentSegmentDisplayIndex = -1;
+                        // Update loading message and clear dropdown
+                        const segmentLoading = document.getElementById('segment-loading');
+                        const segmentSelect = document.getElementById('segment-select');
+                        
+                        if (segmentLoading) {
+                            segmentLoading.textContent = 'No segments available';
+                        }
+                        
+                        if (segmentSelect) {
+                            while (segmentSelect.options.length > 1) {
+                                segmentSelect.remove(1);
+                            }
+                        }
+                        if (selectedLineImageEl.tagName === 'IMG') {
+                            selectedLineImageEl.src = '';
+                            selectedLineImageEl.alt = 'No segments available';
+                        } else {
+                            selectedLineImageEl.innerHTML = '<p style="color:#6c757d;">No segments available</p>';
+                        }
+                        selectedLineTextEl.textContent = 'No segments were detected for this page.'; // Use textContent
+                        if (segmentCounter) segmentCounter.textContent = 'No segments found';
                         updateNavigationButtons();
-                        if (data && data.error) console.warn(`[loadLineSegments] Error from /get_segments: ${data.error}`);
                     }
                 })
                 .catch(error => {
-                    console.error('[loadLineSegments] Fetch/Processing Error for segments:', error);
-                    lineSegmentsNav.innerHTML = `<p style="font-size:0.9em; color:red; padding:10px;">Error loading line segments: ${error.message}</p>`;
-                    selectedLineImageEl.innerHTML = '';
-                    selectedLineTextEl.innerText = '';
-                    currentSegmentsList = [];
-                    currentSegmentDisplayIndex = -1;
+                    // Update error state in dropdown
+                    const segmentLoading = document.getElementById('segment-loading');
+                    const segmentSelect = document.getElementById('segment-select');
+                    
+                    if (segmentLoading) {
+                        segmentLoading.innerHTML = '<span style="color:red;">Error loading segments</span>';
+                    }
+                    
+                    if (segmentSelect) {
+                        while (segmentSelect.options.length > 1) {
+                            segmentSelect.remove(1);
+                        }
+                    }
+
+                    console.error('[loadLineSegments] Error:', error);
+                    if (selectedLineImageEl.tagName === 'IMG') {
+                        selectedLineImageEl.src = '';
+                        selectedLineImageEl.alt = 'Error loading segments';
+                    } else {
+                        selectedLineImageEl.innerHTML = '<p style="color:red;">Error loading segments</p>';
+                    }
+                    selectedLineTextEl.textContent = `Error: ${error.message}`; // Use textContent
+                    if (segmentCounter) segmentCounter.textContent = 'Error loading segments';
                     updateNavigationButtons();
                 });
         }
 
         function showSelectedSegment(folder, pageId, segment) { // folder and pageId are now passed correctly
-            const selectedLineImageContainer = document.querySelector('.selected-line-image');
-            const selectedLineTextContainer = document.querySelector('.selected-line-text');
+            // CORRECTED SELECTORS:
+            const selectedLineImageContainer = document.getElementById('sidebar-segment-image'); // Was: document.querySelector('.selected-line-image');
+            const selectedLineTextContainer = document.getElementById('sidebar-segment-text');   // Was: document.querySelector('.selected-line-text');
             
             if (!selectedLineImageContainer || !selectedLineTextContainer) {
-                console.error('[showSelectedSegment] HTML elements for displaying selected segment not found!');
+                console.error('[showSelectedSegment] HTML elements for displaying selected segment not found! Check IDs: sidebar-segment-image, sidebar-segment-text');
                 return;
             }
             if (!segment || typeof segment !== 'object') {
                 console.error('[showSelectedSegment] Invalid segment data provided:', segment);
-                selectedLineImageContainer.innerHTML = `<p style="font-size:0.9em; color:red;">Error: Invalid segment data.</p>`;
-                selectedLineTextContainer.innerText = 'Error: Invalid segment data.';
+                if (selectedLineImageContainer.tagName === 'IMG') {
+                    selectedLineImageContainer.src = '';
+                    selectedLineImageContainer.alt = 'Error: Invalid segment data.';
+                } else {
+                    selectedLineImageContainer.innerHTML = `<p style="font-size:0.9em; color:red;">Error: Invalid segment data.</p>`;
+                }
+                selectedLineTextContainer.textContent = 'Error: Invalid segment data.'; // Use textContent
                 return;
             }
             console.log('[showSelectedSegment] Displaying segment:', JSON.stringify(segment));
@@ -853,12 +679,31 @@
                 const segmentIdStr = String(segment.id); 
                 const imageUrl = `/uploads/{{ session.get('user_id', 'anonymous') }}/${encodeURIComponent(folder)}/TOOCR/${encodeURIComponent(pageId)}/${encodeURIComponent(segmentIdStr)}.png`;
                 console.log('[showSelectedSegment] Image URL:', imageUrl);
-                selectedLineImageContainer.innerHTML = `
-                    <img src="${imageUrl}" alt="Line segment ${segmentIdStr}" style="max-width: 100%; max-height:150px; border: 1px solid #dee2e6; object-fit: contain; background-color: #fff;"
-                         onerror="this.onerror=null; this.alt='Image not found or error loading.'; this.src=''; this.parentElement.innerHTML='<p style=\\'font-size:0.9em; color:red;\\'>Image not found: ${segmentIdStr}.png (Path: ${imageUrl})</p>';">`; // UX: Added path to onerror
+                if (selectedLineImageContainer.tagName === 'IMG') {
+                    selectedLineImageContainer.src = imageUrl;
+                    selectedLineImageContainer.alt = `Line segment ${segmentIdStr}`;
+                    selectedLineImageContainer.onerror = function() {
+                        this.onerror=null; 
+                        this.alt='Image not found or error loading.'; 
+                        this.src=''; 
+                        // Optionally, display error message in a different way if it's an img tag
+                        // For example, by updating a sibling element or a parent's content.
+                        // For simplicity, we'll just set alt text.
+                        console.error(`Image not found: ${segmentIdStr}.png (Path: ${imageUrl})`);
+                    };
+                } else {
+                     selectedLineImageContainer.innerHTML = `
+                        <img src="${imageUrl}" alt="Line segment ${segmentIdStr}" style="max-width: 100%; max-height:150px; border: 1px solid #dee2e6; object-fit: contain; background-color: #fff;"
+                             onerror="this.onerror=null; this.alt='Image not found or error loading.'; this.src=''; this.parentElement.innerHTML='<p style=\\'font-size:0.9em; color:red;\\'>Image not found: ${segmentIdStr}.png (Path: ${imageUrl})</p>';">`;
+                }
             } else {
                 console.log(`[showSelectedSegment] No image for this segment. has_image: ${segment.has_image}, id: ${segment.id}`);
-                selectedLineImageContainer.innerHTML = `<p style="font-size:0.9em; color:#6c757d; padding: 10px 0;">(No image available for this segment)</p>`; // UX: Added padding
+                if (selectedLineImageContainer.tagName === 'IMG') {
+                    selectedLineImageContainer.src = '';
+                    selectedLineImageContainer.alt = '(No image available for this segment)';
+                } else {
+                    selectedLineImageContainer.innerHTML = `<p style="font-size:0.9em; color:#6c757d; padding: 10px 0;">(No image available for this segment)</p>`;
+                }
             }
             
             let displayText = '(No text recognized for this segment)';
@@ -871,12 +716,111 @@
                     }
                 } else displayText = JSON.stringify(segment.text); 
             } else if (segment.coords && Array.isArray(segment.coords)) {
-                 displayText = `Coordinates: [${segment.coords.join(', ')}] (No text recognized)`; // UX: Clarify no text
+                 displayText = `Coordinates: [${segment.coords.join(', ')}] (No text recognized)`;
             }
             
-            selectedLineTextContainer.innerText = displayText;
+            selectedLineTextContainer.textContent = displayText; // Use textContent
             console.log('[showSelectedSegment] Displayed text:', displayText);
         }
+
+        function initializePreviewOverlay() {
+            const previewImage = document.getElementById('preview-image');
+            let overlay = document.getElementById('preview-overlay');
+            
+            if (!previewImage) {
+                console.error('[initializePreviewOverlay] Preview image not found');
+                return;
+            }
+            
+            // Create overlay if it doesn't exist
+            if (!overlay) {
+                overlay = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                overlay.id = 'preview-overlay';
+                overlay.style.position = 'absolute';
+                overlay.style.top = '0';
+                overlay.style.left = '0';
+                overlay.style.pointerEvents = 'none';
+                previewImage.parentElement.style.position = 'relative';
+                previewImage.parentElement.appendChild(overlay);
+            }
+            
+            // Update overlay dimensions when image loads
+            previewImage.onload = function() {
+                const rect = previewImage.getBoundingClientRect();
+                overlay.style.width = rect.width + 'px';
+                overlay.style.height = rect.height + 'px';
+                overlay.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
+            };
+            
+            console.log('[initializePreviewOverlay] Overlay initialized');
+        }
+
+        function clearSegmentHighlight() {
+            const overlay = document.getElementById('preview-overlay');
+            if (overlay) {
+                while (overlay.firstChild) {
+                    overlay.removeChild(overlay.firstChild);
+                }
+            }
+        }
+
+        function highlightSegment(coords) {
+            const overlay = document.getElementById('preview-overlay');
+            const previewImage = document.getElementById('preview-image');
+            
+            if (!overlay || !previewImage || !Array.isArray(coords) || coords.length !== 4) {
+                console.warn('[highlightSegment] Invalid parameters:', { overlay: !!overlay, coords });
+                return;
+            }
+
+            // Clear existing highlights
+            clearSegmentHighlight();
+
+            // Get image dimensions for scaling
+            const imageRect = previewImage.getBoundingClientRect();
+            const scaleX = imageRect.width / previewImage.naturalWidth;
+            const scaleY = imageRect.height / previewImage.naturalHeight;
+            
+            // Create rectangle element
+            const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            
+            // Calculate coordinates (assuming coords are [x1, y1, x2, y2])
+            const [x1, y1, x2, y2] = coords;
+            const scaledX = Math.min(x1, x2) * scaleX;
+            const scaledY = Math.min(y1, y2) * scaleY;
+            const width = Math.abs(x2 - x1) * scaleX;
+            const height = Math.abs(y2 - y1) * scaleY;
+            
+            // Set rectangle attributes
+            rect.setAttribute("x", scaledX);
+            rect.setAttribute("y", scaledY);
+            rect.setAttribute("width", width);
+            rect.setAttribute("height", height);
+            
+            // Style the highlight
+            rect.setAttribute("class", "segment-highlight");
+            rect.setAttribute("fill", "rgba(255, 255, 0, 0.2)");
+            rect.setAttribute("stroke", "rgba(255, 200, 0, 0.8)");
+            rect.setAttribute("stroke-width", "2");
+            
+            // Add the highlight to the overlay
+            overlay.appendChild(rect);
+            
+            console.log('[highlightSegment] Added highlight:', {
+                original: coords,
+                scaled: { x: scaledX, y: scaledY, width, height }
+            });
+        }
+
+        // Add to DOMContentLoaded event listener
+        document.addEventListener('DOMContentLoaded', function() {
+            // ...existing code...
+            
+            // Initialize the preview overlay
+            initializePreviewOverlay();
+            
+            // ...rest of existing code...
+        });
     </script>
     {% endblock %}
 </body>

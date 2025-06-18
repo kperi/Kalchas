@@ -7,6 +7,79 @@
     {% block head_extra %}
     <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <style>
+        /* Loading animations and smooth transitions */
+        .fade-in {
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+        .fade-in.show {
+            opacity: 1;
+        }
+        
+        .slide-down {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-in-out;
+        }
+        .slide-down.show {
+            max-height: 500px;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 5px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .smooth-transition {
+            transition: all 0.3s ease-in-out;
+        }
+        
+        .gradio-display-area {
+            transition: all 0.3s ease-in-out;
+        }
+        
+        /* Improved select styling */
+        select {
+            transition: border-color 0.3s ease;
+        }
+        
+        select:focus {
+            border-color: #3b82f6;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+        }
+        
+        /* Loading state styles */
+        .loading {
+            pointer-events: none;
+            opacity: 0.7;
+        }
+        
+        .crop-gallery {
+            transition: opacity 0.3s ease-in-out;
+        }
+        
+        .crop-thumbnail {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .crop-thumbnail:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+    </style>
     {% endblock %}
 </head>
 <body>
@@ -16,109 +89,404 @@
         <div class="gradio-component-group" style="max-width: 1000px; margin-left: auto; margin-right: auto;">
             <h1>Image Cropping Tool</h1>
 
-            <form method="GET" action="{{ url_for('app.crop_image') }}" class="selection-form">
-                <div class="gradio-component-group" style="background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
-                    <div style="margin-bottom: 1rem;">
-                        <label for="folder-select">Select Document:</label>
-                        <select name="selected_folder" id="folder-select" onchange="this.form.submit()">
-                            <option value="">-- Select a Document --</option>
-                            {% for folder in folders %}
-                                <option value="{{ folder }}" {% if folder == selected_folder %}selected{% endif %}>{{ folder }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    
-                    {% if selected_folder %}
-                    <div style="margin-bottom: 1rem;">
-                        <label for="file-select">Select Page/Image:</label>
-                        
-                        <!-- Debug info for PNG files -->
-                        <div style="margin-bottom: 10px; padding: 5px; border: 1px solid #ddd; background-color: #f5f5f5; font-size: 0.8em;">
-                            <strong>Debug:</strong> Found {{ png_files_in_selected_folder|length }} PNG files
-                            {% if not png_files_in_selected_folder %}
-                                <p>No PNG files found. Check if files exist in the directory and if they have .png extension.</p>
+            <div class="gradio-component-group" style="background-color: #f0f4f8; padding: 1rem; margin-bottom: 1.5rem; border-left: 4px solid #3b82f6;">
+                <h3 style="margin-top: 0; color: #1f2937;">User Workspace</h3>
+                <p style="font-family: monospace; background-color: #ffffff; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 4px; margin: 0; word-break: break-all;">
+                    User: {{ session.get('user_id', 'anonymous') }} | Documents: {{ documents|length }}
+                </p>
+                
+                {% if documents %}
+                <h4 style="margin-top: 1rem; margin-bottom: 0.5rem; color: #1f2937;">Your Documents:</h4>
+                <div style="background-color: #ffffff; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 4px; max-height: 300px; overflow-y: auto;">
+                    {% for doc in documents %}
+                        <div style="margin-bottom: 0.5rem; padding: 0.5rem; background-color: {% if doc.name == selected_folder %}#e0f2fe{% else %}#f9fafb{% endif %}; border-radius: 3px; border-left: 3px solid {% if doc.is_completed %}#4caf50{% else %}#ff9800{% endif %};">
+                            <div style="display: flex; justify-content: between; align-items: center;">
+                                <strong>{{ doc.name }}</strong>
+                                <span style="margin-left: auto; font-size: 0.8em; color: #666;">
+                                    {% if doc.is_completed %}✅ Completed{% else %}🔄 In Progress{% endif %}
+                                    | {{ doc.total_png_count }} images
+                                </span>
+                            </div>
+                            {% if doc.pdf_files %}
+                                <div style="margin-top: 0.25rem; font-size: 0.85em; color: #666;">
+                                    PDF: {{ doc.pdf_files|join(', ') }}
+                                </div>
+                            {% endif %}
+                            {% if doc.name == selected_folder and png_files_in_selected_folder %}
+                                <ul style="margin: 0.5rem 0 0 1rem; font-family: monospace; font-size: 0.9em;">
+                                    {% for png_file in png_files_in_selected_folder %}
+                                        <li style="margin-bottom: 0.25rem;">{{ png_file }}</li>
+                                    {% endfor %}
+                                </ul>
                             {% endif %}
                         </div>
-                        
-                        <select name="image_file" id="file-select" onchange="this.form.submit()">
-                            <option value="">-- Select an Image --</option>
-                            {% for png_file in png_files_in_selected_folder %}
-                                 <option value="{{ png_file }}" {% if png_file == image_to_crop_filename %}selected{% endif %}>Page {{ png_file.split('.')[0] | int }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    {% endif %}
-                    <noscript><button type="submit" class="gradio-button gradio-button-secondary">Load Selections</button></noscript>
+                    {% endfor %}
                 </div>
-            </form>
-
-            {% if selected_folder and image_to_crop_filename %}
-            <div style="margin-bottom: 10px; padding: 5px; border: 1px solid #ddd; background-color: #f5f5f5;">
-                <strong>Debug Info:</strong> 
-                <span style="font-family: monospace; word-break: break-all;">
-                    Path: /uploads/{{session.get('user_id', 'anonymous')}}/{{selected_folder}}/{{image_to_crop_filename}}
-                </span>
-            </div>
-            {% endif %}
-
-            <div class="gradio-display-area" style="min-height: 400px; background-color: #e5e7eb;"> <!-- Slightly darker background for cropper area -->
-                {% if selected_folder and image_to_crop_filename %}
-                    <img id="image_to_crop_element" 
-                         src="/uploads/{{session.get('user_id', 'anonymous')}}/{{selected_folder}}/{{image_to_crop_filename}}" 
-                         alt="Image to crop">
                 {% else %}
-                    <p class="gradio-placeholder-text">Select a document and page to begin cropping.</p>
+                <div style="text-align: center; padding: 2rem; color: #666;">
+                    <p>No documents found. <a href="{{ url_for('app.show_upload_page') }}" class="gradio-button gradio-button-primary" style="text-decoration: none; display: inline-block; margin-top: 1rem;">Upload your first document</a></p>
+                </div>
                 {% endif %}
             </div>
 
-            {% if selected_folder and image_to_crop_filename %}
-            <div style="text-align: center; margin-top: 1.5rem;">
-                <button id="crop-button-action" class="gradio-button gradio-button-primary">Crop Selected Area</button>
-                <form id="crop-result-form" method="POST" action="{{ url_for('app.process_cropped_image') }}" style="display:none;">
-                    <input type="hidden" name="original_folder" value="{{ selected_folder }}">
-                    <input type="hidden" name="original_filename" value="{{ image_to_crop_filename }}">
-                    <input type="hidden" id="cropped-image-data" name="cropped_image_data">
-                </form>
+            {% if documents %}
+            <div class="gradio-component-group" style="background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
+                <div style="margin-bottom: 1rem;">
+                    <label for="folder-select">Select Document:</label>
+                    <select name="selected_folder" id="folder-select">
+                        <option value="">-- Select a Document --</option>
+                        {% for folder in folders %}
+                            <option value="{{ folder }}" {% if folder == selected_folder %}selected{% endif %}>{{ folder }}</option>
+                        {% endfor %}
+                    </select>
+                    <div id="folder-loading" style="display: none; margin-left: 10px; color: #666;">
+                        <span class="loading-spinner"></span>
+                        <span>Loading images...</span>
+                    </div>
+                </div>
+                
+                <div id="image-selection-container" class="fade-in smooth-transition" style="margin-bottom: 1rem; {% if not selected_folder %}display: none;{% endif %}">
+                    <label for="file-select">Select Page/Image:</label>
+                    
+                    <!-- Debug/status info -->
+                    <div id="debug-info" style="margin-bottom: 10px; padding: 5px; border: 1px solid #ddd; background-color: #f5f5f5; font-size: 0.8em;">
+                        <strong>Status:</strong> <span id="debug-message">Ready</span>
+                    </div>
+                    
+                    <select name="image_file" id="file-select">
+                        <option value="">-- Select an Image --</option>
+                        {% if png_files_in_selected_folder %}
+                            {% for png_file in png_files_in_selected_folder %}
+                                <option value="{{ png_file }}" {% if png_file == image_to_crop_filename %}selected{% endif %}>
+                                    {% if '_crop_' in png_file %}
+                                        {{ png_file | replace('_crop_', ' (Crop ') | replace('.png', ')') }}
+                                    {% else %}
+                                        {{ png_file | replace('page_', 'Page ') | replace('.png', '') }}
+                                    {% endif %}
+                                </option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                    <div id="file-loading" style="display: none; margin-left: 10px; color: #666;">
+                        <span class="loading-spinner"></span>
+                        <span>Loading image...</span>
+                    </div>
+                </div>
+                
+                <!-- Fallback for users without JavaScript -->
+                <noscript>
+                    <div style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 1rem; border-radius: 4px; margin-top: 1rem;">
+                        <strong>⚠️ JavaScript Required:</strong> This page works best with JavaScript enabled. 
+                        <form method="GET" action="{{ url_for('app.crop_image') }}" style="display: inline;">
+                            <button type="submit" class="gradio-button gradio-button-secondary">Reload Page</button>
+                        </form>
+                    </div>
+                </noscript>
             </div>
             {% endif %}
+
+            <!-- Dynamic content area for selected image -->
+            <div id="image-display-container" class="fade-in smooth-transition">
+                {% if selected_folder and image_to_crop_filename %}
+                <div id="debug-path-info" style="margin-bottom: 10px; padding: 5px; border: 1px solid #ddd; background-color: #f5f5f5;">
+                    <strong>Debug Info:</strong> 
+                    <span style="font-family: monospace; word-break: break-all;">
+                        Path: /uploads/{{session.get('user_id', 'anonymous')}}/{{selected_folder}}/PNG/{{image_to_crop_filename}}
+                    </span>
+                </div>
+                {% endif %}
+
+                <div class="gradio-display-area smooth-transition" style="min-height: 400px; background-color: #e5e7eb;" id="cropping-area">
+                    {% if selected_folder and image_to_crop_filename %}
+                        <img id="image_to_crop_element" 
+                             src="{{ url_for('app.serve_document_png_file', user_id=session.get('user_id', 'anonymous'), document_folder_name=selected_folder, image_filename=image_to_crop_filename) }}" 
+                             alt="Image to crop">
+                    {% else %}
+                        <p class="gradio-placeholder-text">Select a document and page to begin cropping.</p>
+                    {% endif %}
+                </div>
+
+                <div id="crop-controls" class="fade-in smooth-transition" style="text-align: center; margin-top: 1.5rem; {% if not (selected_folder and image_to_crop_filename) %}display: none;{% endif %}">
+                    <button id="crop-button-action" class="gradio-button gradio-button-primary">Crop Selected Area</button>
+                    <form id="crop-result-form" method="POST" action="{{ url_for('app.process_cropped_image') }}" style="display:none;">
+                        <input type="hidden" name="original_folder" id="crop-form-folder" value="{{ selected_folder or '' }}">
+                        <input type="hidden" name="original_filename" id="crop-form-filename" value="{{ image_to_crop_filename or '' }}">
+                        <input type="hidden" id="cropped-image-data" name="cropped_image_data">
+                    </form>
+                </div>
+            </div>
         </div>
 
-        {% if selected_folder and image_to_crop_filename %}
         <script>
             document.addEventListener('DOMContentLoaded', function () {
-                const imageElement = document.getElementById('image_to_crop_element');
+                // AJAX functionality variables
+                const folderSelect = document.getElementById('folder-select');
+                const fileSelect = document.getElementById('file-select');
+                const folderLoading = document.getElementById('folder-loading');
+                const fileLoading = document.getElementById('file-loading');
+                const debugMessage = document.getElementById('debug-message');
+                const imageSelectionContainer = document.getElementById('image-selection-container');
+                const imageDisplayContainer = document.getElementById('image-display-container');
+                const cropsContainer = document.getElementById('crops-container');
+                const cropGallery = document.getElementById('crop-gallery');
+                const cropControls = document.getElementById('crop-controls');
+                const debugPathInfo = document.getElementById('debug-path-info');
+                const croppingArea = document.getElementById('cropping-area');
+                
+                // Cropper variables
+                let cropperInstance;
                 const cropButtonAction = document.getElementById('crop-button-action');
                 const cropResultForm = document.getElementById('crop-result-form');
                 const croppedImageDataInput = document.getElementById('cropped-image-data');
-                let cropperInstance;
+                const cropFormFolder = document.getElementById('crop-form-folder');
+                const cropFormFilename = document.getElementById('crop-form-filename');
+                
+                // Current state
+                let currentFolder = '{{ selected_folder or "" }}';
+                let currentImage = '{{ image_to_crop_filename or "" }}';
+                const userId = '{{ session.get("user_id", "anonymous") }}';
 
-                console.log("Image source:", imageElement.src);
+                // Initialize with current state if available
+                if (currentFolder && currentImage) {
+                    initializeCropperForImage();
+                }
 
-                if (imageElement && imageElement.getAttribute('src')) { // Check if image src is set
-                    // Add event listeners before initializing
-                    imageElement.onload = function() {
-                        console.log("Image loaded successfully");
-                        initializeCropper();
-                    };
-                    
-                    imageElement.onerror = function() {
-                        console.error("Failed to load image");
-                        const displayArea = document.querySelector('.gradio-display-area');
-                        if(displayArea) {
-                            displayArea.innerHTML = '<p class="gradio-placeholder-text">Could not load image. Please check the file path and server logs.</p>';
+                // Document selection handler
+                if (folderSelect) {
+                    folderSelect.addEventListener('change', function() {
+                        const selectedFolder = this.value;
+                        currentFolder = selectedFolder;
+                        currentImage = '';
+                        
+                        if (selectedFolder) {
+                            loadDocumentImages(selectedFolder);
+                        } else {
+                            hideImageSelection();
+                            hideImageDisplay();
+                            hideCrops();
                         }
-                    };
+                    });
+                }
+
+                // Image selection handler
+                if (fileSelect) {
+                    fileSelect.addEventListener('change', function() {
+                        const selectedImage = this.value;
+                        currentImage = selectedImage;
+                        
+                        if (selectedImage && currentFolder) {
+                            loadImage(currentFolder, selectedImage);
+                        } else {
+                            hideImageDisplay();
+                            hideCrops();
+                        }
+                    });
+                }
+
+                // AJAX function to load document images
+                function loadDocumentImages(documentName) {
+                    showFolderLoading();
+                    updateDebugMessage('Loading images...');
                     
-                    // Check if image is already loaded (might happen with cached images)
-                    if (imageElement.complete && imageElement.naturalWidth > 0) {
-                        console.log("Image already loaded, initializing cropper");
-                        initializeCropper();
+                    fetch(`/api/get_document_images/${userId}/${documentName}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            hideFolderLoading();
+                            
+                            if (data.success) {
+                                populateImageSelect(data.images);
+                                showImageSelection();
+                                updateDebugMessage(data.message);
+                            } else {
+                                updateDebugMessage('Error: ' + data.message);
+                                hideImageSelection();
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error loading images:', error);
+                            hideFolderLoading();
+                            updateDebugMessage('Network error: Failed to load images');
+                            hideImageSelection();
+                            // Show fallback message
+                            if (debugMessage) {
+                                debugMessage.style.color = '#dc2626';
+                            }
+                        });
+                }
+
+                // Function to load and display an image
+                function loadImage(documentName, imageName) {
+                    showFileLoading();
+                    updateDebugMessage('Loading image...');
+                    
+                    // Update form values
+                    cropFormFolder.value = documentName;
+                    cropFormFilename.value = imageName;
+                    
+                    // Update debug path
+                    if (debugPathInfo) {
+                        debugPathInfo.innerHTML = `
+                            <strong>Debug Info:</strong> 
+                            <span style="font-family: monospace; word-break: break-all;">
+                                Path: /uploads/${userId}/${documentName}/PNG/${imageName}
+                            </span>
+                        `;
+                    }
+                    
+                    // Create image URL using the correct route
+                    const imageUrl = `/uploads/${userId}/${documentName}/PNG/${imageName}`;
+                    
+                    // Update cropping area
+                    croppingArea.innerHTML = `<img id="image_to_crop_element" src="${imageUrl}" alt="Image to crop">`;
+                    
+                    // Initialize cropper for new image
+                    setTimeout(() => {
+                        initializeCropperForImage();
+                        hideFileLoading();
+                        updateDebugMessage('Image loaded successfully');
+                        showImageDisplay();
+                        showCropControls();
+                        
+                        // Load crops for this image
+                        if (!imageName.includes('_crop_')) {
+                            loadPageCrops(documentName, imageName);
+                        } else {
+                            hideCrops();
+                        }
+                    }, 100);
+                }
+
+                // Function to load crops for a page
+                function loadPageCrops(documentName, imageName) {
+                    fetch(`/api/get_page_crops/${userId}/${documentName}/${imageName}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success && data.crops.length > 0) {
+                                populateCropsGallery(data.crops);
+                                showCrops();
+                            } else {
+                                hideCrops();
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error loading crops:', error);
+                            hideCrops();
+                        });
+                }
+
+                // UI helper functions
+                function populateImageSelect(images) {
+                    fileSelect.innerHTML = '<option value="">-- Select an Image --</option>';
+                    images.forEach(image => {
+                        const option = document.createElement('option');
+                        option.value = image.filename;
+                        option.textContent = image.display_name;
+                        fileSelect.appendChild(option);
+                    });
+                }
+
+                function populateCropsGallery(crops) {
+                    cropGallery.innerHTML = '';
+                    crops.forEach(crop => {
+                        const cropDiv = document.createElement('div');
+                        cropDiv.className = 'crop-thumbnail';
+                        cropDiv.style.cssText = 'border: 1px solid #ddd; border-radius: 4px; padding: 10px; text-align: center;';
+                        cropDiv.innerHTML = `
+                            <img src="${crop.url}" alt="Cropped section" 
+                                 style="max-width: 100%; max-height: 120px; margin-bottom: 8px;">
+                            <div style="font-size: 0.8em; word-break: break-all;">${crop.display_name}</div>
+                        `;
+                        cropGallery.appendChild(cropDiv);
+                    });
+                }
+
+                function showFolderLoading() { if (folderLoading) folderLoading.style.display = 'inline'; }
+                function hideFolderLoading() { if (folderLoading) folderLoading.style.display = 'none'; }
+                function showFileLoading() { if (fileLoading) fileLoading.style.display = 'inline'; }
+                function hideFileLoading() { if (fileLoading) fileLoading.style.display = 'none'; }
+                function updateDebugMessage(message) { if (debugMessage) debugMessage.textContent = message; }
+                function showImageSelection() { 
+                    if (imageSelectionContainer) {
+                        imageSelectionContainer.style.display = 'block';
+                        setTimeout(() => imageSelectionContainer.classList.add('show'), 10);
                     }
                 }
-                
+                function hideImageSelection() { 
+                    if (imageSelectionContainer) {
+                        imageSelectionContainer.classList.remove('show');
+                        setTimeout(() => imageSelectionContainer.style.display = 'none', 300);
+                    }
+                }
+                function showImageDisplay() { 
+                    if (imageDisplayContainer) {
+                        imageDisplayContainer.style.display = 'block';
+                        setTimeout(() => imageDisplayContainer.classList.add('show'), 10);
+                    }
+                }
+                function hideImageDisplay() { 
+                    if (imageDisplayContainer) {
+                        imageDisplayContainer.classList.remove('show');
+                        setTimeout(() => imageDisplayContainer.style.display = 'none', 300);
+                    }
+                }
+                function showCropControls() { 
+                    if (cropControls) {
+                        cropControls.style.display = 'block';
+                        setTimeout(() => cropControls.classList.add('show'), 10);
+                    }
+                }
+                function hideCropControls() { 
+                    if (cropControls) {
+                        cropControls.classList.remove('show');
+                        setTimeout(() => cropControls.style.display = 'none', 300);
+                    }
+                }
+                function showCrops() { 
+                    if (cropsContainer) {
+                        cropsContainer.style.display = 'block';
+                        setTimeout(() => cropsContainer.classList.add('show'), 10);
+                    }
+                }
+                function hideCrops() { 
+                    if (cropsContainer) {
+                        cropsContainer.classList.remove('show');
+                        setTimeout(() => cropsContainer.style.display = 'none', 300);
+                    }
+                }
+
+                // Cropper initialization function
+                function initializeCropperForImage() {
+                    const imageElement = document.getElementById('image_to_crop_element');
+                    
+                    if (cropperInstance) {
+                        cropperInstance.destroy();
+                        cropperInstance = null;
+                    }
+
+                    if (imageElement && imageElement.getAttribute('src')) {
+                        imageElement.onload = function() {
+                            console.log("Image loaded successfully");
+                            initializeCropper();
+                        };
+                        
+                        imageElement.onerror = function() {
+                            console.error("Failed to load image");
+                            croppingArea.innerHTML = '<p class="gradio-placeholder-text">Could not load image. Please check the file path and server logs.</p>';
+                        };
+                        
+                        // Check if image is already loaded
+                        if (imageElement.complete && imageElement.naturalWidth > 0) {
+                            console.log("Image already loaded, initializing cropper");
+                            initializeCropper();
+                        }
+                    }
+                }
+
                 function initializeCropper() {
-                    if (imageElement.naturalWidth === 0) {
-                        console.error("Image has zero width");
+                    const imageElement = document.getElementById('image_to_crop_element');
+                    
+                    if (!imageElement || imageElement.naturalWidth === 0) {
+                        console.error("Image element not found or has zero width");
                         return;
                     }
                     
@@ -137,44 +505,48 @@
                         cropBoxResizable: true,
                         checkCrossOrigin: false,
                     });
+                }
 
-                    if (cropButtonAction) {
-                        cropButtonAction.addEventListener('click', function () {
-                            if (cropperInstance) {
-                                const canvas = cropperInstance.getCroppedCanvas({});
-                                if (canvas) {
-                                    croppedImageDataInput.value = canvas.toDataURL('image/png');
-                                    cropResultForm.submit(); // Actually submit the form
-                                } else {
-                                    alert('Could not get cropped canvas.');
-                                }
+                // Crop button handler
+                if (cropButtonAction) {
+                    cropButtonAction.addEventListener('click', function () {
+                        if (cropperInstance) {
+                            const canvas = cropperInstance.getCroppedCanvas({});
+                            if (canvas) {
+                                croppedImageDataInput.value = canvas.toDataURL('image/png');
+                                cropResultForm.submit();
+                            } else {
+                                alert('Could not get cropped canvas.');
                             }
-                        });
-                    }
+                        }
+                    });
                 }
             });
         </script>
-        {% endif %}
 
-        {% if selected_folder and image_to_crop_filename and cropped_images %}
-        <div class="gradio-component-group" style="margin-top: 2rem;">
-            <h3>Existing Crops for This Page</h3>
-            <div class="crop-gallery" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; margin-top: 15px;">
-                {% for cropped_img in cropped_images %}
-                <div class="crop-thumbnail" style="border: 1px solid #ddd; border-radius: 4px; padding: 10px; text-align: center;">
-                    <!-- Use url_for to generate the correct URL path -->
-                    <img src="{{ url_for('app.uploaded_cropped_file', 
-                              user_id=session.get('user_id', 'anonymous'), 
-                              folder=selected_folder,
-                              filename=cropped_img) }}"
-                         alt="Cropped section" 
-                         style="max-width: 100%; max-height: 120px; margin-bottom: 8px;">
-                    <div style="font-size: 0.8em; word-break: break-all;">{{ cropped_img }}</div>
+        <!-- Dynamic crops section -->
+        <div id="crops-container" style="margin-top: 2rem; {% if not (selected_folder and image_to_crop_filename and cropped_images) %}display: none;{% endif %}">
+            <div class="gradio-component-group">
+                <h3>Existing Crops for This Page</h3>
+                <div id="crop-gallery" class="crop-gallery" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; margin-top: 15px;">
+                    {% if cropped_images %}
+                        {% for cropped_img in cropped_images %}
+                        <div class="crop-thumbnail" style="border: 1px solid #ddd; border-radius: 4px; padding: 10px; text-align: center;">
+                            <img src="{{ url_for('app.serve_document_png_file', 
+                                      user_id=session.get('user_id', 'anonymous'), 
+                                      document_folder_name=selected_folder,
+                                      image_filename=cropped_img) }}"
+                                 alt="Cropped section" 
+                                 style="max-width: 100%; max-height: 120px; margin-bottom: 8px;">
+                            <div style="font-size: 0.8em; word-break: break-all;">
+                                {{ cropped_img | replace('_crop_', ' Crop ') | replace('.png', '') }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% endif %}
                 </div>
-                {% endfor %}
             </div>
         </div>
-        {% endif %}
 
         {% if selected_folder %}
         <div class="gradio-component-group" style="margin-top: 2rem; text-align: center;">
