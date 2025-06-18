@@ -367,6 +367,97 @@ def handle_pdf_upload_with_auto_folder(app_config, user_id, uploaded_pdf_file_st
         return None, None, None
 
 
+def handle_pdf_upload_with_auto_folder_no_sanitize(app_config, user_id, uploaded_pdf_file_storage):
+    """
+    Handles PDF upload with automatic folder name creation based on filename.
+    DOES NOT sanitize the filename - stores original filename as provided.
+    Creates folder structure with PNG and TOOCR subfolders.
+    
+    Requirements:
+    - Folder name based on PDF filename (without extension)
+    - Max 20 characters, spaces replaced with underscores
+    - Creates PNG subfolder for converted pages
+    - Creates TOOCR subfolder for processed images
+    - Original filename is preserved without sanitization
+    
+    Args:
+        app_config: Flask app configuration.
+        user_id: The ID of the user.
+        uploaded_pdf_file_storage: The FileStorage object from Flask request.
+        
+    Returns:
+        tuple: (document_folder_path, saved_pdf_path, document_folder_name) or (None, None, None) on error.
+    """
+    try:
+        # Ensure user directory exists
+        user_dir = get_user_upload_dir(app_config, user_id)
+        os.makedirs(user_dir, exist_ok=True)
+        logger.info(f"User directory: {user_dir}")
+
+        # Get the original filename WITHOUT sanitization
+        original_filename = uploaded_pdf_file_storage.filename
+        if not original_filename:
+            logger.error("Invalid or empty filename")
+            return None, None, None
+
+        # Create folder name from filename (this still needs sanitization for folder names)
+        base_folder_name = create_folder_name_from_filename(original_filename)
+        logger.info(f"Original filename: '{original_filename}' -> Folder name: '{base_folder_name}'")
+
+        # Determine unique folder name
+        document_folder_name = base_folder_name
+        document_folder_path = get_document_dir(app_config, user_id, document_folder_name)
+
+        counter = 1
+        while os.path.exists(document_folder_path):
+            counter += 1
+            document_folder_name = f"{base_folder_name}_{counter}"
+            document_folder_path = get_document_dir(app_config, user_id, document_folder_name)
+            logger.info(f"Folder '{base_folder_name}' exists, trying: {document_folder_name}")
+
+        # Create the unique document folder
+        os.makedirs(document_folder_path, exist_ok=True)
+        logger.info(f"Created document folder: {document_folder_path}")
+
+        # Create PNG subfolder for converted pages
+        png_dir = get_document_png_dir(app_config, user_id, document_folder_name)
+        os.makedirs(png_dir, exist_ok=True)
+        logger.info(f"Created PNG subfolder: {png_dir}")
+
+        # Create TOOCR subfolder for processed images
+        toocr_dir = get_document_completed_dir(app_config, user_id, document_folder_name)
+        os.makedirs(toocr_dir, exist_ok=True)
+        logger.info(f"Created TOOCR subfolder: {toocr_dir}")
+
+        # Save the PDF file in the document folder with ORIGINAL filename (no sanitization)
+        saved_pdf_path = os.path.join(document_folder_path, original_filename)
+        uploaded_pdf_file_storage.save(saved_pdf_path)
+        logger.info(f"Saved PDF to: {saved_pdf_path}")
+
+        # Verify the file was saved successfully
+        if not os.path.exists(saved_pdf_path):
+            logger.error(f"PDF file was not saved successfully: {saved_pdf_path}")
+            return None, None, None
+
+        file_size = os.path.getsize(saved_pdf_path)
+        logger.info(f"PDF file saved successfully. Size: {file_size} bytes")
+
+        return document_folder_path, saved_pdf_path, document_folder_name
+
+    except Exception as e:
+        logger.error(f"Error in handle_pdf_upload_with_auto_folder_no_sanitize for file '{uploaded_pdf_file_storage.filename}': {str(e)}")
+
+        # Cleanup on error - remove any partially created folders
+        try:
+            if "document_folder_path" in locals() and os.path.exists(document_folder_path):
+                shutil.rmtree(document_folder_path)
+                logger.info(f"Cleaned up partially created folder: {document_folder_path}")
+        except Exception as cleanup_error:
+            logger.error(f"Error during cleanup: {cleanup_error}")
+
+        return None, None, None
+
+
 # --- Task 2: PDF to PNG Conversion ---
 
 
