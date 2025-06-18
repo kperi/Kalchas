@@ -50,11 +50,27 @@ services:
       - "5001:5001" 
     volumes:
       - ./uploads:/app/uploads
+      - ./my-flask-app:/app  # Mount the entire Flask app directory for live reload
+      - /app/__pycache__  # Exclude pycache to avoid permission issues
     networks:
       - logios-network
     restart: unless-stopped
     environment:
-      - OCR_SERVICE_URL=http://ocr:8000  # Add this to specify OCR service URL
+      - FLASK_CONFIG=development
+      - FLASK_DEBUG=true
+      - FLASK_ENV=development
+      - OCR_SERVICE_URL=http://ocr:8000
+    develop:
+      watch:
+        - action: sync
+          path: ./my-flask-app
+          target: /app
+          ignore:
+            - __pycache__/
+            - "*.pyc"
+            - .git/
+        - action: rebuild
+          path: ./my-flask-app/requirements.txt
 
 volumes:
   upload_data:

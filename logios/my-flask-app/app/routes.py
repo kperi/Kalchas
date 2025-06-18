@@ -949,6 +949,115 @@ def api_get_page_crops(user_id, document_folder_name, page_filename):
         }), 500
 
 
+@app.route("/api/get_user_documents/<user_id>")
+def api_get_user_documents(user_id):
+    """
+    AJAX endpoint to get all documents for a user for sidebar display.
+    Returns JSON data with document metadata for dynamic loading.
+    """
+    try:
+        # Get all documents for the user
+        documents_data = file_operations.get_user_documents_list(
+            current_app.config, user_id, include_completed=True, include_in_progress=True
+        )
+        
+        # Get detailed info for each document
+        detailed_documents = []
+        for doc_name in documents_data.get("all", []):
+            doc_info = file_operations.get_document_info(
+                current_app.config, user_id, doc_name
+            )
+            if doc_info:
+                detailed_documents.append({
+                    "name": doc_info.get("name"),
+                    "is_completed": doc_info.get("is_completed", False),
+                    "total_png_count": doc_info.get("total_png_count", 0),
+                    "crop_count": doc_info.get("crop_count", 0),
+                    "pdf_files": doc_info.get("pdf_files", []),
+                    "status": "Completed" if doc_info.get("is_completed") else "In Progress",
+                    "creation_date": doc_info.get("creation_date", "")
+                })
+        
+        return jsonify({
+            "success": True,
+            "documents": detailed_documents,
+            "message": f"Found {len(detailed_documents)} documents"
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting documents for user {user_id}: {str(e)}")
+        return jsonify({
+            "success": False,
+            "documents": [],
+            "message": f"Error: {str(e)}"
+        }), 500
+
+
+@app.route("/api/process_crop", methods=["POST"])
+def api_process_crop():
+    """
+    AJAX endpoint to process cropped image without page reload.
+    Returns JSON data with success/error information.
+    """
+    try:
+        # Get form data
+        original_folder = request.form.get("original_folder")
+        original_filename = request.form.get("original_filename")
+        cropped_image_data_url = request.form.get("cropped_image_data")
+
+        if not all([original_folder, original_filename, cropped_image_data_url]):
+            return jsonify({
+                "success": False,
+                "message": "Missing required crop parameters"
+            }), 400
+
+        user_id = str(session.get("user_id", "anonymous"))
+        original_page_filename_base = os.path.splitext(original_filename)[0]
+
+        # Save cropped image
+        success, new_crop_filename_or_error = file_operations.save_cropped_page_image(
+            current_app.config,
+            user_id,
+            original_folder,
+            original_page_filename_base,
+            cropped_image_data_url,
+        )
+
+        if success:
+            current_app.logger.info(
+                f"Saved cropped image as {new_crop_filename_or_error} in {original_folder}/PNG"
+            )
+            
+            # Get the URL for the new crop image
+            crop_image_url = url_for('app.serve_document_png_file', 
+                                   user_id=user_id, 
+                                   document_folder_name=original_folder,
+                                   image_filename=new_crop_filename_or_error)
+            
+            return jsonify({
+                "success": True,
+                "message": f"Successfully saved cropped image as {new_crop_filename_or_error}",
+                "crop_filename": new_crop_filename_or_error,
+                "crop_url": crop_image_url,
+                "crop_display_name": new_crop_filename_or_error.replace('_crop_', ' Crop ').replace('.png', '')
+            })
+        else:
+            current_app.logger.error(
+                f"Error saving cropped image: {new_crop_filename_or_error}"
+            )
+            return jsonify({
+                "success": False,
+                "message": f"Error saving cropped image: {new_crop_filename_or_error}"
+            }), 500
+
+    except Exception as e:
+        current_app.logger.error(f"Error processing crop: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": f"Error: {str(e)}"
+        }), 500
+
+
 @app.route("/mark_editing_completed", methods=["POST"])  # Renamed for clarity
 def mark_editing_completed():
     document_folder_name = request.form.get(

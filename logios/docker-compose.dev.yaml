@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  flaskui:
+    environment:
+      - FLASK_CONFIG=development
+      - FLASK_DEBUG=true
+      - FLASK_ENV=development
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./my-flask-app:/app
+      - /app/__pycache__
+    command: python run.py
+    
+  streamlitsrv:
+    volumes:
+      - ./streamlitsrv:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+      
+  doclayout:
+    volumes:
+      - ./dlayout:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+      
+  ocr:
+    volumes:
+      - ./ocr:/app
+    environment:
+      - PYTHONUNBUFFERED=1
