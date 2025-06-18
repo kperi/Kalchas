@@ -5,21 +5,121 @@
 {% block content %}
 <div class="gradio-component-group" style="max-width: 700px; margin-left: auto; margin-right: auto;">
     <h1>Upload New Document</h1>
-    <form action="{{ url_for('app.show_upload_page') }}" method="post" enctype="multipart/form-data">
+    <form id="upload-form" action="{{ url_for('app.show_upload_page') }}" method="post" enctype="multipart/form-data">
         <div class="form-group" style="margin-bottom: 1rem;">
             <label for="file">Choose an Image or PDF file (Max 100MB):</label>
             <input type="file" name="file" id="file" accept="image/*,.pdf" required>
             <small class="form-text text-muted">Folder name will be automatically created based on the filename (max 20 characters, spaces replaced with underscores)</small>
         </div>
-        <button type="submit" class="gradio-button gradio-button-primary gradio-button-fullwidth">Upload Document</button>
+        <button type="submit" id="upload-btn" class="gradio-button gradio-button-primary gradio-button-fullwidth">Upload Document</button>
     </form>
 
+    <!-- Upload Progress Section -->
+    <div id="upload-progress-section" style="display: none; margin-top: 1.5rem;">
+        <div class="gradio-component-group">
+            <h3 id="progress-title">Processing Document...</h3>
+            <div id="progress-status" style="margin-bottom: 1rem; color: #6b7280;">
+                <span id="current-step">Uploading file...</span>
+            </div>
+            
+            <!-- Upload Progress Bar -->
+            <div class="progress-container" style="margin-bottom: 1rem;">
+                <label for="upload-progress" style="font-size: 0.9em; color: #374151; margin-bottom: 0.5rem; display: block;">File Upload Progress</label>
+                <div class="progress-bar-wrapper">
+                    <div class="progress-bar" id="upload-progress-bar" style="width: 0%;"></div>
+                    <span class="progress-text" id="upload-progress-text">0%</span>
+                </div>
+            </div>
+            
+            <!-- PDF Conversion Progress Bar (for PDFs only) -->
+            <div id="conversion-progress-container" style="display: none; margin-bottom: 1rem;">
+                <label for="conversion-progress" style="font-size: 0.9em; color: #374151; margin-bottom: 0.5rem; display: block;">PDF Page Extraction Progress</label>
+                <div class="progress-bar-wrapper">
+                    <div class="progress-bar" id="conversion-progress-bar" style="width: 0%;"></div>
+                    <span class="progress-text" id="conversion-progress-text">0 / 0 pages</span>
+                </div>
+            </div>
+            
+            <!-- Progress Messages -->
+            <div id="progress-messages" style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 0.75rem; max-height: 150px; overflow-y: auto;">
+                <div class="progress-message">📤 Ready to upload...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Preview Area -->
     <div id="preview-area" class="gradio-display-area" style="margin-top: 1.5rem;">
         <p class="gradio-placeholder-text">File preview will appear here once selected.</p>
         <img src="#" alt="Image Preview" id="uploaded-image-preview" style="display: none;">
         <iframe src="#" style="display: none; width:100%; height:400px;" id="uploaded-pdf-preview"></iframe>
     </div>
 </div>
+
+<style>
+.progress-container {
+    width: 100%;
+}
+
+.progress-bar-wrapper {
+    position: relative;
+    width: 100%;
+    height: 24px;
+    background-color: #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+    border-radius: 12px;
+    transition: width 0.3s ease;
+    position: relative;
+}
+
+.progress-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #1f2937;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+    z-index: 10;
+}
+
+.progress-message {
+    font-size: 0.875rem;
+    color: #374151;
+    margin-bottom: 0.5rem;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.progress-message:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.progress-message.success {
+    color: #065f46;
+}
+
+.progress-message.error {
+    color: #dc2626;
+}
+
+.progress-message.info {
+    color: #1e40af;
+}
+
+#upload-form.uploading #upload-btn {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+</style>
 {% endblock %}
 
 {% block scripts_extra %}
@@ -29,8 +129,22 @@
         const previewImage = document.getElementById('uploaded-image-preview');
         const previewPdf = document.getElementById('uploaded-pdf-preview');
         const previewArea = document.getElementById('preview-area');
+        const uploadForm = document.getElementById('upload-form');
+        const uploadBtn = document.getElementById('upload-btn');
+        const progressSection = document.getElementById('upload-progress-section');
         let previewAreaTextNode = previewArea.querySelector('.gradio-placeholder-text');
+        let currentUploadId = null;
 
+        // Progress tracking elements
+        const uploadProgressBar = document.getElementById('upload-progress-bar');
+        const uploadProgressText = document.getElementById('upload-progress-text');
+        const conversionProgressContainer = document.getElementById('conversion-progress-container');
+        const conversionProgressBar = document.getElementById('conversion-progress-bar');
+        const conversionProgressText = document.getElementById('conversion-progress-text');
+        const progressMessages = document.getElementById('progress-messages');
+        const currentStep = document.getElementById('current-step');
+
+        // File preview functionality
         if (fileInput) {
             fileInput.addEventListener('change', function() {
                 const file = this.files[0];
@@ -48,7 +162,6 @@
                 }
                 previewAreaTextNode.textContent = 'File preview will appear here once selected.';
                 previewAreaTextNode.style.display = 'block';
-
 
                 if (file) {
                     const fileURL = URL.createObjectURL(file);
@@ -69,7 +182,195 @@
                 }
             });
         }
-    });
 
+        // Upload form handling with progress tracking
+        uploadForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a file to upload.');
+                return;
+            }
+
+            // Start upload process
+            startUpload(formData, file);
+        });
+
+        function startUpload(formData, file) {
+            // Show progress section
+            progressSection.style.display = 'block';
+            uploadForm.classList.add('uploading');
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading...';
+
+            // Reset progress
+            updateUploadProgress(0);
+            addProgressMessage('📤 Starting upload...', 'info');
+            currentStep.textContent = 'Uploading file...';
+
+            // Show conversion progress bar if PDF
+            if (file.type === 'application/pdf') {
+                conversionProgressContainer.style.display = 'block';
+                updateConversionProgress(0, 0, 0);
+            } else {
+                conversionProgressContainer.style.display = 'none';
+            }
+
+            // Create XMLHttpRequest for upload progress tracking
+            const xhr = new XMLHttpRequest();
+
+            // Track upload progress
+            xhr.upload.addEventListener('progress', function(e) {
+                if (e.lengthComputable) {
+                    const percentComplete = (e.loaded / e.total) * 100;
+                    updateUploadProgress(percentComplete);
+                    if (percentComplete < 100) {
+                        addProgressMessage(`📤 Uploading: ${Math.round(percentComplete)}%`, 'info');
+                    }
+                }
+            });
+
+            // Handle upload completion
+            xhr.addEventListener('load', function() {
+                if (xhr.status === 200) {
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        if (response.success) {
+                            updateUploadProgress(100);
+                            addProgressMessage('✅ Upload completed successfully!', 'success');
+                            
+                            if (response.upload_id) {
+                                currentUploadId = response.upload_id;
+                                
+                                if (file.type === 'application/pdf') {
+                                    currentStep.textContent = 'Converting PDF to images...';
+                                    addProgressMessage('🔄 Starting PDF page extraction...', 'info');
+                                    startProgressPolling(response.upload_id);
+                                } else {
+                                    // For images, we're done
+                                    finishUpload(response.document_folder);
+                                }
+                            } else {
+                                // Fallback - redirect immediately
+                                setTimeout(() => {
+                                    window.location.href = response.redirect_url || '/crop_image';
+                                }, 1000);
+                            }
+                        } else {
+                            addProgressMessage('❌ Upload failed: ' + response.message, 'error');
+                            resetForm();
+                        }
+                    } catch (e) {
+                        addProgressMessage('❌ Upload failed: Invalid response', 'error');
+                        resetForm();
+                    }
+                } else {
+                    addProgressMessage('❌ Upload failed: Server error', 'error');
+                    resetForm();
+                }
+            });
+
+            // Handle upload errors
+            xhr.addEventListener('error', function() {
+                addProgressMessage('❌ Upload failed: Network error', 'error');
+                resetForm();
+            });
+
+            // Send the request
+            xhr.open('POST', '{{ url_for("app.api_upload_with_progress") }}', true);
+            xhr.send(formData);
+        }
+
+        function startProgressPolling(uploadId) {
+            const pollInterval = setInterval(() => {
+                fetch(`/api/upload_progress/${uploadId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            const progress = data.progress;
+                            
+                            // Update conversion progress
+                            if (progress.total_pages > 0) {
+                                const conversionPercent = (progress.converted_pages / progress.total_pages) * 100;
+                                updateConversionProgress(conversionPercent, progress.converted_pages, progress.total_pages);
+                            }
+
+                            // Add progress messages
+                            if (progress.current_message && progress.current_message !== lastMessage) {
+                                addProgressMessage(progress.current_message, 'info');
+                                lastMessage = progress.current_message;
+                            }
+
+                            // Check if completed
+                            if (progress.status === 'completed') {
+                                clearInterval(pollInterval);
+                                addProgressMessage('✅ PDF conversion completed!', 'success');
+                                finishUpload(progress.document_folder);
+                            } else if (progress.status === 'failed') {
+                                clearInterval(pollInterval);
+                                addProgressMessage('❌ PDF conversion failed: ' + progress.error_message, 'error');
+                                resetForm();
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Progress polling error:', error);
+                        // Don't stop polling on network errors, just log them
+                    });
+            }, 1000); // Poll every second
+
+            // Timeout after 5 minutes
+            setTimeout(() => {
+                clearInterval(pollInterval);
+                if (currentUploadId === uploadId) {
+                    addProgressMessage('⏰ Upload timeout - please check if processing completed', 'error');
+                }
+            }, 300000);
+        }
+
+        function updateUploadProgress(percent) {
+            uploadProgressBar.style.width = percent + '%';
+            uploadProgressText.textContent = Math.round(percent) + '%';
+        }
+
+        function updateConversionProgress(percent, converted, total) {
+            conversionProgressBar.style.width = percent + '%';
+            conversionProgressText.textContent = `${converted} / ${total} pages`;
+        }
+
+        let lastMessage = '';
+        function addProgressMessage(message, type = '') {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'progress-message' + (type ? ' ' + type : '');
+            messageDiv.textContent = message;
+            progressMessages.appendChild(messageDiv);
+            progressMessages.scrollTop = progressMessages.scrollHeight;
+        }
+
+        function finishUpload(documentFolder) {
+            currentStep.textContent = 'Processing completed!';
+            addProgressMessage('🎉 Upload and processing completed successfully!', 'success');
+            
+            // Wait a moment, then redirect
+            setTimeout(() => {
+                window.location.href = `/crop_image?selected_folder=${documentFolder}`;
+            }, 2000);
+        }
+
+        function resetForm() {
+            uploadForm.classList.remove('uploading');
+            uploadBtn.disabled = false;
+            uploadBtn.textContent = 'Upload Document';
+            currentUploadId = null;
+            
+            // Hide progress section after a delay
+            setTimeout(() => {
+                progressSection.style.display = 'none';
+            }, 5000);
+        }
+    });
 </script>
 {% endblock %}

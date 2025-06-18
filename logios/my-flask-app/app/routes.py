@@ -1684,6 +1684,332 @@ def api_admin_get_uploaded_file(file_id):
         }), 500
 
 
+# Global dictionary to store upload progress (in production, use Redis or database)
+upload_progress_store = {}
+
+def cleanup_old_progress_entries():
+    """
+    Cleanup old progress entries to prevent memory leaks.
+    Removes entries older than 1 hour.
+    """
+    import time
+    current_time = time.time()
+    keys_to_remove = []
+    
+    for upload_id, progress_data in upload_progress_store.items():
+        # Add timestamp if not present
+        if 'timestamp' not in progress_data:
+            progress_data['timestamp'] = current_time
+        
+        # Remove entries older than 1 hour
+        if current_time - progress_data.get('timestamp', current_time) > 3600:
+            keys_to_remove.append(upload_id)
+    
+    for key in keys_to_remove:
+        del upload_progress_store[key]
+
+# Schedule cleanup every 30 minutes (in production, use a proper scheduler)
+import threading
+import time
+
+def periodic_cleanup():
+    while True:
+        time.sleep(1800)  # 30 minutes
+        cleanup_old_progress_entries()
+
+cleanup_thread = threading.Thread(target=periodic_cleanup, daemon=True)
+cleanup_thread.start()
+
+@app.route("/api/upload_with_progress", methods=["POST"])
+@login_required
+def api_upload_with_progress():
+    """
+    AJAX endpoint for file upload with progress tracking.
+    Returns JSON response with upload_id for progress polling.
+    """
+    import uuid
+    import threading
+    
+    try:
+        if "file" not in request.files:
+            return jsonify({"success": False, "message": "No file part in the request"}), 400
+
+        uploaded_file_storage = request.files["file"]
+        if uploaded_file_storage.filename == "":
+            return jsonify({"success": False, "message": "No selected file"}), 400
+
+        if not (uploaded_file_storage and allowed_file(uploaded_file_storage.filename)):
+            return jsonify({"success": False, "message": "File type not allowed"}), 400
+
+        # Generate unique upload ID
+        upload_id = str(uuid.uuid4())
+        
+        # Initialize progress tracking
+        import time
+        upload_progress_store[upload_id] = {
+            "status": "uploading",
+            "total_pages": 0,
+            "converted_pages": 0,
+            "current_message": "File uploaded, starting processing...",
+            "document_folder": None,
+            "error_message": None,
+            "user_id": current_user.get_user_folder_name(),
+            "filename": uploaded_file_storage.filename,
+            "timestamp": time.time()
+        }
+
+        # Start upload processing in background thread
+        thread = threading.Thread(
+            target=process_upload_with_progress,
+            args=(upload_id, uploaded_file_storage, current_user, current_app.config)
+        )
+        thread.daemon = True
+        thread.start()
+
+        return jsonify({
+            "success": True,
+            "upload_id": upload_id,
+            "message": "Upload started, processing in background"
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Error starting upload: {str(e)}", exc_info=True)
+        return jsonify({
+            "success": False,
+            "message": f"Error starting upload: {str(e)}"
+        }), 500
+
+
+@app.route("/api/upload_progress/<upload_id>", methods=["GET"])
+@login_required
+def api_get_upload_progress(upload_id):
+    """
+    API endpoint to get upload progress information.
+    Returns JSON data with current progress status.
+    """
+    try:
+        if upload_id not in upload_progress_store:
+            return jsonify({
+                "success": False,
+                "message": "Upload ID not found"
+            }), 404
+
+        progress_data = upload_progress_store[upload_id]
+        
+        # Check if this upload belongs to the current user
+        if progress_data.get("user_id") != current_user.get_user_folder_name():
+            return jsonify({
+                "success": False,
+                "message": "Access denied"
+            }), 403
+
+        return jsonify({
+            "success": True,
+            "progress": progress_data
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Error getting upload progress: {str(e)}", exc_info=True)
+        return jsonify({
+            "success": False,
+            "message": f"Error getting progress: {str(e)}"
+        }), 500
+
+
+def process_upload_with_progress(upload_id, uploaded_file_storage, user, app_config):
+    """
+    Background function to process file upload with progress tracking.
+    Updates progress in upload_progress_store.
+    """
+    from app.models import UploadedFile, db
+    from app import create_app
+    import mimetypes
+    
+    # Create app context for background thread
+    app = create_app()
+    
+    with app.app_context():
+        try:
+            # Get progress tracker
+            progress = upload_progress_store[upload_id]
+            
+            user_id = user.get_user_folder_name()
+            original_filename = uploaded_file_storage.filename
+            
+            progress["current_message"] = "Creating document folder..."
+
+            # Handle PDF Upload and Folder Creation
+            doc_folder_path, saved_pdf_path, doc_folder_name = (
+                file_operations.handle_pdf_upload_with_auto_folder_no_sanitize(
+                    app_config, user_id, uploaded_file_storage
+                )
+            )
+
+            if not doc_folder_path:
+                progress["status"] = "failed"
+                progress["error_message"] = "Error saving uploaded file or creating document folder"
+                return
+
+            progress["document_folder"] = doc_folder_name
+            progress["current_message"] = f"File saved to document folder: {doc_folder_name}"
+
+            # Get file information for database
+            file_size = os.path.getsize(saved_pdf_path)
+            file_type = "pdf" if original_filename.lower().endswith(".pdf") else "image"
+            mime_type, _ = mimetypes.guess_type(original_filename)
+            stored_filename = os.path.basename(saved_pdf_path)
+            relative_file_path = os.path.relpath(saved_pdf_path, app_config["UPLOAD_FOLDER"])
+
+            # Create database record for uploaded file
+            try:
+                uploaded_file_record = UploadedFile(
+                    user_id=user.id,
+                    original_filename=original_filename,
+                    stored_filename=stored_filename,
+                    file_type=file_type,
+                    file_size=file_size,
+                    mime_type=mime_type,
+                    document_folder=doc_folder_name,
+                    file_path=relative_file_path,
+                    processing_status='uploaded'
+                )
+                db.session.add(uploaded_file_record)
+                db.session.commit()
+                progress["current_message"] = "Database record created"
+            except Exception as e:
+                app.logger.error(f"Error creating database record: {e}")
+                progress["current_message"] = "File uploaded but database record creation failed"
+
+            # PDF to PNG Conversion (if it's a PDF)
+            if original_filename.lower().endswith(".pdf"):
+                progress["current_message"] = "Starting PDF page extraction..."
+                
+                # Update processing status
+                try:
+                    uploaded_file_record.update_processing_status('processing')
+                except:
+                    pass
+                
+                # Custom PDF conversion with progress tracking
+                success_conversion, png_paths_or_message = convert_pdf_with_progress_tracking(
+                    app_config, user_id, doc_folder_name, saved_pdf_path, upload_id
+                )
+                
+                if success_conversion:
+                    app.logger.info(f"Successfully converted PDF to {len(png_paths_or_message)} PNGs")
+                    
+                    # Update processing status and page count
+                    try:
+                        uploaded_file_record.update_processing_status('completed')
+                        uploaded_file_record.page_count = len(png_paths_or_message)
+                        db.session.commit()
+                    except:
+                        pass
+                    
+                    progress["status"] = "completed"
+                    progress["current_message"] = f"PDF conversion completed! Created {len(png_paths_or_message)} images"
+                else:
+                    app.logger.error(f"Error converting PDF: {png_paths_or_message}")
+                    
+                    # Update processing status to failed
+                    try:
+                        uploaded_file_record.update_processing_status('failed')
+                    except:
+                        pass
+                    
+                    progress["status"] = "failed"
+                    progress["error_message"] = f"PDF conversion failed: {png_paths_or_message}"
+            else:
+                # For images, mark as completed immediately
+                try:
+                    uploaded_file_record.update_processing_status('completed')
+                except:
+                    pass
+                    
+                progress["status"] = "completed"
+                progress["current_message"] = "Image upload completed successfully"
+
+        except Exception as e:
+            app.logger.error(f"Error in background upload processing: {str(e)}", exc_info=True)
+            progress["status"] = "failed"
+            progress["error_message"] = str(e)
+
+
+def convert_pdf_with_progress_tracking(app_config, user_id, document_folder_name, pdf_file_path, upload_id):
+    """
+    Custom PDF conversion function with progress tracking.
+    Updates progress in upload_progress_store during conversion.
+    """
+    try:
+        from pdf2image import convert_from_path
+        import tempfile
+        
+        progress = upload_progress_store[upload_id]
+        
+        # Get the PNG directory for the document
+        png_output_dir = file_operations.get_document_png_dir(app_config, user_id, document_folder_name)
+        
+        progress["current_message"] = "Analyzing PDF structure..."
+        
+        # First, get total page count
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                # Convert first page to get total count
+                test_images = convert_from_path(pdf_file_path, first_page=1, last_page=1)
+                
+                # Get total page count using pdf2image's internal method
+                from pdf2image.pdf2image import pdfinfo_from_path
+                info = pdfinfo_from_path(pdf_file_path)
+                total_pages = info.get("Pages", 1)
+                
+                progress["total_pages"] = total_pages
+                progress["current_message"] = f"Found {total_pages} pages to convert"
+                
+            except Exception as e:
+                # Fallback: convert all at once if we can't get page count
+                total_pages = 1
+                progress["total_pages"] = total_pages
+        
+        # Convert pages one by one for progress tracking
+        converted_files = []
+        
+        for page_num in range(1, total_pages + 1):
+            try:
+                progress["current_message"] = f"Converting page {page_num} of {total_pages}..."
+                
+                # Convert single page
+                images = convert_from_path(
+                    pdf_file_path,
+                    first_page=page_num,
+                    last_page=page_num,
+                    dpi=200,
+                    fmt='PNG'
+                )
+                
+                if images:
+                    # Save the page image
+                    page_filename = f"{page_num:03d}.png"
+                    page_path = os.path.join(png_output_dir, page_filename)
+                    images[0].save(page_path, "PNG")
+                    converted_files.append(page_path)
+                    
+                    # Update progress
+                    progress["converted_pages"] = page_num
+                    progress["current_message"] = f"Converted page {page_num} of {total_pages}"
+                
+            except Exception as e:
+                current_app.logger.error(f"Error converting page {page_num}: {str(e)}")
+                return False, f"Error converting page {page_num}: {str(e)}"
+        
+        return True, converted_files
+        
+    except ImportError:
+        return False, "pdf2image library not available"
+    except Exception as e:
+        current_app.logger.error(f"Error in PDF conversion with progress: {str(e)}")
+        return False, str(e)
+
+
 @app.route("/mark_editing_completed", methods=["POST"])  # Renamed for clarity
 def mark_editing_completed():
     document_folder_name = request.form.get(
