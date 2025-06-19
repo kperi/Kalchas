@@ -13,16 +13,13 @@ from flask import (
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
-# pdf2image and shutil are no longer directly used here, they are in file_operations
 import os
 import re  # Still used in process_ocr for data from OCR service
-
-# from collections import defaultdict # No longer used directly here
 import requests
+import shutil
 
 from loguru import logger
 from collections import defaultdict
-import shutil
 
 from . import file_operations
 
@@ -318,33 +315,6 @@ def image_preview():
     )
 
 
-@app.route("/documents_dashboard")
-def documents_dashboard():
-    """
-    New route to show all documents with their status and details.
-    """
-    user_id = current_user.get_user_folder_name()
-
-    # Get all documents
-    documents_data = file_operations.get_user_documents_list(
-        current_app.config, user_id, include_completed=True, include_in_progress=True
-    )
-
-    # Get detailed info for each document
-    documents_with_info = []
-    for doc_name in documents_data["all"]:
-        doc_info = file_operations.get_document_info(
-            current_app.config, user_id, doc_name
-        )
-        documents_with_info.append(doc_info)
-
-    return render_template(
-        "documents_dashboard.html",
-        documents=documents_with_info,
-        completed_count=len(documents_data["completed"]),
-        in_progress_count=len(documents_data["in_progress"]),
-        total_count=len(documents_data["all"]),
-    )
 
 
 @app.route(
@@ -605,37 +575,6 @@ def admin():
     )
 
 
-@app.route("/fs-check")
-def fs_check():
-    """Diagnostic endpoint to check file system"""
-    upload_dir = current_app.config["UPLOAD_FOLDER"]
-    results = []
-
-    # Check if upload dir exists
-    results.append(f"Upload dir ({upload_dir}) exists: {os.path.exists(upload_dir)}")
-
-    # List upload dir contents
-    if os.path.exists(upload_dir):
-        results.append(f"Upload dir contents: {os.listdir(upload_dir)}")
-
-        # Check anonymous dir
-        anon_dir = os.path.join(upload_dir, "anonymous")
-        results.append(f"Anonymous dir ({anon_dir}) exists: {os.path.exists(anon_dir)}")
-
-        if os.path.exists(anon_dir):
-            results.append(f"Anonymous dir contents: {os.listdir(anon_dir)}")
-
-            # Try to find the boarding pass dir
-            boarding_dirs = [d for d in os.listdir(anon_dir) if "boarding" in d.lower()]
-            results.append(f"Found boarding dirs: {boarding_dirs}")
-
-            # List boarding dir contents if found
-            for bd in boarding_dirs:
-                bd_path = os.path.join(anon_dir, bd)
-                if os.path.exists(bd_path):
-                    results.append(f"Dir {bd_path} contents: {os.listdir(bd_path)}")
-
-    return "<br>".join(results), 200, {"Content-Type": "text/html"}
 
 
 @app.route("/process_cropped_image", methods=["POST"])
@@ -2060,37 +1999,6 @@ def api_move_to_ocr():
         }), 500
 
 
-@app.route("/mark_editing_completed", methods=["POST"])  # Renamed for clarity
-def mark_editing_completed():
-    document_folder_name = request.form.get(
-        "document_folder_name"
-    )  # The base folder like 'mydoc' or 'mydoc_X'
-
-    if not document_folder_name:
-        flash("No document folder specified for completion.", "danger")
-        # Redirect to a relevant page, perhaps the document listing or crop_menu
-        return redirect(url_for("app.crop_image"))
-
-    user_id = current_user.get_user_folder_name()
-
-    # Task 4: Mark Editing as Completed
-    # This moves content from /<user_id>/<document_folder_name>/ into /<user_id>/<document_folder_name>/TOOCR/
-    success, message = file_operations.mark_document_editing_completed(
-        current_app.config, user_id, document_folder_name
-    )
-
-    if success:
-        current_app.logger.info(message)
-        flash(message, "success")
-        # Redirect to image_preview for the now "completed" folder
-        return redirect(
-            url_for("app.image_preview", selected_folder=document_folder_name)
-        )
-    else:
-        current_app.logger.error(message)
-        flash(message, "danger")
-        # Redirect back to where the action was initiated, e.g., crop_menu
-        return redirect(url_for("app.crop_image", selected_folder=document_folder_name))
 
 
 # General file serving from the root of a document folder (e.g., the PDF before completion)
