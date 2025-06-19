@@ -1,12 +1,38 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document Preview & OCR - Logios App</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
-    <style>
+{% extends 'layout.html' %}
+
+{% block title %}Document Preview & OCR - Logios App{% endblock %}
+
+{% block head_extra %}
+<style>
+        /* Loading animations and smooth transitions */
+        .fade-in {
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+        .fade-in.show {
+            opacity: 1;
+        }
+        
+        .smooth-transition {
+            transition: all 0.3s ease-in-out;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 5px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
         .loading-dots::after {
             content: ' .';
             animation: dots 1s steps(5, end) infinite;
@@ -18,38 +44,171 @@
             60% { text-shadow: .25em 0 0 inherit, .5em 0 0 rgba(0,0,0,0); }
             80%, 100% { text-shadow: .25em 0 0 inherit, .5em 0 0 inherit; }
         }
-    </style>
-</head>
-<body>
-    {% extends "layout.html" %}
 
-    {% block title %}Document Preview & OCR - Logios App{% endblock %}
+        /* Sidebar Layout Styles - copied from crop_menu.html */
+        .page-layout {
+            display: flex;
+            min-height: 100vh;
+            gap: 0;
+        }
+        
+        .sidebar {
+            width: 300px;
+            background-color: #f8fafc;
+            border-right: 1px solid #e2e8f0;
+            padding: 1rem;
+            overflow-y: auto;
+            max-height: 100vh;
+            flex-shrink: 0;
+        }
+        
+        .main-content {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+        }
+        
+        .sidebar-section {
+            margin-bottom: 1.5rem;
+        }
+        
+        .sidebar-section h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 0.75rem;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 0.5rem;
+        }
+        
+        .document-item {
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            background-color: #ffffff;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .document-item:hover {
+            background-color: #f1f5f9;
+            border-color: #cbd5e1;
+            transform: translateX(2px);
+        }
+        
+        .document-item.selected {
+            background-color: #e0f2fe;
+            border-color: #0ea5e9;
+            border-left: 4px solid #0ea5e9;
+        }
+        
+        .document-name {
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 0.25rem;
+        }
+        
+        .document-meta {
+            font-size: 0.75rem;
+            color: #6b7280;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .document-status {
+            padding: 0.125rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.625rem;
+            font-weight: 500;
+            background-color: #dcfce7;
+            color: #166534;
+        }
+        
+        .sidebar-loading {
+            text-align: center;
+            padding: 1rem;
+            color: #6b7280;
+        }
 
-    {% block content %}
-    <div class="gradio-two-column-layout">
-        <aside class="gradio-sidebar">
-            <div class="gradio-component-group">
+        /* Responsive behavior */
+        @media (max-width: 768px) {
+            .page-layout {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                max-height: 300px;
+                border-right: none;
+                border-bottom: 1px solid #e2e8f0;
+            }
+        }
+</style>
+{% endblock %}
+
+{% block content %}
+    <div class="page-layout">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <h3>User Workspace</h3>
+                <p style="font-family: monospace; background-color: #ffffff; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; margin: 0; word-break: break-all; font-size: 0.75rem;">
+                    User: {{ session.get('user_id', 'anonymous') }}
+                </p>
+            </div>
+            
+            <div class="sidebar-section">
                 <h3>OCR-Ready Documents</h3>
-                <form method="get" action="{{ url_for('app.image_preview') }}" id="folder-form">
-                    <div style="margin-bottom: 1rem;">
-                        <label for="folder-select">Select Document:</label>
-                        <select name="selected_folder" id="folder-select" onchange="document.getElementById('folder-form').submit()">
-                            <option value="">-- Select OCR-Ready Document --</option>
-                            {% for folder in folders %}
-                                <option value="{{ folder }}" {% if folder == selected_folder %}selected{% endif %}>{{ folder }}</option>
-                            {% endfor %}
-                        </select>
+                
+                <div id="sidebar-documents-container">
+                    <div id="sidebar-loading" class="sidebar-loading" style="display: none;">
+                        <span class="loading-spinner"></span>
+                        <div>Loading documents...</div>
                     </div>
-                    <noscript><button type="submit" class="gradio-button gradio-button-secondary">View Document</button></noscript>
-                </form>
+                    <div id="sidebar-documents-list">
+                        {% if folders %}
+                            {% for folder in folders %}
+                                <div class="document-item {% if folder == selected_folder %}selected{% endif %}" 
+                                     data-document-name="{{ folder }}">
+                                    <div class="document-name">{{ folder }}</div>
+                                    <div class="document-meta">
+                                        <span>OCR Ready</span>
+                                        <span class="document-status">Completed</span>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div style="text-align: center; padding: 1rem; color: #666; font-size: 0.875rem;">
+                                <p>No OCR-ready documents found.</p>
+                                <p style="margin-top: 0.5rem; font-size: 0.8em;">Documents become OCR-ready after using the "Move to OCR" button in the Image Cropping Tool.</p>
+                                <button onclick="navigateToEdit()" class="gradio-button gradio-button-primary" style="display: inline-block; margin-top: 0.5rem; font-size: 0.75rem; padding: 0.5rem 0.75rem; border: none; cursor: pointer;">Go to Image Cropping Tool</button>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="gradio-component-group" style="max-width: 1200px; margin-left: auto; margin-right: auto;">
+                <h1>OCR Document Preview</h1>
 
-                {% if selected_folder and png_files %}
-                <form method="get" action="{{ url_for('app.image_preview') }}" id="file-form">
-                    <input type="hidden" name="selected_folder" value="{{ selected_folder }}">
-                    <div style="margin-bottom: 1rem;">
-                        <label for="png-select">Select Page/Crop:</label>
-                        <select name="selected_png" id="png-select" onchange="document.getElementById('file-form').submit()">
-                            <option value="">-- Select Page --</option>
+            {% if folders %}
+            <div class="gradio-component-group" style="background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
+                <div style="margin-bottom: 1rem;">
+                    <div id="selected-document-info" style="display: none;">
+                        <h3 style="margin-top: 0; color: #1f2937;">Selected Document: <span id="current-document-name">{{ selected_folder or '' }}</span></h3>
+                    </div>
+                </div>
+                
+                <div id="page-selection-container" class="fade-in smooth-transition" style="margin-bottom: 1rem; display: none;">
+                    <label for="png-select">Select Page/Crop:</label>
+                    <select name="selected_png" id="png-select">
+                        <option value="">-- Select Page --</option>
+                        {% if png_files %}
                             {% for png in png_files %}
                                 <option value="{{ png }}" {% if png == request.args.get('selected_png') %}selected{% endif %}>
                                     {% if 'crop' in png %}
@@ -59,46 +218,23 @@
                                     {% endif %}
                                 </option>
                             {% endfor %}
-                        </select>
-                    </div>
-                    <noscript><button type="submit" class="gradio-button gradio-button-secondary">Show Page</button></noscript>
-                </form>
+                        {% endif %}
+                    </select>
+                </div>
+            </div>
+            {% endif %}
 
+            <!-- Dynamic content area for selected document -->
+            <div id="document-display-container" class="fade-in smooth-transition">
                 {% if selected_folder and request.args.get('selected_png') %}
-                <form id="segment-form" onsubmit="return false;">
-                    <input type="hidden" name="selected_folder" value="{{ selected_folder }}">
-                    <input type="hidden" name="selected_png" value="{{ request.args.get('selected_png') }}">
-                    <div style="margin-top: 1rem;">
-                        <label for="segment-select">Select Detected Segment:</label>
-                        <select name="selected_segment" id="segment-select">
-                            <option value="">-- Select Segment --</option>
-                            <!-- Segments will be populated in JavaScript -->
-                        </select>
-                        <div id="segment-loading" style="font-size: 0.8em; margin-top: 5px; color: #6c757d;">
-                            Run OCR to detect segments
-                        </div>
-                    </div>
-                </form>
-                {% endif %}
-
-                {% elif selected_folder %}
-                <p class="gradio-placeholder-text" style="font-size: 0.9em; margin-top: 1rem;">No pages found in the OCR folder.</p>
-                {% endif %}
-                
-                {% if folders|length == 0 %}
-                <div style="margin-top: 1rem; padding: 1rem; background-color: #fff3cd; border: 1px solid #ffeeba; border-radius: 5px;">
-                    <p style="margin: 0; color: #856404; font-size: 0.9em;">No OCR-ready documents found.</p>
-                    <p style="margin-top: 0.5rem; font-size: 0.8em;">Documents become OCR-ready after using the "Move to OCR" button in the Image Cropping Tool.</p>
-                    <a href="{{ url_for('app.crop_image') }}" class="gradio-button gradio-button-secondary" style="margin-top: 0.5rem; font-size: 0.8em;">Go to Image Cropping Tool</a>
+                <div id="debug-path-info" style="margin-bottom: 10px; padding: 5px; border: 1px solid #ddd; background-color: #f5f5f5;">
+                    <strong>Debug Info:</strong> 
+                    <span style="font-family: monospace; word-break: break-all;">
+                        Path: /uploads/{{session.get('user_id', 'anonymous')}}/{{selected_folder}}/TOOCR/PNG/{{request.args.get('selected_png')}}
+                    </span>
                 </div>
                 {% endif %}
-            </div>
-        </aside>
 
-        <main class="gradio-main-content">
-            <div class="gradio-component-group">
-                <h2>OCR Document Preview</h2>
-                
                 {% if selected_folder and request.args.get('selected_png') %}
                 <div class="gradio-display-area" style="flex-direction: column; align-items: stretch; gap: 1.5rem;">
                     <div class="gradio-display-area" style="min-height: 40vh; padding:0; border: none; background: #fff;"> <!-- Inner display for main page image -->
@@ -110,7 +246,25 @@
                              alt="Page Preview">
                     </div>
 
-                    <!-- MOVED BLOCK WILL GO HERE -->
+                    <!-- Segment Selection Form -->
+                    {% if selected_folder and request.args.get('selected_png') %}
+                    <div id="segment-selection-container" style="background-color: #f9fafb; padding: 1rem; border-radius: 6px;">
+                        <form id="segment-form" onsubmit="return false;">
+                            <input type="hidden" name="selected_folder" value="{{ selected_folder }}">
+                            <input type="hidden" name="selected_png" value="{{ request.args.get('selected_png') }}">
+                            <div style="margin-top: 1rem;">
+                                <label for="segment-select">Select Detected Segment:</label>
+                                <select name="selected_segment" id="segment-select">
+                                    <option value="">-- Select Segment --</option>
+                                    <!-- Segments will be populated in JavaScript -->
+                                </select>
+                                <div id="segment-loading" style="font-size: 0.8em; margin-top: 5px; color: #6c757d;">
+                                    Run OCR to detect segments
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    {% endif %}
 
                     <div class="ocr-section gradio-component-group" style="margin-top:0; padding: 1rem; background-color: #f9fafb;"> <!-- Nested component group for OCR -->
                         <h4>Text Recognition (OCR)</h4>
@@ -187,7 +341,7 @@
                 </div>
                 {% elif selected_folder %}
                 <div class="gradio-display-area">
-                    <p class="gradio-placeholder-text">Please select a page from the sidebar to preview and perform OCR.</p>
+                    <p class="gradio-placeholder-text">Please select a page to preview and perform OCR.</p>
                 </div>
                 {% else %}
                 <div class="gradio-display-area">
@@ -195,10 +349,217 @@
                 </div>
                 {% endif %}
             </div>
-        </main>
+        </div>
     </div>
 
-     <script>
+    <script>
+        // Document selection and navigation variables
+        const pngSelect = document.getElementById('png-select');
+        const selectedDocumentInfo = document.getElementById('selected-document-info');
+        const currentDocumentName = document.getElementById('current-document-name');
+        const pageSelectionContainer = document.getElementById('page-selection-container');
+        const documentDisplayContainer = document.getElementById('document-display-container');
+        
+        // Current state
+        let currentFolder = '{{ selected_folder or "" }}';
+        let currentPage = '{{ request.args.get("selected_png") or "" }}';
+        const userId = '{{ session.get("user_id", "anonymous") }}';
+        
+        // URL state management without page reloads
+        function updateBrowserURL(folder, page) {
+            const url = new URL(window.location);
+            if (folder) {
+                url.searchParams.set('selected_folder', folder);
+            } else {
+                url.searchParams.delete('selected_folder');
+            }
+            if (page) {
+                url.searchParams.set('selected_png', page);
+            } else {
+                url.searchParams.delete('selected_png');
+            }
+            
+            // Update URL without page reload
+            window.history.pushState({
+                folder: folder,
+                page: page
+            }, '', url.toString());
+        }
+        
+        // Handle browser back/forward navigation
+        window.addEventListener('popstate', function(event) {
+            if (event.state) {
+                const { folder, page } = event.state;
+                
+                if (folder !== currentFolder) {
+                    // Navigate to different folder
+                    if (folder) {
+                        selectDocument(folder);
+                    } else {
+                        // Clear selection
+                        currentFolder = '';
+                        currentPage = '';
+                        hidePageSelection();
+                        hideDocumentDisplay();
+                        if (selectedDocumentInfo) {
+                            selectedDocumentInfo.style.display = 'none';
+                        }
+                    }
+                }
+                
+                if (page !== currentPage && folder) {
+                    // Navigate to different page
+                    if (page) {
+                        pngSelect.value = page;
+                        loadPage(folder, page);
+                    }
+                }
+            }
+        });
+
+        // Sidebar document selection handler
+        function setupSidebarDocumentSelection() {
+            const documentItems = document.querySelectorAll('.document-item');
+            documentItems.forEach(item => {
+                item.addEventListener('click', function(e) {
+                    const documentName = this.getAttribute('data-document-name');
+                    if (documentName && documentName !== currentFolder) {
+                        selectDocument(documentName);
+                    }
+                });
+            });
+        }
+        
+        // Function to select a document
+        function selectDocument(documentName) {
+            // Update current state
+            currentFolder = documentName;
+            currentPage = '';
+            
+            // Update browser URL
+            updateBrowserURL(documentName, '');
+            
+            // Update sidebar selection
+            document.querySelectorAll('.document-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            const selectedItem = document.querySelector(`[data-document-name="${documentName}"]`);
+            if (selectedItem) {
+                selectedItem.classList.add('selected');
+            }
+            
+            // Update main content
+            if (currentDocumentName) {
+                currentDocumentName.textContent = documentName;
+            }
+            if (selectedDocumentInfo) {
+                selectedDocumentInfo.style.display = 'block';
+            }
+            
+            // Load document pages
+            loadDocumentPages(documentName);
+        }
+        
+        // Page selection handler
+        if (pngSelect) {
+            pngSelect.addEventListener('change', function() {
+                const selectedPage = this.value;
+                currentPage = selectedPage;
+                
+                // Update browser URL
+                updateBrowserURL(currentFolder, selectedPage);
+                
+                if (selectedPage && currentFolder) {
+                    loadPage(currentFolder, selectedPage);
+                } else {
+                    hideDocumentDisplay();
+                }
+            });
+        }
+
+        // AJAX function to load document pages
+        function loadDocumentPages(documentName) {
+            // For now, this will use the existing form submission approach
+            // In the future, this could be converted to AJAX like in crop_menu.html
+            if (selectedDocumentInfo) {
+                selectedDocumentInfo.style.display = 'block';
+            }
+            if (pageSelectionContainer) {
+                pageSelectionContainer.style.display = 'block';
+                setTimeout(() => pageSelectionContainer.classList.add('show'), 10);
+            }
+            
+            // Navigate to the document (this will cause a page reload for now)
+            window.location.href = `{{ url_for('app.image_preview') }}?selected_folder=${encodeURIComponent(documentName)}`;
+        }
+
+        // Function to load and display a page
+        function loadPage(documentName, pageName) {
+            // Update browser URL
+            updateBrowserURL(documentName, pageName);
+            
+            // Navigate to the page (this will cause a page reload for now)
+            window.location.href = `{{ url_for('app.image_preview') }}?selected_folder=${encodeURIComponent(documentName)}&selected_png=${encodeURIComponent(pageName)}`;
+        }
+
+        // UI helper functions
+        function showPageSelection() {
+            if (pageSelectionContainer) {
+                pageSelectionContainer.style.display = 'block';
+                setTimeout(() => pageSelectionContainer.classList.add('show'), 10);
+            }
+        }
+        
+        function hidePageSelection() {
+            if (pageSelectionContainer) {
+                pageSelectionContainer.classList.remove('show');
+                setTimeout(() => pageSelectionContainer.style.display = 'none', 300);
+            }
+        }
+        
+        function showDocumentDisplay() {
+            if (documentDisplayContainer) {
+                documentDisplayContainer.style.display = 'block';
+                setTimeout(() => documentDisplayContainer.classList.add('show'), 10);
+            }
+        }
+        
+        function hideDocumentDisplay() {
+            if (documentDisplayContainer) {
+                documentDisplayContainer.classList.remove('show');
+                setTimeout(() => documentDisplayContainer.style.display = 'none', 300);
+            }
+        }
+
+        // Navigation function
+        window.navigateToEdit = function() {
+            window.location.href = '{{ url_for("app.crop_image") }}';
+        };
+
+        // Initialize sidebar selection
+        document.addEventListener('DOMContentLoaded', function() {
+            setupSidebarDocumentSelection();
+            
+            // Set initial browser history state
+            if (currentFolder || currentPage) {
+                window.history.replaceState({
+                    folder: currentFolder,
+                    page: currentPage
+                }, '', window.location.href);
+            }
+            
+            // Show/hide elements based on current state
+            if (currentFolder) {
+                if (selectedDocumentInfo) {
+                    selectedDocumentInfo.style.display = 'block';
+                }
+                if (pageSelectionContainer) {
+                    pageSelectionContainer.style.display = 'block';
+                    pageSelectionContainer.classList.add('show');
+                }
+            }
+        });
+
         // Add before DOMContentLoaded event listener
         function checkForExistingSegments(folder, pageFilename) {
             if (!folder || !pageFilename) {
@@ -357,8 +718,12 @@
                 return;
             }
             
-            // Construct URL with proper encoding
-            const jsonUrl = `/get_segment_json/${encodeURIComponent(userId)}/${encodeURIComponent(folder)}/${encodeURIComponent(pageId)}/${encodeURIComponent(segmentId)}`;
+            // Construct URL with proper encoding using url_for pattern
+            const jsonUrl = `{{ url_for('app.get_segment_json', user_id='__USER_ID__', document_folder_name='__FOLDER__', page_image_filename_base='__PAGE_ID__', segment_id_str='__SEGMENT_ID__') }}`
+                .replace('__USER_ID__', encodeURIComponent(userId))
+                .replace('__FOLDER__', encodeURIComponent(folder))
+                .replace('__PAGE_ID__', encodeURIComponent(pageId))
+                .replace('__SEGMENT_ID__', encodeURIComponent(segmentId));
             
             console.log('[fetchSegmentJson] Fetching JSON from:', jsonUrl);
             
@@ -456,7 +821,7 @@
 
                     // NEW URL construction using url_for pattern:
                     // The placeholders like '__USER_ID__' will be replaced by JavaScript.
-                    const imageUrl = `{{ url_for('app.get_segment_image', user_id='__USER_ID__', folder='__FOLDER__', page_id='__PAGE_ID__', segment_id='__SEGMENT_ID__') }}`
+                    const imageUrl = `{{ url_for('app.get_segment_image', user_id='__USER_ID__', document_folder_name='__FOLDER__', page_image_filename_base='__PAGE_ID__', segment_id_str='__SEGMENT_ID__') }}`
                         .replace('__USER_ID__', encodeURIComponent("{{ session.get('user_id', 'anonymous') }}"))
                         .replace('__FOLDER__', encodeURIComponent(currentSegmentFolderGlobal))
                         .replace('__PAGE_ID__', encodeURIComponent(currentSegmentPageIdGlobal))
@@ -537,7 +902,7 @@
             currentSegmentPageIdGlobal = pageId;
             updateNavigationButtons();
 
-            const segmentsUrl = `{{ url_for('app.get_segments', user_id='USERID', folder='FOLDER', page_id='PAGEID') }}`
+            const segmentsUrl = `{{ url_for('app.get_segments', user_id='USERID', document_folder_name='FOLDER', page_image_filename_base='PAGEID') }}`
                 .replace('USERID', '{{ session.get("user_id", "anonymous") }}')
                 .replace('FOLDER', encodeURIComponent(folder))
                 .replace('PAGEID', encodeURIComponent(pageId));
@@ -677,7 +1042,11 @@
  
             if (segment.has_image === true && (segment.id !== null && segment.id !== undefined)) {
                 const segmentIdStr = String(segment.id); 
-                const imageUrl = `/uploads/{{ session.get('user_id', 'anonymous') }}/${encodeURIComponent(folder)}/TOOCR/${encodeURIComponent(pageId)}/${encodeURIComponent(segmentIdStr)}.png`;
+                const imageUrl = `{{ url_for('app.get_segment_image', user_id='__USER_ID__', document_folder_name='__FOLDER__', page_image_filename_base='__PAGE_ID__', segment_id_str='__SEGMENT_ID__') }}`
+                    .replace('__USER_ID__', encodeURIComponent("{{ session.get('user_id', 'anonymous') }}"))
+                    .replace('__FOLDER__', encodeURIComponent(folder))
+                    .replace('__PAGE_ID__', encodeURIComponent(pageId))
+                    .replace('__SEGMENT_ID__', encodeURIComponent(segmentIdStr));
                 console.log('[showSelectedSegment] Image URL:', imageUrl);
                 if (selectedLineImageContainer.tagName === 'IMG') {
                     selectedLineImageContainer.src = imageUrl;
@@ -822,6 +1191,4 @@
             // ...rest of existing code...
         });
     </script>
-    {% endblock %}
-</body>
-</html>
+{% endblock %}
