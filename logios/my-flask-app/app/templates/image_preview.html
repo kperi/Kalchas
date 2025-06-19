@@ -1,8 +1,10 @@
-{% extends 'layout.html' %}
-
-{% block title %}Document Preview & OCR - Logios App{% endblock %}
-
-{% block head_extra %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Preview & OCR - Logios App</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 <style>
         /* Loading animations and smooth transitions */
         .fade-in {
@@ -44,8 +46,78 @@
             60% { text-shadow: .25em 0 0 inherit, .5em 0 0 rgba(0,0,0,0); }
             80%, 100% { text-shadow: .25em 0 0 inherit, .5em 0 0 inherit; }
         }
+        
+        /* Gradio-style components */
+        .gradio-component-group {
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .gradio-display-area {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 200px;
+            transition: all 0.3s ease-in-out;
+        }
+        
+        .gradio-placeholder-text {
+            color: #6b7280;
+            font-style: italic;
+            text-align: center;
+        }
+        
+        /* Image preview styles */
+        #preview-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Button styles */
+        .gradio-button {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .gradio-button:hover {
+            background-color: #2563eb;
+            transform: translateY(-1px);
+        }
+        
+        .gradio-button-primary {
+            background-color: #3b82f6;
+        }
+        
+        .gradio-button-secondary {
+            background-color: #6b7280;
+        }
+        
+        .gradio-button-secondary:hover {
+            background-color: #4b5563;
+        }
 
-        /* Sidebar Layout Styles - copied from crop_menu.html */
+        /* Sidebar Layout Styles - exact copy from crop_menu.html */
         .page-layout {
             display: flex;
             min-height: 100vh;
@@ -122,14 +194,85 @@
             border-radius: 12px;
             font-size: 0.625rem;
             font-weight: 500;
+        }
+        
+        .status-completed {
             background-color: #dcfce7;
             color: #166534;
+        }
+        
+        .status-progress {
+            background-color: #fef3c7;
+            color: #92400e;
         }
         
         .sidebar-loading {
             text-align: center;
             padding: 1rem;
             color: #6b7280;
+        }
+        
+        /* Document delete button styles - exact copy from crop_menu.html */
+        .document-delete-btn {
+            background-color: #dc2626;
+            color: white;
+            border: none;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.625rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            opacity: 0;
+            visibility: hidden;
+            margin-left: 0.5rem;
+        }
+        
+        .document-delete-btn:hover {
+            background-color: #b91c1c;
+            transform: scale(1.05);
+        }
+        
+        .document-item:hover .document-delete-btn {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .document-delete-btn:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .document-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+        
+        .document-name-section {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        /* Sidebar alert styles */
+        .sidebar-alert {
+            padding: 0.75rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+        }
+        
+        .sidebar-alert-success {
+            background-color: #dcfce7;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+        
+        .sidebar-alert-error {
+            background-color: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
         }
 
         /* Segment OCR status styles */
@@ -170,10 +313,10 @@
                 border-bottom: 1px solid #e2e8f0;
             }
         }
-</style>
-{% endblock %}
-
-{% block content %}
+    </style>
+</head>
+<body>
+    {% include 'layout.html' %}
     <div class="page-layout">
         <!-- Sidebar -->
         <div class="sidebar">
@@ -187,6 +330,9 @@
             <div class="sidebar-section">
                 <h3>OCR-Ready Documents</h3>
                 
+                <!-- Alert area for sidebar notifications -->
+                <div id="sidebar-alert-area"></div>
+                
                 <div id="sidebar-documents-container">
                     <div id="sidebar-loading" class="sidebar-loading" style="display: none;">
                         <span class="loading-spinner"></span>
@@ -197,10 +343,19 @@
                             {% for folder in folders %}
                                 <div class="document-item {% if folder == selected_folder %}selected{% endif %}" 
                                      data-document-name="{{ folder }}">
-                                    <div class="document-name">{{ folder }}</div>
-                                    <div class="document-meta">
-                                        <span>OCR Ready</span>
-                                        <span class="document-status">Completed</span>
+                                    <div class="document-header">
+                                        <div class="document-name-section">
+                                            <div class="document-name">{{ folder }}</div>
+                                            <div class="document-meta">
+                                                <span>OCR Ready</span>
+                                                <span class="document-status status-completed">Completed</span>
+                                            </div>
+                                        </div>
+                                        <button class="document-delete-btn" 
+                                                onclick="confirmDeleteDocumentFromOCR('{{ folder }}')" 
+                                                title="Delete {{ folder }}">
+                                            🗑️
+                                        </button>
                                     </div>
                                 </div>
                             {% endfor %}
@@ -220,20 +375,32 @@
         <div class="main-content">
             <div class="gradio-component-group" style="max-width: 1200px; margin-left: auto; margin-right: auto;">
                 <h1>OCR Document Preview</h1>
+                
+                <!-- DEBUG INFO - Remove this later -->
+                <div style="background: #f0f0f0; padding: 10px; margin: 10px 0; font-family: monospace; font-size: 0.8em;">
+                    <strong>Debug Info:</strong><br>
+                    folders: {{ folders | length if folders else 'None' }} items<br>
+                    selected_folder: "{{ selected_folder or 'None' }}"<br>
+                    png_files: {{ png_files | length if png_files else 'None' }} items<br>
+                    selected_png: "{{ request.args.get('selected_png') or 'None' }}"<br>
+                    request.args: {{ request.args }}
+                </div>
+            </div>
 
             {% if folders %}
             <div class="gradio-component-group" style="background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
                 <div style="margin-bottom: 1rem;">
-                    <div id="selected-document-info" style="display: none;">
+                    <div id="selected-document-info" style="{% if selected_folder %}display: block;{% else %}display: none;{% endif %}">
                         <h3 style="margin-top: 0; color: #1f2937;">Selected Document: <span id="current-document-name">{{ selected_folder or '' }}</span></h3>
                     </div>
                 </div>
                 
-                <div id="page-selection-container" class="fade-in smooth-transition" style="margin-bottom: 1rem; display: none;">
+                <div id="page-selection-container" class="{% if selected_folder %}fade-in show{% else %}fade-in{% endif %} smooth-transition" style="margin-bottom: 1rem; {% if selected_folder %}display: block;{% else %}display: none;{% endif %}">
                     <label for="png-select">Select Page/Crop:</label>
                     <select name="selected_png" id="png-select">
                         <option value="">-- Select Page --</option>
                         {% if png_files %}
+                            <!-- DEBUG: We have {{ png_files | length }} PNG files -->
                             {% for png in png_files %}
                                 <option value="{{ png }}" {% if png == request.args.get('selected_png') %}selected{% endif %}>
                                     {% if 'crop' in png %}
@@ -243,14 +410,25 @@
                                     {% endif %}
                                 </option>
                             {% endfor %}
+                        {% else %}
+                            <!-- DEBUG: No PNG files found -->
                         {% endif %}
                     </select>
+                    <!-- DEBUG: Container should be visible because selected_folder = "{{ selected_folder }}" -->
                 </div>
+            </div>
+            {% else %}
+            <div class="gradio-component-group" style="background-color: #fef3c7; padding: 1rem; margin-bottom: 1.5rem;">
+                <p><strong>No OCR-ready documents found.</strong></p>
+                <p>Documents become OCR-ready after using the "Move to OCR" button in the Image Cropping Tool.</p>
+                <a href="{{ url_for('app.crop_image') }}" class="gradio-button gradio-button-primary">Go to Image Cropping Tool</a>
             </div>
             {% endif %}
 
             <!-- Dynamic content area for selected document -->
-            <div id="document-display-container" class="fade-in smooth-transition">
+            <div id="document-display-container" class="fade-in show smooth-transition">
+                <!-- DEBUG: Image section will show when both selected_folder AND selected_png are set -->
+                <!-- Currently: selected_folder="{{ selected_folder or 'None' }}", selected_png="{{ request.args.get('selected_png') or 'None' }}" -->
                 {% if selected_folder and request.args.get('selected_png') %}
                 <div id="debug-path-info" style="margin-bottom: 10px; padding: 5px; border: 1px solid #ddd; background-color: #f5f5f5;">
                     <strong>Debug Info:</strong> 
@@ -1406,5 +1584,40 @@
             
             // ...rest of existing code...
         });
+        
+        // Function to confirm document deletion from OCR page
+        function confirmDeleteDocumentFromOCR(documentName) {
+            if (confirm(`Are you sure you want to delete the OCR-ready document "${documentName}"? This will remove all processed OCR data.`)) {
+                deleteDocumentFromOCR(documentName);
+            }
+        }
+        
+        // Function to delete document from OCR page
+        function deleteDocumentFromOCR(documentName) {
+            console.log('Deleting OCR document:', documentName);
+            
+            // For now, show an alert - you can implement the actual deletion logic
+            alert('Document deletion from OCR page is not yet implemented. This would delete the TOOCR folder and redirect back to the crop page.');
+            
+            // TODO: Implement AJAX call to delete the TOOCR folder
+            // fetch('/api/delete_ocr_document', {
+            //     method: 'POST',
+            //     headers: { 'Content-Type': 'application/json' },
+            //     body: JSON.stringify({ document_name: documentName })
+            // }).then(response => response.json())
+            //   .then(data => {
+            //       if (data.success) {
+            //           window.location.href = '/crop_image';
+            //       } else {
+            //           alert('Error deleting document: ' + data.error);
+            //       }
+            //   });
+        }
+        
+        // Function to navigate to edit page
+        function navigateToEdit() {
+            window.location.href = "{{ url_for('app.crop_image') }}";
+        }
     </script>
-{% endblock %}
+</body>
+</html>
