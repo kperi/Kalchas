@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR - Optical Character Recognition</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/ocr.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/sidebar_documents.css') }}" rel="stylesheet">
+</head>
+<body>
+    <!-- Enhanced Documents Sidebar -->
+    <div class="sidebar" id="documentsSidebar">
+        <div class="sidebar-header">
+            <h3>
+                <i class="fas fa-folder-open"></i>
+                My Documents
+            </h3>
+            <button class="close-btn" onclick="toggleDocumentsSidebar()">×</button>
+        </div>
+        
+        <div class="sidebar-content">
+            <!-- Search Section -->
+            <div class="search-section">
+                <div class="search-box">
+                    <input type="text" id="documentSearch" placeholder="Search documents..." 
+                           oninput="filterDocuments()">
+                    <i class="fas fa-search"></i>
+                </div>
+                
+                <div class="filter-tabs">
+                    <button class="filter-tab active" onclick="filterByStatus('all')">
+                        All <span class="document-count">{{ documents|length }}</span>
+                    </button>
+                    <button class="filter-tab" onclick="filterByStatus('completed')">
+                        Completed <span class="document-count">{{ documents|selectattr('is_completed')|list|length }}</span>
+                    </button>
+                    <button class="filter-tab" onclick="filterByStatus('in-progress')">
+                        In Progress <span class="document-count">{{ documents|rejectattr('is_completed')|list|length }}</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Documents List -->
+            <div class="documents-section">
+                <div class="section-header">
+                    <div class="section-title">
+                        <i class="fas fa-file-alt"></i>
+                        Recent Activity
+                    </div>
+                    <button class="refresh-btn" onclick="refreshDocuments()" title="Refresh">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+                
+                <div class="documents-list" id="documentsList">
+                    {% if documents %}
+                        {% for doc in documents %}
+                        <div class="document-item" 
+                             data-name="{{ doc.name|lower }}" 
+                             data-status="{{ 'completed' if doc.is_completed else 'in-progress' }}"
+                             onclick="loadDocumentInOCR('{{ doc.name }}')">
+                            
+                            <div class="document-icon {{ 'completed' if doc.is_completed else 'in-progress' }} 
+                                        {% if doc.pdf_files %}pdf{% elif doc.total_png_count > 1 %}mixed{% else %}img{% endif %}">
+                                <i class="fas {% if doc.pdf_files %}fa-file-pdf{% elif doc.total_png_count > 1 %}fa-layer-group{% else %}fa-image{% endif %}"></i>
+                            </div>
+                            
+                            <div class="document-info">
+                                <div class="document-name" title="{{ doc.name }}">{{ doc.name }}</div>
+                                
+                                <div class="document-meta">
+                                    {% if doc.total_png_count > 0 %}
+                                    <span class="meta-tag images">
+                                        <i class="fas fa-images"></i>
+                                        {{ doc.total_png_count }} images
+                                    </span>
+                                    {% endif %}
+                                    
+                                    {% if doc.crop_count > 0 %}
+                                    <span class="meta-tag crops">
+                                        <i class="fas fa-crop"></i>
+                                        {{ doc.crop_count }} crops
+                                    </span>
+                                    {% endif %}
+                                    
+                                    <span class="meta-tag {{ 'completed' if doc.is_completed else 'in-progress' }}">
+                                        <i class="fas {{ 'fa-check-circle' if doc.is_completed else 'fa-clock' }}"></i>
+                                        {{ 'Completed' if doc.is_completed else 'In Progress' }}
+                                    </span>
+                                </div>
+                                
+                                <div class="document-timestamp">
+                                    <i class="fas fa-clock"></i>
+                                    Last modified: {{ moment(doc.last_modified).fromNow() if doc.last_modified else 'Unknown' }}
+                                </div>
+                            </div>
+                            
+                            <div class="document-actions">
+                                <button class="action-btn" onclick="event.stopPropagation(); viewDocument('{{ doc.name }}')" 
+                                        title="View Document">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                
+                                <button class="action-btn" onclick="event.stopPropagation(); cropDocument('{{ doc.name }}')" 
+                                        title="Edit/Crop">
+                                    <i class="fas fa-crop"></i>
+                                </button>
+                                
+                                {% if doc.is_completed %}
+                                <button class="action-btn" onclick="event.stopPropagation(); processOCRDocument('{{ doc.name }}')" 
+                                        title="Process OCR">
+                                    <i class="fas fa-magic"></i>
+                                </button>
+                                {% endif %}
+                                
+                                <button class="action-btn danger" onclick="event.stopPropagation(); deleteDocument('{{ doc.name }}')" 
+                                        title="Delete Document">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state">
+                            <i class="fas fa-folder-open"></i>
+                            <h4>No Documents Found</h4>
+                            <p>Upload your first document to get started with OCR processing</p>
+                            <a href="{{ url_for('app.show_upload_page') }}" class="btn-primary">
+                                <i class="fas fa-upload"></i>
+                                Upload Document
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Quick Actions -->
+            <div class="sidebar-actions">
+                <a href="{{ url_for('app.show_upload_page') }}" class="btn-primary">
+                    <i class="fas fa-upload"></i>
+                    Upload New Document
+                </a>
+                <a href="{{ url_for('app.crop_image') }}" class="btn-secondary">
+                    <i class="fas fa-crop"></i>
+                    Crop & Edit
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar overlay -->
+    <div class="sidebar-overlay" id="documentsOverlay" onclick="toggleDocumentsSidebar()"></div>
+
+    <!-- Rest of the OCR interface remains the same -->
+    <div class="gradio-container">
+        <div class="gradio-header">
+            <div class="header-controls">
+                <button class="sidebar-trigger" onclick="toggleDocumentsSidebar()" title="My Documents">
+                    <i class="fas fa-folder"></i>
+                    Documents ({{ documents|length }})
+                </button>
+            </div>
+            <h1 class="gradio-title">
+                <i class="fas fa-eye"></i>
+                OCR Processing
+            </h1>
+            <p class="gradio-subtitle">Extract text from images and documents with advanced optical character recognition</p>
+        </div>
+
+        <div class="gradio-interface">
+            <div class="gradio-tabs">
+                <button class="gradio-tab active" onclick="switchTab('upload')">
+                    <i class="fas fa-upload"></i> Upload & Process
+                </button>
+                <button class="gradio-tab" onclick="switchTab('batch')">
+                    <i class="fas fa-layer-group"></i> Batch Processing
+                </button>
+                <button class="gradio-tab" onclick="switchTab('settings')">
+                    <i class="fas fa-cog"></i> Settings
+                </button>
+            </div>
+
+            <div class="gradio-content">
+                <!-- Upload Tab -->
+                <div id="upload-tab" class="tab-content">
+                    <div class="gradio-row">
+                        <div class="gradio-column">
+                            <label class="gradio-label">Input Image/Document</label>
+                            <div class="gradio-block" id="dropzone">
+                                <div class="upload-content">
+                                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                                    <div class="upload-text">Drop your file here or click to browse</div>
+                                    <div class="upload-subtext">Supports: PNG, JPG, PDF, TIFF (max 10MB)</div>
+                                    <div class="upload-subtext">Or select from your documents using the sidebar</div>
+                                </div>
+                                <div class="file-preview" id="filePreview">
+                                    <img class="preview-image" id="previewImage" alt="Preview">
+                                    <div class="file-info" id="fileInfo"></div>
+                                </div>
+                            </div>
+                            <input type="file" id="fileInput" style="display: none;" accept=".png,.jpg,.jpeg,.pdf,.tiff,.bmp">
+                            
+                            <div class="progress-bar" id="progressBar">
+                                <div class="progress-fill" id="progressFill"></div>
+                            </div>
+
+                            <button class="gradio-button" id="processBtn" onclick="processOCR()" disabled>
+                                <i class="fas fa-magic"></i>
+                                Process OCR
+                            </button>
+                        </div>
+
+                        <div class="gradio-column">
+                            <label class="gradio-label">Extracted Text</label>
+                            <div class="output-container" id="ocrOutput">
+                                <div style="color: #9ca3af; font-style: italic;">
+                                    Upload an image or document to extract text...
+                                </div>
+                            </div>
+                            
+                            <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                                <button class="gradio-button" onclick="copyText()" id="copyBtn" disabled>
+                                    <i class="fas fa-copy"></i>
+                                    Copy Text
+                                </button>
+                                <button class="gradio-button" onclick="downloadText()" id="downloadBtn" disabled>
+                                    <i class="fas fa-download"></i>
+                                    Download
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Batch Processing Tab -->
+                <div id="batch-tab" class="tab-content" style="display: none;">
+                    <div class="gradio-column">
+                        <label class="gradio-label">Batch Upload</label>
+                        <div class="gradio-block" id="batchDropzone">
+                            <i class="fas fa-layer-group upload-icon"></i>
+                            <div class="upload-text">Drop multiple files here</div>
+                            <div class="upload-subtext">Process multiple documents at once</div>
+                        </div>
+                        <input type="file" id="batchFileInput" style="display: none;" multiple accept=".png,.jpg,.jpeg,.pdf,.tiff,.bmp">
+                        
+                        <button class="gradio-button" onclick="processBatch()">
+                            <i class="fas fa-play"></i>
+                            Process All Files
+                        </button>
+
+                        <div id="batchResults" style="margin-top: 2rem;"></div>
+                    </div>
+                </div>
+
+                <!-- Settings Tab -->
+                <div id="settings-tab" class="tab-content" style="display: none;">
+                    <div class="gradio-accordion">
+                        <div class="accordion-header" onclick="toggleAccordion(this)">
+                            <span>OCR Engine Settings</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="accordion-content">
+                            <div class="settings-grid">
+                                <div class="setting-item">
+                                    <label class="gradio-label">OCR Engine</label>
+                                    <select class="gradio-input" id="ocrEngine">
+                                        <option value="tesseract">Tesseract</option>
+                                        <option value="easyocr">EasyOCR</option>
+                                        <option value="paddleocr">PaddleOCR</option>
+                                    </select>
+                                </div>
+                                <div class="setting-item">
+                                    <label class="gradio-label">Language</label>
+                                    <select class="gradio-input" id="language">
+                                        <option value="eng">English</option>
+                                        <option value="spa">Spanish</option>
+                                        <option value="fra">French</option>
+                                        <option value="deu">German</option>
+                                        <option value="chi_sim">Chinese (Simplified)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="gradio-accordion">
+                        <div class="accordion-header" onclick="toggleAccordion(this)">
+                            <span>Image Preprocessing</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="accordion-content">
+                            <div class="settings-grid">
+                                <label class="gradio-checkbox">
+                                    <input type="checkbox" id="denoise">
+                                    <span>Noise Reduction</span>
+                                </label>
+                                <label class="gradio-checkbox">
+                                    <input type="checkbox" id="deskew">
+                                    <span>Auto Deskew</span>
+                                </label>
+                                <label class="gradio-checkbox">
+                                    <input type="checkbox" id="enhance">
+                                    <span>Contrast Enhancement</span>
+                                </label>
+                                <label class="gradio-checkbox">
+                                    <input type="checkbox" id="binarize">
+                                    <span>Binarization</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Enhanced sidebar functionality
+        let currentFilter = 'all';
+        
+        function toggleDocumentsSidebar() {
+            const sidebar = document.getElementById('documentsSidebar');
+            const overlay = document.getElementById('documentsOverlay');
+            
+            sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
+        }
+
+        function filterDocuments() {
+            const searchTerm = document.getElementById('documentSearch').value.toLowerCase();
+            const documentItems = document.querySelectorAll('#documentsList .document-item');
+            let visibleCount = 0;
+            
+            documentItems.forEach(item => {
+                const documentName = item.getAttribute('data-name');
+                const documentStatus = item.getAttribute('data-status');
+                
+                const matchesSearch = documentName.includes(searchTerm);
+                const matchesFilter = currentFilter === 'all' || documentStatus === currentFilter;
+                
+                if (matchesSearch && matchesFilter) {
+                    item.style.display = 'flex';
+                    visibleCount++;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+            
+            // Show empty state if no results
+            showEmptyStateIfNeeded(visibleCount);
+        }
+
+        function filterByStatus(status) {
+            currentFilter = status;
+            
+            // Update active tab
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Apply filter
+            filterDocuments();
+        }
+
+        function showEmptyStateIfNeeded(visibleCount) {
+            const documentsList = document.getElementById('documentsList');
+            let emptyState = documentsList.querySelector('.empty-state-search');
+            
+            if (visibleCount === 0 && document.getElementById('documentSearch').value) {
+                if (!emptyState) {
+                    emptyState = document.createElement('div');
+                    emptyState.className = 'empty-state empty-state-search';
+                    emptyState.innerHTML = `
+                        <i class="fas fa-search"></i>
+                        <h4>No Results Found</h4>
+                        <p>Try adjusting your search or filter criteria</p>
+                    `;
+                    documentsList.appendChild(emptyState);
+                }
+                emptyState.style.display = 'block';
+            } else if (emptyState) {
+                emptyState.style.display = 'none';
+            }
+        }
+
+        function refreshDocuments() {
+            const refreshBtn = document.querySelector('.refresh-btn');
+            const icon = refreshBtn.querySelector('i');
+            
+            icon.style.animation = 'spin 1s linear infinite';
+            
+            // Simulate refresh - in real app, this would reload data
+            setTimeout(() => {
+                icon.style.animation = '';
+                location.reload();
+            }, 1000);
+        }
+
+        function deleteDocument(documentName) {
+            if (!confirm(`Are you sure you want to delete "${documentName}"? This action cannot be undone.`)) {
+                return;
+            }
+            
+            // Here you would make an API call to delete the document
+            console.log('Deleting document:', documentName);
+            
+            // For now, just remove from UI
+            const documentItem = document.querySelector(`[data-name="${documentName.toLowerCase()}"]`);
+            if (documentItem) {
+                documentItem.style.animation = 'slideOutRight 0.3s ease forwards';
+                setTimeout(() => {
+                    documentItem.remove();
+                    updateDocumentCounts();
+                }, 300);
+            }
+        }
+
+        function updateDocumentCounts() {
+            const allCount = document.querySelectorAll('.document-item').length;
+            const completedCount = document.querySelectorAll('[data-status="completed"]').length;
+            const inProgressCount = document.querySelectorAll('[data-status="in-progress"]').length;
+            
+            document.querySelectorAll('.document-count').forEach((counter, index) => {
+                switch (index) {
+                    case 0: counter.textContent = allCount; break;
+                    case 1: counter.textContent = completedCount; break;
+                    case 2: counter.textContent = inProgressCount; break;
+                }
+            });
+        }
+
+        // Add CSS animation for slide out
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideOutRight {
+                to {
+                    opacity: 0;
+                    transform: translateX(100%);
+                }
+            }
+        `;
+        document.head.appendChild(style);
+
+        let currentFile = null;
+        let currentDocument = null;
+        let currentDocumentImages = [];
+
+        // Document actions
+        function loadDocumentInOCR(documentName) {
+            currentDocument = documentName;
+            
+            // Load document images
+            fetch(`/api/get_document_images/{{ user_id }}/${documentName}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        currentDocumentImages = data.images;
+                        showDocumentImageSelector(documentName, data.images);
+                        toggleDocumentsSidebar(); // Close sidebar
+                    } else {
+                        alert('Error loading document images: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error loading document images');
+                });
+        }
+
+        function showDocumentImageSelector(documentName, images) {
+            const dropzone = document.getElementById('dropzone');
+            
+            // Update dropzone to show document selector
+            dropzone.innerHTML = `
+                <div class="document-selector">
+                    <div class="document-header">
+                        <h4><i class="fas fa-folder"></i> ${documentName}</h4>
+                        <button class="btn-small" onclick="clearDocumentSelection()">
+                            <i class="fas fa-times"></i> Clear
+                        </button>
+                    </div>
+                    <div class="images-grid">
+                        ${images.map(img => `
+                            <div class="image-item" onclick="selectDocumentImage('${img.filename}')">
+                                <img src="/uploads/{{ user_id }}/${documentName}/PNG/${img.filename}" alt="${img.display_name}">
+                                <div class="image-name">${img.display_name}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            
+            // Update process button
+            const processBtn = document.getElementById('processBtn');
+            processBtn.textContent = 'Select an image to process';
+            processBtn.disabled = true;
+        }
+
+        function selectDocumentImage(imageFilename) {
+            if (!currentDocument) return;
+            
+            const imageUrl = `/uploads/{{ user_id }}/${currentDocument}/PNG/${imageFilename}`;
+            
+            // Show preview
+            const dropzone = document.getElementById('dropzone');
+            dropzone.innerHTML = `
+                <div class="selected-image">
+                    <div class="image-header">
+                        <h4>${currentDocument} - ${imageFilename}</h4>
+                        <button class="btn-small" onclick="loadDocumentInOCR('${currentDocument}')">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </button>
+                    </div>
+                    <img src="${imageUrl}" alt="${imageFilename}" class="preview-image">
+                    <div class="file-info">${imageFilename}</div>
+                </div>
+            `;
+            
+            // Set current file for OCR processing
+            currentFile = {
+                name: imageFilename,
+                document: currentDocument,
+                url: imageUrl
+            };
+            
+            // Enable process button
+            const processBtn = document.getElementById('processBtn');
+            processBtn.innerHTML = '<i class="fas fa-magic"></i> Process OCR';
+            processBtn.disabled = false;
+        }
+
+        function clearDocumentSelection() {
+            currentFile = null;
+            currentDocument = null;
+            currentDocumentImages = [];
+            
+            // Reset dropzone
+            const dropzone = document.getElementById('dropzone');
+            dropzone.innerHTML = `
+                <div class="upload-content">
+                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                    <div class="upload-text">Drop your file here or click to browse</div>
+                    <div class="upload-subtext">Supports: PNG, JPG, PDF, TIFF (max 10MB)</div>
+                    <div class="upload-subtext">Or select from your documents using the sidebar</div>
+                </div>
+                <div class="file-preview" id="filePreview" style="display: none;">
+                    <img class="preview-image" id="previewImage" alt="Preview">
+                    <div class="file-info" id="fileInfo"></div>
+                </div>
+            `;
+            
+            // Reset process button
+            const processBtn = document.getElementById('processBtn');
+            processBtn.innerHTML = '<i class="fas fa-magic"></i> Process OCR';
+            processBtn.disabled = true;
+        }
+
+        function viewDocument(documentName) {
+            window.open(`{{ url_for('app.image_preview') }}?selected_folder=${documentName}`, '_blank');
+        }
+
+        function cropDocument(documentName) {
+            window.open(`{{ url_for('app.crop_image') }}?selected_folder=${documentName}`, '_blank');
+        }
+
+        function processOCRDocument(documentName) {
+            // Load the document for OCR processing
+            loadDocumentInOCR(documentName);
+        }
+
+        // Original OCR functionality
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.style.display = 'none';
+            });
+            
+            document.querySelectorAll('.gradio-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            document.getElementById(tabName + '-tab').style.display = 'block';
+            event.target.classList.add('active');
+        }
+
+        function toggleAccordion(header) {
+            const content = header.nextElementSibling;
+            const icon = header.querySelector('i');
+            
+            content.classList.toggle('active');
+            icon.style.transform = content.classList.contains('active') ? 'rotate(180deg)' : 'rotate(0deg)';
+        }
+
+        // File upload handling
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+
+        dropzone.addEventListener('click', (e) => {
+            if (!e.target.closest('.document-selector') && !e.target.closest('.selected-image')) {
+                fileInput.click();
+            }
+        });
+
+        dropzone.addEventListener('dragover', handleDragOver);
+        dropzone.addEventListener('drop', handleDrop);
+        fileInput.addEventListener('change', handleFileSelect);
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            if (!currentDocument) {
+                dropzone.classList.add('dragover');
+            }
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            dropzone.classList.remove('dragover');
+            if (!currentDocument && e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        }
+
+        function handleFileSelect(e) {
+            if (e.target.files.length > 0) {
+                clearDocumentSelection();
+                handleFile(e.target.files[0]);
+            }
+        }
+
+        function handleFile(file) {
+            currentFile = file;
+            
+            const fileInfo = document.getElementById('fileInfo');
+            const filePreview = document.getElementById('filePreview');
+            const previewImage = document.getElementById('previewImage');
+            const processBtn = document.getElementById('processBtn');
+            
+            fileInfo.textContent = `${file.name} (${formatFileSize(file.size)})`;
+            
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    previewImage.src = e.target.result;
+                    filePreview.style.display = 'flex';
+                    dropzone.querySelector('.upload-content').style.display = 'none';
+                };
+                reader.readAsDataURL(file);
+            } else {
+                filePreview.style.display = 'flex';
+                previewImage.style.display = 'none';
+                dropzone.querySelector('.upload-content').style.display = 'none';
+            }
+            
+            processBtn.disabled = false;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        async function processOCR() {
+            if (!currentFile) return;
+            
+            const progressBar = document.getElementById('progressBar');
+            const progressFill = document.getElementById('progressFill');
+            const ocrOutput = document.getElementById('ocrOutput');
+            const copyBtn = document.getElementById('copyBtn');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const processBtn = document.getElementById('processBtn');
+            
+            progressBar.style.display = 'block';
+            processBtn.disabled = true;
+            processBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += Math.random() * 30;
+                if (progress > 90) progress = 90;
+                progressFill.style.width = progress + '%';
+            }, 200);
+            
+            try {
+                let response;
+                
+                if (currentFile.document) {
+                    // Processing existing document image
+                    response = await fetch('/process_ocr', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            folder: currentFile.document,
+                            filename: currentFile.name
+                        })
+                    });
+                } else {
+                    // Processing uploaded file
+                    const formData = new FormData();
+                    formData.append('file', currentFile);
+                    formData.append('engine', document.getElementById('ocrEngine').value);
+                    formData.append('language', document.getElementById('language').value);
+                    
+                    response = await fetch('/api/ocr/process', {
+                        method: 'POST',
+                        body: formData
+                    });
+                }
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    ocrOutput.textContent = result.text || 'No text detected';
+                    copyBtn.disabled = false;
+                    downloadBtn.disabled = false;
+                } else {
+                    throw new Error('OCR processing failed');
+                }
+            } catch (error) {
+                ocrOutput.innerHTML = '<div style="color: #ef4444;">Error: ' + error.message + '</div>';
+            } finally {
+                clearInterval(progressInterval);
+                progressFill.style.width = '100%';
+                setTimeout(() => {
+                    progressBar.style.display = 'none';
+                    progressFill.style.width = '0%';
+                }, 1000);
+                processBtn.disabled = false;
+                processBtn.innerHTML = '<i class="fas fa-magic"></i> Process OCR';
+            }
+        }
+
+        function copyText() {
+            const text = document.getElementById('ocrOutput').textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                const copyBtn = document.getElementById('copyBtn');
+                const originalText = copyBtn.innerHTML;
+                copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalText;
+                }, 2000);
+            });
+        }
+
+        function downloadText() {
+            const text = document.getElementById('ocrOutput').textContent;
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'extracted_text.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function processBatch() {
+            alert('Batch processing feature coming soon!');
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const sidebar = document.getElementById('documentsSidebar');
+                if (sidebar.classList.contains('active')) {
+                    toggleDocumentsSidebar();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
