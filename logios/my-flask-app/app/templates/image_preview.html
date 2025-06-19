@@ -132,6 +132,31 @@
             color: #6b7280;
         }
 
+        /* Segment OCR status styles */
+        .segment-ocr-status-success {
+            background-color: #dcfce7;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+        
+        .segment-ocr-status-error {
+            background-color: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+        
+        .segment-ocr-status-processing {
+            background-color: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fed7aa;
+        }
+
+        /* Button loading state */
+        .button-loading {
+            pointer-events: none;
+            opacity: 0.7;
+        }
+
         /* Responsive behavior */
         @media (max-width: 768px) {
             .page-layout {
@@ -230,7 +255,7 @@
                 <div id="debug-path-info" style="margin-bottom: 10px; padding: 5px; border: 1px solid #ddd; background-color: #f5f5f5;">
                     <strong>Debug Info:</strong> 
                     <span style="font-family: monospace; word-break: break-all;">
-                        Path: /uploads/{{session.get('user_id', 'anonymous')}}/{{selected_folder}}/TOOCR/PNG/{{request.args.get('selected_png')}}
+                        TOOCR Path: /uploads/{{session.get('user_id', 'anonymous')}}/{{selected_folder}}/TOOCR/PNG/{{request.args.get('selected_png')}}
                     </span>
                 </div>
                 {% endif %}
@@ -239,10 +264,10 @@
                 <div class="gradio-display-area" style="flex-direction: column; align-items: stretch; gap: 1.5rem;">
                     <div class="gradio-display-area" style="min-height: 40vh; padding:0; border: none; background: #fff;"> <!-- Inner display for main page image -->
                          <img id="preview-image"
-                             src="{{ url_for('app.uploaded_toocr_file', 
+                             src="{{ url_for('app.serve_completed_document_png_file', 
                                user_id=session.get('user_id', 'anonymous'), 
-                               folder=selected_folder, 
-                               filename=request.args.get('selected_png')) }}"
+                               document_folder_name=selected_folder, 
+                               image_filename=request.args.get('selected_png')) }}"
                              alt="Page Preview">
                     </div>
 
@@ -268,7 +293,21 @@
 
                     <div class="ocr-section gradio-component-group" style="margin-top:0; padding: 1rem; background-color: #f9fafb;"> <!-- Nested component group for OCR -->
                         <h4>Text Recognition (OCR)</h4>
-                        <button class="gradio-button gradio-button-primary" onclick="performOCR()" style="margin-bottom: 1rem;">Extract Text from Page</button>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                            <button class="gradio-button gradio-button-primary" onclick="performOCR()" style="flex: 1; min-width: 150px;">Extract Text from Page</button>
+                            <button id="segment-ocr-btn" class="gradio-button gradio-button-secondary" onclick="performSegmentOCR()" style="flex: 1; min-width: 150px; background-color: #059669; color: white;">
+                                <span id="segment-ocr-text">Segment & OCR</span>
+                                <span id="segment-ocr-loading" style="display: none;">
+                                    <span class="loading-spinner"></span>
+                                    Processing...
+                                </span>
+                            </button>
+                        </div>
+                        
+                        <!-- Status messages for Segment & OCR -->
+                        <div id="segment-ocr-status" style="margin-bottom: 1rem; padding: 0.75rem; border-radius: 6px; display: none;">
+                            <div id="segment-ocr-status-message"></div>
+                        </div>
                         
                         <!-- START: Preview for Segment Selected from Sidebar Dropdown - MOVED HERE -->
                         {% if selected_segment %} {# selected_segment is passed from routes.py context #}
@@ -1179,6 +1218,109 @@
                 original: coords,
                 scaled: { x: scaledX, y: scaledY, width, height }
             });
+        }
+
+        // Segment & OCR functionality
+        function performSegmentOCR() {
+            if (!currentFolder || !currentPage) {
+                showSegmentOCRStatus('error', 'No page selected for OCR processing');
+                return;
+            }
+
+            showSegmentOCRLoading(true);
+            hideSegmentOCRStatus();
+
+            // Get the image URL for the current page
+            const imageUrl = `{{ url_for('app.serve_completed_document_png_file', 
+                user_id='__USER_ID__', 
+                document_folder_name='__FOLDER__', 
+                image_filename='__FILENAME__') }}`
+                .replace('__USER_ID__', encodeURIComponent("{{ session.get('user_id', 'anonymous') }}"))
+                .replace('__FOLDER__', encodeURIComponent(currentFolder))
+                .replace('__FILENAME__', encodeURIComponent(currentPage));
+
+            // Prepare form data for OCR service
+            const formData = new FormData();
+            
+            // Fetch the image and add it to form data
+            fetch(imageUrl)
+                .then(response => response.blob())
+                .then(blob => {
+                    formData.append('file', blob, currentPage);
+                    
+                    // Call the OCR service endpoint
+                    return fetch('/process_image/', {
+                        method: 'POST',
+                        body: formData
+                    });
+                })
+                .then(response => response.json())
+                .then(data => {
+                    showSegmentOCRLoading(false);
+                    
+                    if (data.success) {
+                        showSegmentOCRStatus('success', 'OCR processing completed successfully!');
+                        
+                        // Reload segments to show the new results
+                        if (currentFolder && currentPage) {
+                            const pageId = currentPage.split('.')[0];
+                            setTimeout(() => {
+                                checkForExistingSegments(currentFolder, pageId);
+                            }, 1000);
+                        }
+                    } else {
+                        showSegmentOCRStatus('error', data.message || 'Failed to process image with OCR');
+                    }
+                })
+                .catch(error => {
+                    console.error('Segment OCR error:', error);
+                    showSegmentOCRLoading(false);
+                    showSegmentOCRStatus('error', 'Network error occurred during OCR processing');
+                });
+        }
+
+        // Helper functions for Segment OCR status
+        function showSegmentOCRLoading(show) {
+            const textElement = document.getElementById('segment-ocr-text');
+            const loadingElement = document.getElementById('segment-ocr-loading');
+            const buttonElement = document.getElementById('segment-ocr-btn');
+            
+            if (textElement && loadingElement && buttonElement) {
+                if (show) {
+                    textElement.style.display = 'none';
+                    loadingElement.style.display = 'inline';
+                    buttonElement.classList.add('button-loading');
+                } else {
+                    textElement.style.display = 'inline';
+                    loadingElement.style.display = 'none';
+                    buttonElement.classList.remove('button-loading');
+                }
+            }
+        }
+        
+        function showSegmentOCRStatus(type, message) {
+            const statusElement = document.getElementById('segment-ocr-status');
+            const messageElement = document.getElementById('segment-ocr-status-message');
+            
+            if (statusElement && messageElement) {
+                statusElement.className = `segment-ocr-status-${type}`;
+                messageElement.textContent = message;
+                statusElement.style.display = 'block';
+                
+                // Auto-hide success messages after 5 seconds
+                if (type === 'success') {
+                    setTimeout(() => {
+                        hideSegmentOCRStatus();
+                    }, 5000);
+                }
+            }
+        }
+        
+        function hideSegmentOCRStatus() {
+            const statusElement = document.getElementById('segment-ocr-status');
+            if (statusElement) {
+                statusElement.style.display = 'none';
+            }
         }
 
         // Add to DOMContentLoaded event listener
