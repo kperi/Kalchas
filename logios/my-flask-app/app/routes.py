@@ -1255,6 +1255,119 @@ def api_admin_get_user_documents(user_id):
         return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
 
 
+@app.route("/api/delete_page", methods=["POST"])
+@login_required
+def api_delete_page():
+    """
+    AJAX endpoint to delete a specific page but keep its cropped files.
+    Returns JSON data with success/error information.
+    """
+    try:
+        user_id = request.form.get("user_id")
+        document_name = request.form.get("document_name")
+        page_name = request.form.get("page_name")
+
+        if not user_id or not document_name or not page_name:
+            return (
+                jsonify(
+                    {"success": False, "message": "Missing user_id, document_name, or page_name"}
+                ),
+                400,
+            )
+
+        # Verify user authorization (user can delete their own pages, admin can delete any)
+        if user_id != session.get('user_id') and not current_user.is_admin:
+            return jsonify({"success": False, "message": "Access denied"}), 403
+
+        # Get PNG directory path
+        png_directory = file_operations.get_document_png_dir(
+            current_app.config, user_id, document_name
+        )
+
+        if not os.path.exists(png_directory):
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": f"Document '{document_name}' not found for user '{user_id}'",
+                    }
+                ),
+                404,
+            )
+
+        # Get the full path to the page file
+        page_file_path = os.path.join(png_directory, page_name)
+
+        if not os.path.exists(page_file_path):
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": f"Page '{page_name}' not found",
+                    }
+                ),
+                404,
+            )
+
+        # Check if this is a crop file (don't allow deleting crops this way)
+        if "_crop_" in page_name:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Cannot delete crop files using this endpoint. Use the crop management interface instead.",
+                    }
+                ),
+                400,
+            )
+
+        # Delete only the original page file, keeping all crop files
+        os.remove(page_file_path)
+
+        # Also remove from TOOCR/PNG directory if it exists
+        toocr_directory = os.path.join(
+            file_operations.get_document_completed_dir(current_app.config, user_id, document_name),
+            "PNG"
+        )
+        toocr_page_path = os.path.join(toocr_directory, page_name)
+        if os.path.exists(toocr_page_path):
+            os.remove(toocr_page_path)
+            current_app.logger.info(f"Also removed page from TOOCR directory: {toocr_page_path}")
+
+        # Get page base name to count remaining crops
+        page_base = os.path.splitext(page_name)[0]
+        all_files = os.listdir(png_directory)
+        remaining_crops = [
+            f for f in all_files 
+            if f.startswith(f"{page_base}_crop_") and f.endswith(".png")
+        ]
+
+        success_message = f"Page '{page_name}' deleted successfully"
+        if remaining_crops:
+            success_message += f" (kept {len(remaining_crops)} associated crop files)"
+
+        current_app.logger.info(
+            f"User '{user_id}' deleted page '{page_name}' from document '{document_name}' (kept {len(remaining_crops)} crops)"
+        )
+
+        return jsonify(
+            {
+                "success": True,
+                "message": success_message,
+                "remaining_crops": len(remaining_crops)
+            }
+        )
+
+    except Exception as e:
+        current_app.logger.error(f"Error deleting page: {str(e)}")
+        return (
+            jsonify(
+                {"success": False, "message": f"Error deleting page: {str(e)}"}
+            ),
+            500,
+        )
+
+
 @app.route("/api/admin/delete_document", methods=["POST"])
 @login_required
 def api_admin_delete_document():
