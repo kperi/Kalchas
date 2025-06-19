@@ -58,6 +58,29 @@ def get_document_completed_dir(app_config, user_id, document_folder_name):
     )
 
 
+def get_ocr_source_png_dir(app_config, user_id, document_folder_name, is_completed=True):
+    """
+    Directory containing PNG files to be used for OCR processing.
+    If is_completed=True, looks in TOOCR/PNG directory.
+    If is_completed=False, looks in PNG directory.
+    
+    Args:
+        app_config: Flask app configuration
+        user_id: The ID of the user
+        document_folder_name: Name of the document folder
+        is_completed: Whether to look in completed (TOOCR) or in-progress directory
+        
+    Returns:
+        str: Path to the PNG directory containing OCR source images
+    """
+    if is_completed:
+        return os.path.join(
+            get_document_completed_dir(app_config, user_id, document_folder_name), "PNG"
+        )
+    else:
+        return get_document_png_dir(app_config, user_id, document_folder_name)
+
+
 # --- Task 1: PDF File Upload and Folder Creation ---
 
 
@@ -981,3 +1004,188 @@ def get_document_summary_stats(app_config, user_id):
         logger.error(f"Error generating document summary stats for user {user_id}: {e}")
 
     return stats
+
+
+# --- OCR Data Processing Functions ---
+
+
+def save_ocr_processed_data(app_config, user_id, document_folder_name, page_image_filename_base, ocr_result_data, is_document_completed=True):
+    """
+    Save OCR processed segments data for a specific page.
+    
+    Args:
+        app_config: Flask app configuration
+        user_id: The ID of the user
+        document_folder_name: Name of the document folder
+        page_image_filename_base: Base filename of the page (e.g., "page_001" or "page_001_crop_001")
+        ocr_result_data: OCR results data from OCR service
+        is_document_completed: Whether document is in TOOCR folder
+        
+    Returns:
+        tuple: (text_summary, segments_data_list)
+    """
+    try:
+        if is_document_completed:
+            base_dir = get_document_completed_dir(app_config, user_id, document_folder_name)
+        else:
+            base_dir = get_document_png_dir(app_config, user_id, document_folder_name)
+        
+        # Create segments directory for this page under PNG subdirectory
+        # Pattern: /uploads/kostas/<document_name>/TOOCR/PNG/page_004_crop_002/
+        png_subdir = os.path.join(base_dir, "PNG")
+        segments_dir = os.path.join(png_subdir, page_image_filename_base)
+        os.makedirs(segments_dir, exist_ok=True)
+        
+        segments_data_list = []
+        text_summary = ""
+        
+        # Process each segment from OCR results
+        if isinstance(ocr_result_data, dict) and "segments" in ocr_result_data:
+            segments = ocr_result_data["segments"]
+        elif isinstance(ocr_result_data, list):
+            segments = ocr_result_data
+        else:
+            logger.warning(f"Unexpected OCR result data format: {type(ocr_result_data)}")
+            segments = []
+        
+        for i, segment in enumerate(segments):
+            segment_id = f"{i:03d}"
+            segment_file = os.path.join(segments_dir, f"{segment_id}.json")
+            
+            # Save individual segment data
+            with open(segment_file, 'w', encoding='utf-8') as f:
+                json.dump(segment, f, ensure_ascii=False, indent=2)
+            
+            # Extract text for summary and client data
+            segment_text = segment.get('text', '')
+            text_summary += segment_text + "\n"
+            
+            # Prepare segment data for client
+            segment_data = {
+                'id': segment_id,
+                'text': segment_text,
+                'confidence': segment.get('confidence', 0.0),
+                'bbox': segment.get('bbox', []),
+                'file_path': segment_file
+            }
+            segments_data_list.append(segment_data)
+        
+        # Save combined summary in the same directory as the segments
+        summary_file = os.path.join(segments_dir, "summary.txt")
+        
+        with open(summary_file, 'w', encoding='utf-8') as f:
+            f.write(text_summary.strip())
+        
+        logger.info(f"Saved OCR data for {page_image_filename_base}: {len(segments_data_list)} segments")
+        return text_summary.strip(), segments_data_list
+        
+    except Exception as e:
+        logger.error(f"Error saving OCR processed data for {page_image_filename_base}: {str(e)}")
+        return "", []
+
+
+def fetch_page_segments_data(app_config, user_id, document_folder_name, page_image_filename_base, is_document_completed=True):
+    """
+    Fetch OCR segments data for a specific page that has been processed.
+    
+    Args:
+        app_config: Flask app configuration
+        user_id: The ID of the user
+        document_folder_name: Name of the document folder
+        page_image_filename_base: Base filename of the page (e.g., "page_001" or "page_001_crop_001")
+        is_document_completed: Whether document is in TOOCR folder
+        
+    Returns:
+        list: List of segment data dictionaries, or None if not found
+    """
+    try:
+        if is_document_completed:
+            base_dir = get_document_completed_dir(app_config, user_id, document_folder_name)
+        else:
+            base_dir = get_document_png_dir(app_config, user_id, document_folder_name)
+        
+        # Look for segments directory for this page under PNG subdirectory
+        # Pattern: /uploads/kostas/<document_name>/TOOCR/PNG/page_004_crop_002/
+        png_subdir = os.path.join(base_dir, "PNG")
+        segments_dir = os.path.join(png_subdir, page_image_filename_base)
+        
+        if not os.path.exists(segments_dir):
+            logger.warning(f"Segments directory not found: {segments_dir}")
+            return None
+        
+        segments_data_list = []
+        
+        # Read all segment JSON files
+        try:
+            segment_files = [f for f in os.listdir(segments_dir) if f.endswith('.json')]
+            segment_files.sort()  # Ensure proper order (000.json, 001.json, etc.)
+            
+            for segment_file in segment_files:
+                segment_path = os.path.join(segments_dir, segment_file)
+                segment_id = os.path.splitext(segment_file)[0]
+                
+                with open(segment_path, 'r', encoding='utf-8') as f:
+                    segment_data = json.load(f)
+                
+                # Prepare segment data for client
+                client_segment_data = {
+                    'id': segment_id,
+                    'text': segment_data.get('text', ''),
+                    'confidence': segment_data.get('confidence', 0.0),
+                    'bbox': segment_data.get('bbox', []),
+                    'file_path': segment_path
+                }
+                segments_data_list.append(client_segment_data)
+                
+        except Exception as e:
+            logger.error(f"Error reading segment files from {segments_dir}: {str(e)}")
+            return None
+        
+        logger.info(f"Fetched {len(segments_data_list)} segments for {page_image_filename_base}")
+        return segments_data_list
+        
+    except Exception as e:
+        logger.error(f"Error fetching page segments data for {page_image_filename_base}: {str(e)}")
+        return None
+
+
+def get_segment_image_file_details(app_config, user_id, document_folder_name, page_image_filename_base, segment_id_str, is_document_completed=True):
+    """
+    Get the directory and filename for a specific segment image.
+    
+    Args:
+        app_config: Flask app configuration
+        user_id: The ID of the user
+        document_folder_name: Name of the document folder
+        page_image_filename_base: Base filename of the page (e.g., "page_001" or "page_001_crop_001")
+        segment_id_str: Segment ID as string (e.g., "000", "001")
+        is_document_completed: Whether document is in TOOCR folder
+        
+    Returns:
+        tuple: (segment_dir, segment_image_filename) or (None, None) if not found
+    """
+    try:
+        if is_document_completed:
+            base_dir = get_document_completed_dir(app_config, user_id, document_folder_name)
+        else:
+            base_dir = get_document_png_dir(app_config, user_id, document_folder_name)
+        
+        # Segments are under PNG subdirectory with page name
+        # Pattern: /uploads/kostas/<document_name>/TOOCR/PNG/page_004_crop_002/
+        png_subdir = os.path.join(base_dir, "PNG")
+        segments_dir = os.path.join(png_subdir, page_image_filename_base)
+        
+        # Segment image filename pattern: 000.png, 001.png, etc.
+        segment_image_filename = f"{segment_id_str}.png"
+        segment_image_path = os.path.join(segments_dir, segment_image_filename)
+        
+        if os.path.exists(segment_image_path):
+            logger.info(f"Found segment image: {segment_image_path}")
+            return segments_dir, segment_image_filename
+        else:
+            logger.warning(f"Segment image not found: {segment_image_path}")
+            return None, None
+            
+    except Exception as e:
+        logger.error(f"Error getting segment image file details: {str(e)}")
+        return None, None

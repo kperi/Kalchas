@@ -738,6 +738,7 @@ def move_to_ocr():
 
 
 @app.route("/process_ocr", methods=["POST"])
+@login_required
 def process_ocr():
     data = request.json
     if (
@@ -790,8 +791,8 @@ def process_ocr():
         page_image_filename_base = os.path.splitext(page_image_to_ocr)[0]
 
         # Save the processed OCR data using the new file_operations function
-        # This will save segments to /<user_id>/<doc_folder_name>/TOOCR/PNG/<page_image_filename_base>_ocr_segments/
-        # And combined summary to /<user_id>/<doc_folder_name>/TOOCR/PNG_ocr_segments_summary/
+        # This will save segments to /<user_id>/<doc_folder_name>/TOOCR/PNG/<page_image_filename_base>/
+        # With individual segment files: 000.json, 001.json, etc. and summary.txt
         text_summary, saved_segments_data = file_operations.save_ocr_processed_data(
             current_app.config,
             user_id,
@@ -2253,8 +2254,8 @@ def api_move_to_ocr():
                 f"User {user_id} moved document {folder_name} to OCR via AJAX"
             )
 
-            # Generate redirect URL for preview page
-            redirect_url = url_for("app.image_preview", selected_folder=folder_name)
+            # Generate redirect URL for OCR page
+            redirect_url = url_for("app.ocr", selected_folder=folder_name)
 
             return jsonify(
                 {

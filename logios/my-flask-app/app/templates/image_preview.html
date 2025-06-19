@@ -279,12 +279,12 @@
                             <input type="hidden" name="selected_png" value="{{ request.args.get('selected_png') }}">
                             <div style="margin-top: 1rem;">
                                 <label for="segment-select">Select Detected Segment:</label>
-                                <select name="selected_segment" id="segment-select">
+                                <select name="selected_segment" id="segment-select" disabled>
                                     <option value="">-- Select Segment --</option>
                                     <!-- Segments will be populated in JavaScript -->
                                 </select>
                                 <div id="segment-loading" style="font-size: 0.8em; margin-top: 5px; color: #6c757d;">
-                                    Run OCR to detect segments
+                                    Run "Segment & OCR" to detect segments
                                 </div>
                             </div>
                         </form>
@@ -1239,29 +1239,47 @@
                 .replace('__FOLDER__', encodeURIComponent(currentFolder))
                 .replace('__FILENAME__', encodeURIComponent(currentPage));
 
-            // Prepare form data for OCR service
-            const formData = new FormData();
+            // Call the Flask OCR processing endpoint
+            const ocrData = {
+                folder: currentFolder,
+                filename: currentPage
+            };
             
-            // Fetch the image and add it to form data
-            fetch(imageUrl)
-                .then(response => response.blob())
-                .then(blob => {
-                    formData.append('file', blob, currentPage);
-                    
-                    // Call the OCR service endpoint
-                    return fetch('/process_image/', {
-                        method: 'POST',
-                        body: formData
-                    });
+            fetch('/process_ocr', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(ocrData)
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
                 })
-                .then(response => response.json())
                 .then(data => {
                     showSegmentOCRLoading(false);
                     
                     if (data.success) {
                         showSegmentOCRStatus('success', 'OCR processing completed successfully!');
                         
-                        // Reload segments to show the new results
+                        // Update the OCR result textarea with the text
+                        const ocrResult = document.getElementById('ocr-result');
+                        if (ocrResult && data.text) {
+                            ocrResult.value = data.text;
+                        }
+                        
+                        // Populate the segment dropdown with the new segments
+                        if (data.segments && data.segments.length > 0) {
+                            populateSegmentDropdown(data.segments);
+                            showSegmentStatus(`Found ${data.segments.length} segments`);
+                        } else {
+                            populateSegmentDropdown([]);
+                            showSegmentStatus('No segments detected');
+                        }
+                        
+                        // Also reload segments to show in the navigation
                         if (currentFolder && currentPage) {
                             const pageId = currentPage.split('.')[0];
                             setTimeout(() => {
@@ -1269,13 +1287,13 @@
                             }, 1000);
                         }
                     } else {
-                        showSegmentOCRStatus('error', data.message || 'Failed to process image with OCR');
+                        showSegmentOCRStatus('error', data.error || data.message || 'Failed to process image with OCR');
                     }
                 })
                 .catch(error => {
                     console.error('Segment OCR error:', error);
                     showSegmentOCRLoading(false);
-                    showSegmentOCRStatus('error', 'Network error occurred during OCR processing');
+                    showSegmentOCRStatus('error', `Network error: ${error.message}`);
                 });
         }
 
@@ -1321,6 +1339,63 @@
             if (statusElement) {
                 statusElement.style.display = 'none';
             }
+        }
+        
+        // Function to populate the segment dropdown
+        function populateSegmentDropdown(segments) {
+            const segmentSelect = document.getElementById('segment-select');
+            if (!segmentSelect) return;
+            
+            // Clear existing options except the default
+            segmentSelect.innerHTML = '<option value="">-- Select Segment --</option>';
+            
+            // Add segments to dropdown
+            segments.forEach((segment, index) => {
+                const option = document.createElement('option');
+                option.value = index;  // Use index to match existing loadLineSegments behavior
+                
+                // Create display text
+                let displayText = `Segment ${index + 1}`;
+                if (segment.text) {
+                    const textPreview = String(segment.text).substring(0, 30);
+                    displayText += `: ${textPreview}...`;
+                }
+                
+                option.textContent = displayText;
+                segmentSelect.appendChild(option);
+            });
+            
+            // Enable the dropdown
+            segmentSelect.disabled = false;
+            
+            // Add event listener for segment selection if not already added
+            if (!segmentSelect.hasAttribute('data-listener-added')) {
+                segmentSelect.addEventListener('change', handleSegmentSelection);
+                segmentSelect.setAttribute('data-listener-added', 'true');
+            }
+        }
+        
+        // Function to show segment status
+        function showSegmentStatus(message) {
+            const statusElement = document.getElementById('segment-loading');
+            if (statusElement) {
+                statusElement.textContent = message;
+                statusElement.style.color = '#059669';
+            }
+        }
+        
+        // Function to handle segment selection from dropdown
+        function handleSegmentSelection(event) {
+            const selectedSegmentIndex = event.target.value;
+            if (selectedSegmentIndex === '' || !currentFolder || !currentPage) return;
+            
+            // Convert index to segment ID (000, 001, etc.)
+            const segmentId = String(selectedSegmentIndex).padStart(3, '0');
+            
+            // Navigate to the selected segment
+            const pageId = currentPage.split('.')[0];
+            const newUrl = `{{ url_for('app.image_preview') }}?selected_folder=${encodeURIComponent(currentFolder)}&selected_png=${encodeURIComponent(currentPage)}&selected_segment=${encodeURIComponent(segmentId)}`;
+            window.location.href = newUrl;
         }
 
         // Add to DOMContentLoaded event listener
