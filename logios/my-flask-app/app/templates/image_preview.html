@@ -290,11 +290,10 @@
                         </form>
                     </div>
                     {% endif %}
-
+                    
                     <div class="ocr-section gradio-component-group" style="margin-top:0; padding: 1rem; background-color: #f9fafb;"> <!-- Nested component group for OCR -->
                         <h4>Text Recognition (OCR)</h4>
                         <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
-                            <button class="gradio-button gradio-button-primary" onclick="performOCR()" style="flex: 1; min-width: 150px;">Extract Text from Page</button>
                             <button id="segment-ocr-btn" class="gradio-button gradio-button-secondary" onclick="performSegmentOCR()" style="flex: 1; min-width: 150px; background-color: #059669; color: white;">
                                 <span id="segment-ocr-text">Segment & OCR</span>
                                 <span id="segment-ocr-loading" style="display: none;">

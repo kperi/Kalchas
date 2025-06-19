@@ -195,7 +195,14 @@
                                     <div class="upload-subtext">Or select from your documents using the sidebar</div>
                                 </div>
                                 <div class="file-preview" id="filePreview">
-                                    <img class="preview-image" id="previewImage" alt="Preview">
+                                    <div class="image-zoom-container"></div>
+                                        <img class="preview-image" id="previewImage" alt="Preview">
+                                        <div class="zoom-controls">
+                                            <button onclick="zoomIn()"><i class="fas fa-search-plus"></i></button>
+                                            <button onclick="zoomOut()"><i class="fas fa-search-minus"></i></button>
+                                            <button onclick="resetZoom()"><i class="fas fa-undo"></i></button>
+                                        </div>
+                                    </div>
                                     <div class="file-info" id="fileInfo"></div>
                                 </div>
                             </div>
@@ -210,6 +217,67 @@
                                 Process OCR
                             </button>
                         </div>
+
+<style>
+.image-zoom-container {
+    position: relative;
+    overflow: hidden;
+    max-width: 100%;
+}
+
+.preview-image {
+    transform-origin: center;
+    transition: transform 0.3s ease;
+}
+
+.zoom-controls {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 5px;
+    border-radius: 4px;
+    display: flex;
+    gap: 5px;
+}
+
+.zoom-controls button {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 3px;
+}
+
+.zoom-controls button:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+</style>
+
+<script>
+let currentZoom = 1;
+
+function zoomIn() {
+    currentZoom = Math.min(currentZoom + 0.2, 3);
+    updateZoom();
+}
+
+function zoomOut() {
+    currentZoom = Math.max(currentZoom - 0.2, 0.5);
+    updateZoom();
+}
+
+function resetZoom() {
+    currentZoom = 1;
+    updateZoom();
+}
+
+function updateZoom() {
+    const image = document.getElementById('previewImage');
+    image.style.transform = `scale(${currentZoom})`;
+}
+</script>
 
                         <div class="gradio-column">
                             <label class="gradio-label">Extracted Text</label>

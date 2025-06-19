@@ -34,28 +34,6 @@ class OCRSegment(BaseModel):
     y2: int
 
 
-@app.post("/ocr_image_segment")
-async def ocr_image_segment(request: OCRSegment):
-    logger.info(f"Doing ocr segment for file {request.path}")
-
-    filename = request.path
-    x1 = request.x1
-    x2 = request.x2
-    y1 = request.y1
-    y2 = request.y2
-    image = np.array(Image.open(filename))
-    sub_image = image[y1:y2, x1:x2]
-    sub_image_pil = Image.fromarray(sub_image)
-    sub_image_pil.save("test_img.png")
-    size = sub_image_pil.size
-    logger.info(f"Chopping subimage with size {size}")
-
-    # ret = segmentation_and_recognition_ii(src_page="test_img.png")
-
-    ret = segmenter.segment("test_img.png")
-    return {"received_value": request.path, "ret": ret}
-
-
 @app.post("/process_image/")
 async def process_image_string(request: StringRequest):
     logger.info(f"Received file {request.value}")
@@ -67,5 +45,5 @@ async def process_image_string(request: StringRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
