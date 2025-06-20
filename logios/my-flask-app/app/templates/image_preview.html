@@ -138,6 +138,18 @@
             flex: 1;
             padding: 1rem;
             overflow-y: auto;
+            display: flex;
+            gap: 1.5rem;
+        }
+        
+        .main-left-column {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .main-right-column {
+            flex: 1;
+            min-width: 0;
         }
         
         .sidebar-section {
@@ -312,6 +324,28 @@
                 border-right: none;
                 border-bottom: 1px solid #e2e8f0;
             }
+            
+            .main-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .main-left-column,
+            .main-right-column {
+                flex: none;
+            }
+        }
+        
+        @media (max-width: 1200px) {
+            .main-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .main-left-column,
+            .main-right-column {
+                flex: none;
+            }
         }
     </style>
 </head>
@@ -373,66 +407,58 @@
         
         <!-- Main Content -->
         <div class="main-content">
-            <div class="gradio-component-group" style="max-width: 1200px; margin-left: auto; margin-right: auto;">
-                <h1>OCR Document Preview</h1>
-                
-          
-            </div>
-
-            {% if folders %}
-            <div class="gradio-component-group" style="background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
-                <div style="margin-bottom: 1rem;">
-                    <div id="selected-document-info" style="{% if selected_folder %}display: block;{% else %}display: none;{% endif %}">
-                        <h3 style="margin-top: 0; color: #1f2937;">Selected Document: <span id="current-document-name">{{ selected_folder or '' }}</span></h3>
+            <!-- Left Column: Page Selection and Image Preview -->
+            <div class="main-left-column">
+              
+                {% if folders %}
+                <div class="gradio-component-group" style="background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
+                    <div style="margin-bottom: 1rem;">
+                        <div id="selected-document-info" style="{% if selected_folder %}display: block;{% else %}display: none;{% endif %}">
+                            <h3 style="margin-top: 0; color: #1f2937;">Selected Document: <span id="current-document-name">{{ selected_folder or '' }}</span></h3>
+                        </div>
+                    </div>
+                    
+                    <div id="page-selection-container" class="{% if selected_folder %}fade-in show{% else %}fade-in{% endif %} smooth-transition" style="margin-bottom: 1rem; {% if selected_folder %}display: block;{% else %}display: none;{% endif %}">
+                        <label for="png-select">Select Page/Crop:</label>
+                        <select name="selected_png" id="png-select">
+                            <option value="">-- Select Page --</option>
+                            {% if png_files %}
+                                <!-- DEBUG: We have {{ png_files | length }} PNG files -->
+                                {% for png in png_files %}
+                                    <option value="{{ png }}" {% if png == request.args.get('selected_png') %}selected{% endif %}>
+                                        {% if 'crop' in png %}
+                                            {{ png.split('.')[0] }} <!-- Show full name for crops -->
+                                        {% else %}
+                                            Page {{ png.split('_')[1].split('.')[0] | int }} <!-- Extract page number for regular pages -->
+                                        {% endif %}
+                                    </option>
+                                {% endfor %}
+                            {% else %}
+                                <!-- DEBUG: No PNG files found -->
+                            {% endif %}
+                        </select>
+                        <!-- DEBUG: Container should be visible because selected_folder = "{{ selected_folder }}" -->
                     </div>
                 </div>
-                
-                <div id="page-selection-container" class="{% if selected_folder %}fade-in show{% else %}fade-in{% endif %} smooth-transition" style="margin-bottom: 1rem; {% if selected_folder %}display: block;{% else %}display: none;{% endif %}">
-                    <label for="png-select">Select Page/Crop:</label>
-                    <select name="selected_png" id="png-select">
-                        <option value="">-- Select Page --</option>
-                        {% if png_files %}
-                            <!-- DEBUG: We have {{ png_files | length }} PNG files -->
-                            {% for png in png_files %}
-                                <option value="{{ png }}" {% if png == request.args.get('selected_png') %}selected{% endif %}>
-                                    {% if 'crop' in png %}
-                                        {{ png.split('.')[0] }} <!-- Show full name for crops -->
-                                    {% else %}
-                                        Page {{ png.split('_')[1].split('.')[0] | int }} <!-- Extract page number for regular pages -->
-                                    {% endif %}
-                                </option>
-                            {% endfor %}
-                        {% else %}
-                            <!-- DEBUG: No PNG files found -->
-                        {% endif %}
-                    </select>
-                    <!-- DEBUG: Container should be visible because selected_folder = "{{ selected_folder }}" -->
-                </div>
-            </div>
-            {% else %}
-            <div class="gradio-component-group" style="background-color: #fef3c7; padding: 1rem; margin-bottom: 1.5rem;">
-                <p><strong>No OCR-ready documents found.</strong></p>
-                <p>Documents become OCR-ready after using the "Move to OCR" button in the Image Cropping Tool.</p>
-                <a href="{{ url_for('app.crop_image') }}" class="gradio-button gradio-button-primary">Go to Image Cropping Tool</a>
-            </div>
-            {% endif %}
-
-            <!-- Dynamic content area for selected document -->
-            <div id="document-display-container" class="fade-in show smooth-transition">
-                <!-- DEBUG: Image section will show when both selected_folder AND selected_png are set -->
-                <!-- Currently: selected_folder="{{ selected_folder or 'None' }}", selected_png="{{ request.args.get('selected_png') or 'None' }}" -->
-                {% if selected_folder and request.args.get('selected_png') %}
-                <div id="debug-path-info" style="margin-bottom: 10px; padding: 5px; border: 1px solid #ddd; background-color: #f5f5f5;">
-                    <strong>Debug Info:</strong> 
-                    <span style="font-family: monospace; word-break: break-all;">
-                        TOOCR Path: /uploads/{{session.get('user_id', 'anonymous')}}/{{selected_folder}}/TOOCR/PNG/{{request.args.get('selected_png')}}
-                    </span>
+                {% else %}
+                <div class="gradio-component-group" style="background-color: #fef3c7; padding: 1rem; margin-bottom: 1.5rem;">
+                    <p><strong>No OCR-ready documents found.</strong></p>
+                    <p>Documents become OCR-ready after using the "Move to OCR" button in the Image Cropping Tool.</p>
+                    <a href="{{ url_for('app.crop_image') }}" class="gradio-button gradio-button-primary">Go to Image Cropping Tool</a>
                 </div>
                 {% endif %}
 
-                {% if selected_folder and request.args.get('selected_png') %}
-                <div class="gradio-display-area" style="flex-direction: column; align-items: stretch; gap: 1.5rem;">
-                    <div class="gradio-display-area" style="min-height: 40vh; padding:0; border: none; background: #fff;"> <!-- Inner display for main page image -->
+                <!-- Image Preview Area -->
+                <div id="document-display-container" class="fade-in show smooth-transition">
+                    {% if selected_folder and request.args.get('selected_png') %}
+                    <div id="debug-path-info" style="margin-bottom: 10px; padding: 5px; border: 1px solid #ddd; background-color: #f5f5f5;">
+                        <strong>Debug Info:</strong> 
+                        <span style="font-family: monospace; word-break: break-all;">
+                            TOOCR Path: /uploads/{{session.get('user_id', 'anonymous')}}/{{selected_folder}}/TOOCR/PNG/{{request.args.get('selected_png')}}
+                        </span>
+                    </div>
+
+                    <div class="gradio-display-area" style="min-height: 40vh; padding:0; border: none; background: #fff;">
                         <div id="image-container" style="position: relative; display: inline-block;">
                             <img id="preview-image"
                                 src="{{ url_for('app.serve_completed_document_png_file', 
@@ -444,120 +470,127 @@
                             <canvas id="bounding-box-overlay" style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 10;"></canvas>
                         </div>
                     </div>
-
-                    <!-- Segment Selection Form -->
-                    {% if selected_folder and request.args.get('selected_png') %}
-                    <div id="segment-selection-container" style="background-color: #f9fafb; padding: 1rem; border-radius: 6px;">
-                        <form id="segment-form" onsubmit="return false;">
-                            <input type="hidden" name="selected_folder" value="{{ selected_folder }}">
-                            <input type="hidden" name="selected_png" value="{{ request.args.get('selected_png') }}">
-                            <div style="margin-top: 1rem;">
-                                <label for="segment-select">Select Detected Segment:</label>
-                                <select name="selected_segment" id="segment-select" disabled>
-                                    <option value="">-- Select Segment --</option>
-                                    <!-- Segments will be populated in JavaScript -->
-                                </select>
-                                <div id="segment-loading" style="font-size: 0.8em; margin-top: 5px; color: #6c757d;">
-                                    Run "Segment & OCR" to detect segments
-                                </div>
-                            </div>
-                        </form>
+                    {% elif selected_folder %}
+                    <div class="gradio-display-area">
+                        <p class="gradio-placeholder-text">Please select a page to preview and perform OCR.</p>
+                    </div>
+                    {% else %}
+                    <div class="gradio-display-area">
+                        <p class="gradio-placeholder-text">Please select an OCR-ready document from the sidebar.</p>
                     </div>
                     {% endif %}
+                </div>
+            </div>
+
+            <!-- Right Column: OCR Controls and Segments -->
+            <div class="main-right-column">
+                {% if selected_folder and request.args.get('selected_png') %}
+                <!-- Segment Selection Form -->
+                <div id="segment-selection-container" class="gradio-component-group" style="background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
+                    <h4>Segment Selection</h4>
+                    <form id="segment-form" onsubmit="return false;">
+                        <input type="hidden" name="selected_folder" value="{{ selected_folder }}">
+                        <input type="hidden" name="selected_png" value="{{ request.args.get('selected_png') }}">
+                        <div style="margin-top: 1rem;">
+                            <label for="segment-select">Select Detected Segment:</label>
+                            <select name="selected_segment" id="segment-select" disabled>
+                                <option value="">-- Select Segment --</option>
+                                <!-- Segments will be populated in JavaScript -->
+                            </select>
+                            <div id="segment-loading" style="font-size: 0.8em; margin-top: 5px; color: #6c757d;">
+                                Run "Segment & OCR" to detect segments
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- OCR Section -->
+                <div class="ocr-section gradio-component-group" style="background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
+                    <h4>Text Recognition (OCR)</h4>
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                        <button id="segment-ocr-btn" class="gradio-button gradio-button-secondary" onclick="performSegmentOCR()" style="flex: 1; min-width: 150px; background-color: #059669; color: white;">
+                            <span id="segment-ocr-text">Segment & OCR</span>
+                            <span id="segment-ocr-loading" style="display: none;">
+                                <span class="loading-spinner"></span>
+                                Processing...
+                            </span>
+                        </button>
+                    </div>
                     
-                    <div class="ocr-section gradio-component-group" style="margin-top:0; padding: 1rem; background-color: #f9fafb;"> <!-- Nested component group for OCR -->
-                        <h4>Text Recognition (OCR)</h4>
-                        <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
-                            <button id="segment-ocr-btn" class="gradio-button gradio-button-secondary" onclick="performSegmentOCR()" style="flex: 1; min-width: 150px; background-color: #059669; color: white;">
-                                <span id="segment-ocr-text">Segment & OCR</span>
-                                <span id="segment-ocr-loading" style="display: none;">
-                                    <span class="loading-spinner"></span>
-                                    Processing...
-                                </span>
-                            </button>
-                        </div>
-                        
-                        <!-- Status messages for Segment & OCR -->
-                        <div id="segment-ocr-status" style="margin-bottom: 1rem; padding: 0.75rem; border-radius: 6px; display: none;">
-                            <div id="segment-ocr-status-message"></div>
-                        </div>
-                        
-                        <!-- START: Preview for Segment Selected from Sidebar Dropdown - MOVED HERE -->
-                        {% if selected_segment %} {# selected_segment is passed from routes.py context #}
-                            <div id="sidebar-selected-segment-preview" style="margin-top: 1rem; margin-bottom: 1rem; padding: 1rem; border: 1px solid #e0e0e0; background-color: #fdfdfd; border-radius: 5px;">
- 
-                                
-                                {% if segment_data and segment_data.text %}
-                                    <div style="padding: 0.5rem; background-color: #f0f0f0; border-radius: 3px;">
-                                        <p style="font-family: monospace; white-space: pre-wrap; font-size: 0.9em; margin:0; color: #333;">
-                                            {% if segment_data.text is string %}
-                                                {{ segment_data.text }}
-                                            {% elif segment_data.text is iterable and segment_data.text[0] is string %}
-                                                {{ segment_data.text[0] }}
-                                                {% if segment_data.text[1] is number %}
-                                                    (Confidence: {{ "%.3f"|format(segment_data.text[1]) }})
-                                                {% endif %}
-                                            {% else %}
-                                                {{ segment_data.text | tojson }}
-                                            {% endif %}
-                                        </p>
-                                    </div>
-                                {% elif segment_data %}
-                                    <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">(No text data available for this segment in the JSON)</p>
-                                {% endif %}
-                            </div>
-                        {% endif %}
-                        <!-- END: Preview for Segment Selected from Sidebar Dropdown -->
+                    <!-- Status messages for Segment & OCR -->
+                    <div id="segment-ocr-status" style="margin-bottom: 1rem; padding: 0.75rem; border-radius: 6px; display: none;">
+                        <div id="segment-ocr-status-message"></div>
+                    </div>
 
-                        <!-- Line Segments Navigation - Initially hidden -->
-                        <div id="line-segments-container" style="display: none; margin-bottom: 1rem;">
-                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                                <button id="prev-segment-btn" class="gradio-button gradio-button-secondary" style="padding: 5px 10px; font-size:0.9em;">&lt; Prev</button>
-                                <div style="text-align: center; flex-grow: 1; font-size: 0.9em; color: #666;">
-                                    <span id="segment-counter">Segment 0 of 0</span>
-                                </div>
-                                <button id="next-segment-btn" class="gradio-button gradio-button-secondary" style="padding: 5px 10px; font-size:0.9em;">Next &gt;</button>
-                            </div>
+                    <textarea id="ocr-result" placeholder="Extracted text will appear here..." style="height: 200px; width: 100%; font-family: monospace;" readonly></textarea>
+                </div>
 
-                            <!-- Single preview container that will be used for all segment displays -->
-                            <div id="sidebar-selected-segment-preview" style="margin-top: 1rem; margin-bottom: 1rem; padding: 1rem; border: 1px solid #e0e0e0; background-color: #fdfdfd; border-radius: 5px;">
-                                <h5 id="sidebar-segment-title" style="margin-top:0; margin-bottom: 0.5rem; font-size: 1em; color: #333;">
-                                    Preview of Selected Segment
-                                </h5>
-                                <div style="text-align: center; margin-bottom: 0.5rem;">
-                                    <img id="sidebar-segment-image" src="" alt="Selected Segment Image"
-                                         style="max-width: 100%; max-height: 200px; border: 1px solid #ccc; object-fit: contain; background-color: #fff;">
-                                </div>
-                                <div id="sidebar-segment-text-container" style="padding: 0.5rem; background-color: #f0f0f0; border-radius: 3px;">
-                                    <p id="sidebar-segment-text" style="font-family: monospace; white-space: pre-wrap; font-size: 0.9em; margin:0; color: #333;">
-                                        Select a segment to view text
-                                    </p>
-                                </div>
-                                <button id="view-segment-json-btn" class="gradio-button gradio-button-sm" style="margin-top: 10px; font-size:0.8em; padding: 3px 8px;">View Segment JSON</button>
-                            </div>
+                <!-- Line Segments Navigation - Initially hidden -->
+                <div id="line-segments-container" class="gradio-component-group" style="display: none; background-color: #f9fafb; padding: 1rem;">
+                    <h4>Segment Navigation</h4>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                        <button id="prev-segment-btn" class="gradio-button gradio-button-secondary" style="padding: 5px 10px; font-size:0.9em;">&lt; Prev</button>
+                        <div style="text-align: center; flex-grow: 1; font-size: 0.9em; color: #666;">
+                            <span id="segment-counter">Segment 0 of 0</span>
                         </div>
-                        
-                        <!-- Container for displaying segment JSON -->
-                        <div id="segment-json-display-container" style="display: none; margin-top: 1rem; margin-bottom: 1rem; padding: 1rem; border: 1px solid #e0e0e0; background-color: #f8f9fa; border-radius: 5px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                                <h6 style="margin: 0;">Segment JSON Data:</h6>
-                                <button id="close-segment-json-btn" class="gradio-button gradio-button-sm" style="font-size:0.8em; padding: 3px 8px;">×</button>
-                            </div>
-                            <div id="segment-json-loading" style="display: none; color: #6c757d; font-size: 0.9em; padding: 10px 0;">Loading JSON data...</div>
-                            <pre id="segment-json-content" style="white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; background-color: #fff; padding:10px; border-radius: 3px; margin-bottom: 0;"></pre>
-                        </div>
+                        <button id="next-segment-btn" class="gradio-button gradio-button-secondary" style="padding: 5px 10px; font-size:0.9em;">Next &gt;</button>
+                    </div>
 
-                        <textarea id="ocr-result" placeholder="Extracted text will appear here..." style="height: 200px; width: 100%; font-family: monospace;" readonly></textarea>
-                        {# <div id="ocr-status" style="margin-top: 0.5rem; font-size: 0.8em; color: #6c757d;"></div> #}
+                    <!-- Single preview container that will be used for all segment displays -->
+                    <div id="sidebar-selected-segment-preview" style="margin-top: 1rem; margin-bottom: 1rem; padding: 1rem; border: 1px solid #e0e0e0; background-color: #fdfdfd; border-radius: 5px;">
+                        <h5 id="sidebar-segment-title" style="margin-top:0; margin-bottom: 0.5rem; font-size: 1em; color: #333;">
+                            Preview of Selected Segment
+                        </h5>
+                        <div style="text-align: center; margin-bottom: 0.5rem;">
+                            <img id="sidebar-segment-image" src="" alt="Selected Segment Image"
+                                 style="max-width: 100%; max-height: 200px; border: 1px solid #ccc; object-fit: contain; background-color: #fff;">
+                        </div>
+                        <div id="sidebar-segment-text-container" style="padding: 0.5rem; background-color: #f0f0f0; border-radius: 3px;">
+                            <p id="sidebar-segment-text" style="font-family: monospace; white-space: pre-wrap; font-size: 0.9em; margin:0; color: #333;">
+                                Select a segment to view text
+                            </p>
+                        </div>
+                        <button id="view-segment-json-btn" class="gradio-button gradio-button-sm" style="margin-top: 10px; font-size:0.8em; padding: 3px 8px;">View Segment JSON</button>
                     </div>
                 </div>
-                {% elif selected_folder %}
-                <div class="gradio-display-area">
-                    <p class="gradio-placeholder-text">Please select a page to preview and perform OCR.</p>
+                
+                <!-- Container for displaying segment JSON -->
+                <div id="segment-json-display-container" class="gradio-component-group" style="display: none; background-color: #f8f9fa; padding: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <h6 style="margin: 0;">Segment JSON Data:</h6>
+                        <button id="close-segment-json-btn" class="gradio-button gradio-button-sm" style="font-size:0.8em; padding: 3px 8px;">×</button>
+                    </div>
+                    <div id="segment-json-loading" style="display: none; color: #6c757d; font-size: 0.9em; padding: 10px 0;">Loading JSON data...</div>
+                    <pre id="segment-json-content" style="white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; background-color: #fff; padding:10px; border-radius: 3px; margin-bottom: 0;"></pre>
                 </div>
+
+                <!-- START: Preview for Segment Selected from Sidebar Dropdown - MOVED HERE -->
+                {% if selected_segment %} {# selected_segment is passed from routes.py context #}
+                    <div id="sidebar-selected-segment-preview-legacy" class="gradio-component-group" style="background-color: #fdfdfd; padding: 1rem;">
+                        {% if segment_data and segment_data.text %}
+                            <div style="padding: 0.5rem; background-color: #f0f0f0; border-radius: 3px;">
+                                <p style="font-family: monospace; white-space: pre-wrap; font-size: 0.9em; margin:0; color: #333;">
+                                    {% if segment_data.text is string %}
+                                        {{ segment_data.text }}
+                                    {% elif segment_data.text is iterable and segment_data.text[0] is string %}
+                                        {{ segment_data.text[0] }}
+                                        {% if segment_data.text[1] is number %}
+                                            (Confidence: {{ "%.3f"|format(segment_data.text[1]) }})
+                                        {% endif %}
+                                    {% else %}
+                                        {{ segment_data.text | tojson }}
+                                    {% endif %}
+                                </p>
+                            </div>
+                        {% elif segment_data %}
+                            <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">(No text data available for this segment in the JSON)</p>
+                        {% endif %}
+                    </div>
+                {% endif %}
+                <!-- END: Preview for Segment Selected from Sidebar Dropdown -->
                 {% else %}
-                <div class="gradio-display-area">
-                    <p class="gradio-placeholder-text">Please select an OCR-ready document from the sidebar.</p>
+                <div class="gradio-component-group" style="background-color: #f9fafb; padding: 1rem;">
+                    <p class="gradio-placeholder-text">Select a document and page to access OCR controls.</p>
                 </div>
                 {% endif %}
             </div>
