@@ -312,7 +312,63 @@
             opacity: 0.7;
         }
 
-        /* Responsive behavior */
+        /* Notification system styles */
+        .notification-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            max-width: 400px;
+        }
+        
+        .notification {
+            padding: 12px 16px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transform: translateX(100%);
+            transition: transform 0.3s ease-in-out;
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .notification-success {
+            background-color: #dcfce7;
+            border-left: 4px solid #16a34a;
+            color: #166534;
+        }
+        
+        .notification-error {
+            background-color: #fef2f2;
+            border-left: 4px solid #dc2626;
+            color: #dc2626;
+        }
+        
+        .notification-info {
+            background-color: #dbeafe;
+            border-left: 4px solid #2563eb;
+            color: #1d4ed8;
+        }
+        
+        .notification-close {
+            margin-left: auto;
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            color: inherit;
+            opacity: 0.7;
+        }
+        
+        .notification-close:hover {
+            opacity: 1;
+        }
         @media (max-width: 768px) {
             .page-layout {
                 flex-direction: column;
@@ -645,18 +701,46 @@
                         currentFolder = '';
                         currentPage = '';
                         hidePageSelection();
-                        hideDocumentDisplay();
+                        const documentDisplayContainer = document.getElementById('document-display-container');
+                        if (documentDisplayContainer) {
+                            documentDisplayContainer.innerHTML = `
+                                <div class="gradio-display-area">
+                                    <p class="gradio-placeholder-text">Please select an OCR-ready document from the sidebar.</p>
+                                </div>
+                            `;
+                        }
+                        hideOCRControls();
+                        clearSegmentData();
                         if (selectedDocumentInfo) {
                             selectedDocumentInfo.style.display = 'none';
                         }
+                        // Clear sidebar selection
+                        document.querySelectorAll('.document-item').forEach(item => {
+                            item.classList.remove('selected');
+                        });
                     }
                 }
                 
                 if (page !== currentPage && folder) {
                     // Navigate to different page
                     if (page) {
-                        pngSelect.value = page;
+                        currentPage = page;
+                        if (pngSelect) {
+                            pngSelect.value = page;
+                        }
                         loadPage(folder, page);
+                    } else {
+                        // No page selected, but folder is selected
+                        const documentDisplayContainer = document.getElementById('document-display-container');
+                        if (documentDisplayContainer) {
+                            documentDisplayContainer.innerHTML = `
+                                <div class="gradio-display-area">
+                                    <p class="gradio-placeholder-text">Please select a page to preview and perform OCR.</p>
+                                </div>
+                            `;
+                        }
+                        hideOCRControls();
+                        clearSegmentData();
                     }
                 }
             }
@@ -677,6 +761,8 @@
         
         // Function to select a document
         function selectDocument(documentName) {
+            console.log('[selectDocument] Selecting document:', documentName);
+            
             // Update current state
             currentFolder = documentName;
             currentPage = '';
@@ -701,50 +787,407 @@
                 selectedDocumentInfo.style.display = 'block';
             }
             
-            // Load document pages
+            // Clear any existing page data and show placeholder
+            const documentDisplayContainer = document.getElementById('document-display-container');
+            if (documentDisplayContainer) {
+                documentDisplayContainer.innerHTML = `
+                    <div class="gradio-display-area">
+                        <p class="gradio-placeholder-text">Please select a page to preview and perform OCR.</p>
+                    </div>
+                `;
+            }
+            
+            // Hide OCR controls until a page is selected
+            hideOCRControls();
+            clearSegmentData();
+            
+            // Load document pages via AJAX
             loadDocumentPages(documentName);
         }
         
-        // Page selection handler
-        if (pngSelect) {
-            pngSelect.addEventListener('change', function() {
-                const selectedPage = this.value;
-                currentPage = selectedPage;
-                
-                // Update browser URL
-                updateBrowserURL(currentFolder, selectedPage);
-                
-                if (selectedPage && currentFolder) {
-                    loadPage(currentFolder, selectedPage);
-                } else {
-                    hideDocumentDisplay();
-                }
-            });
+        // Function to setup page selection event listener
+        function setupPageSelectionListener() {
+            const pngSelect = document.getElementById('png-select');
+            if (pngSelect && !pngSelect.hasAttribute('data-listener-added')) {
+                pngSelect.addEventListener('change', function(event) {
+                    const selectedPage = this.value;
+                    currentPage = selectedPage;
+                    
+                    // Update browser URL without page reload
+                    updateBrowserURL(currentFolder, selectedPage);
+                    
+                    if (selectedPage && currentFolder) {
+                        // Load page via AJAX instead of page reload
+                        loadPage(currentFolder, selectedPage);
+                    } else {
+                        // No page selected - hide preview and OCR controls
+                        const documentDisplayContainer = document.getElementById('document-display-container');
+                        if (documentDisplayContainer) {
+                            if (currentFolder) {
+                                // Document selected but no page
+                                documentDisplayContainer.innerHTML = `
+                                    <div class="gradio-display-area">
+                                        <p class="gradio-placeholder-text">Please select a page to preview and perform OCR.</p>
+                                    </div>
+                                `;
+                            } else {
+                                // No document selected
+                                documentDisplayContainer.innerHTML = `
+                                    <div class="gradio-display-area">
+                                        <p class="gradio-placeholder-text">Please select an OCR-ready document from the sidebar.</p>
+                                    </div>
+                                `;
+                            }
+                        }
+                        hideOCRControls();
+                        clearSegmentData();
+                    }
+                });
+                pngSelect.setAttribute('data-listener-added', 'true');
+                console.log('[setupPageSelectionListener] Page selection event listener attached');
+            }
         }
 
         // AJAX function to load document pages
         function loadDocumentPages(documentName) {
-            // For now, this will use the existing form submission approach
-            // In the future, this could be converted to AJAX like in crop_menu.html
-            if (selectedDocumentInfo) {
-                selectedDocumentInfo.style.display = 'block';
-            }
+            console.log('[loadDocumentPages] Loading pages for document:', documentName);
+            
+            // Show loading state
+            const pageSelectionContainer = document.getElementById('page-selection-container');
+            const pngSelect = document.getElementById('png-select');
+            
             if (pageSelectionContainer) {
                 pageSelectionContainer.style.display = 'block';
                 setTimeout(() => pageSelectionContainer.classList.add('show'), 10);
             }
             
-            // Navigate to the document (this will cause a page reload for now)
-            window.location.href = `{{ url_for('app.image_preview') }}?selected_folder=${encodeURIComponent(documentName)}`;
+            if (pngSelect) {
+                pngSelect.disabled = true;
+                pngSelect.innerHTML = '<option value="">Loading pages...</option>';
+            }
+            
+            // Make AJAX call to get document images
+            const userId = '{{ session.get("user_id", "anonymous") }}';
+            const apiUrl = `{{ url_for('app.api_get_document_images', user_id='__USER_ID__', document_folder_name='__DOCUMENT_NAME__') }}`
+                .replace('__USER_ID__', encodeURIComponent(userId))
+                .replace('__DOCUMENT_NAME__', encodeURIComponent(documentName));
+            
+            fetch(apiUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('[loadDocumentPages] Received data:', data);
+                    
+                    if (data.success && data.images && Array.isArray(data.images)) {
+                        // Populate the dropdown
+                        if (pngSelect) {
+                            pngSelect.innerHTML = '<option value="">-- Select Page --</option>';
+                            
+                            data.images.forEach(image => {
+                                const option = document.createElement('option');
+                                option.value = image.filename;
+                                
+                                if (image.filename.includes('crop')) {
+                                    option.textContent = image.filename.split('.')[0]; // Show full name for crops
+                                } else {
+                                    // Extract page number for regular pages
+                                    const pageMatch = image.filename.match(/page_(\d+)/);
+                                    if (pageMatch) {
+                                        option.textContent = `Page ${parseInt(pageMatch[1])}`;
+                                    } else {
+                                        option.textContent = image.filename;
+                                    }
+                                }
+                                
+                                pngSelect.appendChild(option);
+                            });
+                            
+                            pngSelect.disabled = false;
+                            
+                            // Re-setup event listener for the page selection dropdown
+                            setupPageSelectionListener();
+                        }
+                        
+                        // Update document info display
+                        if (selectedDocumentInfo) {
+                            selectedDocumentInfo.style.display = 'block';
+                        }
+                        
+                        showAlert('success', `Loaded ${data.images.length} pages for ${documentName}`);
+                        console.log('[loadDocumentPages] Successfully loaded', data.images.length, 'pages');
+                    } else {
+                        throw new Error(data.error || 'Failed to load document pages');
+                    }
+                })
+                .catch(error => {
+                    console.error('[loadDocumentPages] Error:', error);
+                    
+                    if (pngSelect) {
+                        pngSelect.innerHTML = '<option value="">Error loading pages</option>';
+                        pngSelect.disabled = true;
+                    }
+                    
+                    // Show error message
+                    showAlert('error', `Failed to load document pages: ${error.message}`);
+                });
         }
 
         // Function to load and display a page
         function loadPage(documentName, pageName) {
-            // Update browser URL
+            console.log('[loadPage] Loading page:', { documentName, pageName });
+            
+            // Update browser URL without page reload
             updateBrowserURL(documentName, pageName);
             
-            // Navigate to the page (this will cause a page reload for now)
-            window.location.href = `{{ url_for('app.image_preview') }}?selected_folder=${encodeURIComponent(documentName)}&selected_png=${encodeURIComponent(pageName)}`;
+            // Use a retry mechanism to find the document display container
+            function tryLoadPage(retryCount = 0) {
+                const maxRetries = 5;
+                const documentDisplayContainer = document.getElementById('document-display-container');
+                
+                // Debug: Log what we found
+                console.log(`[loadPage] Attempt ${retryCount + 1}/${maxRetries + 1} - Element check:`, {
+                    documentDisplayContainer: !!documentDisplayContainer,
+                    documentDisplayContainerDisplay: documentDisplayContainer ? documentDisplayContainer.style.display : 'N/A'
+                });
+                
+                if (documentDisplayContainer) {
+                    console.log('[loadPage] Container found, proceeding with page load');
+                    
+                    const userId = '{{ session.get("user_id", "anonymous") }}';
+                    const imageUrl = `{{ url_for('app.serve_completed_document_png_file', 
+                        user_id='__USER_ID__', 
+                        document_folder_name='__FOLDER__', 
+                        image_filename='__FILENAME__') }}`
+                        .replace('__USER_ID__', encodeURIComponent(userId))
+                        .replace('__FOLDER__', encodeURIComponent(documentName))
+                        .replace('__FILENAME__', encodeURIComponent(pageName));
+                    
+                    // Update image preview area to show the selected page
+                    documentDisplayContainer.innerHTML = `
+                        <div id="debug-path-info" style="margin-bottom: 10px; padding: 5px; border: 1px solid #ddd; background-color: #f5f5f5;">
+                            <strong>Debug Info:</strong> 
+                            <span style="font-family: monospace; word-break: break-all;">
+                                TOOCR Path: /uploads/${userId}/${documentName}/TOOCR/PNG/${pageName}
+                            </span>
+                        </div>
+
+                        <div class="gradio-display-area" style="min-height: 40vh; padding:0; border: none; background: #fff;">
+                            <div id="image-container" style="position: relative; display: inline-block;">
+                                <img id="preview-image"
+                                    src="${imageUrl}"
+                                    alt="Page Preview: ${pageName}">
+                                <!-- Overlay canvas for bounding boxes -->
+                                <canvas id="bounding-box-overlay" style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 10;"></canvas>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Show the document display container
+                    showDocumentDisplay();
+                    
+                    // Show the OCR controls in the right column
+                    showOCRControls(documentName, pageName);
+                    
+                    // Clear any existing segments and OCR results
+                    clearSegmentData();
+                    
+                    // Initialize the preview overlay now that the image exists
+                    setTimeout(() => {
+                        console.log('[loadPage] Initializing preview overlay for dynamically loaded image');
+                        initializePreviewOverlay();
+                    }, 100); // Small delay to ensure DOM is updated
+                    
+                    // Check for existing segments for this page (after OCR controls are ready)
+                    const pageId = pageName.split('.')[0];
+                    
+                    // Use a more robust retry mechanism
+                    function waitForElementsAndCheckSegments(retryCount = 0) {
+                        const maxRetries = 10; // Maximum 10 attempts
+                        const lineSegmentsContainer = document.getElementById('line-segments-container');
+                        const selectedLineImageEl = document.getElementById('sidebar-segment-image');
+                        const selectedLineTextEl = document.getElementById('sidebar-segment-text');
+                        
+                        if (lineSegmentsContainer && selectedLineImageEl && selectedLineTextEl) {
+                            console.log('[loadPage] Required elements found, checking for existing segments');
+                            checkForExistingSegments(documentName, pageId);
+                        } else if (retryCount < maxRetries) {
+                            console.warn(`[loadPage] Required elements not ready (attempt ${retryCount + 1}/${maxRetries}), retrying in 100ms`);
+                            setTimeout(() => waitForElementsAndCheckSegments(retryCount + 1), 100);
+                        } else {
+                            console.error('[loadPage] Failed to find required elements after maximum retries');
+                        }
+                    }
+                    
+                    // Start the retry mechanism
+                    setTimeout(() => waitForElementsAndCheckSegments(), 50);
+                    
+                    showAlert('info', `Loaded page: ${pageName}`);
+                    console.log('[loadPage] Page loaded successfully');
+                    
+                } else if (retryCount < maxRetries) {
+                    console.warn(`[loadPage] Document display container not found, retrying in 50ms (attempt ${retryCount + 1}/${maxRetries + 1})`);
+                    setTimeout(() => tryLoadPage(retryCount + 1), 50);
+                } else {
+                    console.error('[loadPage] Document display container not found after maximum retries');
+                    showAlert('error', 'Failed to load page: Document display container not found');
+                }
+            }
+            
+            // Start the load attempt
+            tryLoadPage();
+        }
+
+        // Function to show OCR controls in the right column
+        function showOCRControls(documentName, pageName) {
+            const rightColumn = document.querySelector('.main-right-column');
+            if (!rightColumn) {
+                console.error('[showOCRControls] Right column not found');
+                return;
+            }
+            
+            rightColumn.innerHTML = `
+                <!-- Segment Selection Form -->
+                <div id="segment-selection-container" class="gradio-component-group" style="background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
+                    <h4>Segment Selection</h4>
+                    <form id="segment-form" onsubmit="return false;">
+                        <input type="hidden" name="selected_folder" value="${documentName}">
+                        <input type="hidden" name="selected_png" value="${pageName}">
+                        <div style="margin-top: 1rem;">
+                            <label for="segment-select">Select Detected Segment:</label>
+                            <select name="selected_segment" id="segment-select" disabled>
+                                <option value="">-- Select Segment --</option>
+                                <!-- Segments will be populated in JavaScript -->
+                            </select>
+                            <div id="segment-loading" style="font-size: 0.8em; margin-top: 5px; color: #6c757d;">
+                                Run "Segment & OCR" to detect segments
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- OCR Section -->
+                <div class="ocr-section gradio-component-group" style="background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
+                    <h4>Text Recognition (OCR)</h4>
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                        <button id="segment-ocr-btn" class="gradio-button gradio-button-secondary" onclick="performSegmentOCR()" style="flex: 1; min-width: 150px; background-color: #059669; color: white;">
+                            <span id="segment-ocr-text">Segment & OCR</span>
+                            <span id="segment-ocr-loading" style="display: none;">
+                                <span class="loading-spinner"></span>
+                                Processing...
+                            </span>
+                        </button>
+                    </div>
+                    
+                    <!-- Status messages for Segment & OCR -->
+                    <div id="segment-ocr-status" style="margin-bottom: 1rem; padding: 0.75rem; border-radius: 6px; display: none;">
+                        <div id="segment-ocr-status-message"></div>
+                    </div>
+
+                    <textarea id="ocr-result" placeholder="Extracted text will appear here..." style="height: 200px; width: 100%; font-family: monospace;" readonly></textarea>
+                </div>
+
+                <!-- Line Segments Navigation - Initially hidden -->
+                <div id="line-segments-container" class="gradio-component-group" style="display: none; background-color: #f9fafb; padding: 1rem;">
+                    <h4>Segment Navigation</h4>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                        <button id="prev-segment-btn" class="gradio-button gradio-button-secondary" style="padding: 5px 10px; font-size:0.9em;">&lt; Prev</button>
+                        <div style="text-align: center; flex-grow: 1; font-size: 0.9em; color: #666;">
+                            <span id="segment-counter">Segment 0 of 0</span>
+                        </div>
+                        <button id="next-segment-btn" class="gradio-button gradio-button-secondary" style="padding: 5px 10px; font-size:0.9em;">Next &gt;</button>
+                    </div>
+
+                    <!-- Single preview container that will be used for all segment displays -->
+                    <div id="sidebar-selected-segment-preview" style="margin-top: 1rem; margin-bottom: 1rem; padding: 1rem; border: 1px solid #e0e0e0; background-color: #fdfdfd; border-radius: 5px;">
+                        <h5 id="sidebar-segment-title" style="margin-top:0; margin-bottom: 0.5rem; font-size: 1em; color: #333;">
+                            Preview of Selected Segment
+                        </h5>
+                        <div style="text-align: center; margin-bottom: 0.5rem;">
+                            <img id="sidebar-segment-image" src="" alt="Selected Segment Image"
+                                 style="max-width: 100%; max-height: 200px; border: 1px solid #ccc; object-fit: contain; background-color: #fff;">
+                        </div>
+                        <div id="sidebar-segment-text-container" style="padding: 0.5rem; background-color: #f0f0f0; border-radius: 3px;">
+                            <p id="sidebar-segment-text" style="font-family: monospace; white-space: pre-wrap; font-size: 0.9em; margin:0; color: #333;">
+                                Select a segment to view text
+                            </p>
+                        </div>
+                        <button id="view-segment-json-btn" class="gradio-button gradio-button-sm" style="margin-top: 10px; font-size:0.8em; padding: 3px 8px;">View Segment JSON</button>
+                    </div>
+                </div>
+                
+                <!-- Container for displaying segment JSON -->
+                <div id="segment-json-display-container" class="gradio-component-group" style="display: none; background-color: #f8f9fa; padding: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <h6 style="margin: 0;">Segment JSON Data:</h6>
+                        <button id="close-segment-json-btn" class="gradio-button gradio-button-sm" style="font-size:0.8em; padding: 3px 8px;">×</button>
+                    </div>
+                    <div id="segment-json-loading" style="display: none; color: #6c757d; font-size: 0.9em; padding: 10px 0;">Loading JSON data...</div>
+                    <pre id="segment-json-content" style="white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; background-color: #fff; padding:10px; border-radius: 3px; margin-bottom: 0;"></pre>
+                </div>
+            `;
+            
+            // Re-setup event listeners for the newly created elements
+            setupOCRControlEventListeners();
+            
+            console.log('[showOCRControls] OCR controls shown for page:', pageName);
+        }
+
+        // Function to hide OCR controls when no page is selected
+        function hideOCRControls() {
+            const rightColumn = document.querySelector('.main-right-column');
+            if (rightColumn) {
+                rightColumn.innerHTML = `
+                    <div class="gradio-component-group" style="background-color: #f9fafb; padding: 1rem;">
+                        <p class="gradio-placeholder-text">Select a document and page to access OCR controls.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Function to setup event listeners for OCR controls
+        function setupOCRControlEventListeners() {
+            // Setup segment dropdown event listener
+            const segmentSelect = document.getElementById('segment-select');
+            if (segmentSelect && !segmentSelect.hasAttribute('data-listener-added')) {
+                segmentSelect.addEventListener('change', handleSegmentSelection);
+                segmentSelect.setAttribute('data-listener-added', 'true');
+            }
+            
+            // Setup prev/next button event listeners
+            const prevBtn = document.getElementById('prev-segment-btn');
+            const nextBtn = document.getElementById('next-segment-btn');
+            if (prevBtn) {
+                prevBtn.onclick = function() {
+                    if (currentSegmentDisplayIndex > 0) {
+                        displaySegmentByIndex(currentSegmentDisplayIndex - 1);
+                    }
+                };
+            }
+            if (nextBtn) {
+                nextBtn.onclick = function() {
+                    if (currentSegmentDisplayIndex < currentSegmentsList.length - 1) {
+                        displaySegmentByIndex(currentSegmentDisplayIndex + 1);
+                    }
+                };
+            }
+            
+            // Setup JSON viewer event listeners
+            const viewJsonBtn = document.getElementById('view-segment-json-btn');
+            const closeJsonBtn = document.getElementById('close-segment-json-btn');
+            if (viewJsonBtn) {
+                viewJsonBtn.onclick = function() {
+                    toggleSegmentJson(true);
+                };
+            }
+            if (closeJsonBtn) {
+                closeJsonBtn.onclick = function() {
+                    toggleSegmentJson(false);
+                };
+            }
         }
 
         // UI helper functions
@@ -781,9 +1224,146 @@
             window.location.href = '{{ url_for("app.crop_image") }}';
         };
 
+        // Make loadUserDocuments globally accessible
+        window.loadUserDocuments = loadUserDocuments;
+
+        // Helper function to clear segment data when switching pages
+        function clearSegmentData() {
+            // Clear OCR result textarea
+            const ocrResult = document.getElementById('ocr-result');
+            if (ocrResult) {
+                ocrResult.value = '';
+            }
+            
+            // Clear segment dropdown
+            const segmentSelect = document.getElementById('segment-select');
+            const segmentLoading = document.getElementById('segment-loading');
+            
+            if (segmentSelect) {
+                segmentSelect.innerHTML = '<option value="">-- Select Segment --</option>';
+                segmentSelect.disabled = true;
+            }
+            
+            if (segmentLoading) {
+                segmentLoading.textContent = 'Run "Segment & OCR" to detect segments';
+                segmentLoading.style.color = '#6c757d';
+            }
+            
+            // Hide segment navigation
+            const lineSegmentsContainer = document.getElementById('line-segments-container');
+            if (lineSegmentsContainer) {
+                lineSegmentsContainer.style.display = 'none';
+            }
+            
+            // Clear bounding boxes
+            clearBoundingBoxes();
+            
+            // Reset segment variables
+            currentSegmentsList = [];
+            currentSegmentDisplayIndex = -1;
+            currentSegmentFolderGlobal = '';
+            currentSegmentPageIdGlobal = '';
+            
+            console.log('[clearSegmentData] Segment data cleared');
+        }
+
+        // Helper function to show alerts/notifications
+        function showAlert(type, message, duration = 5000) {
+            console.log(`[${type.toUpperCase()}]`, message);
+            
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            
+            const icon = getNotificationIcon(type);
+            const messageText = document.createElement('span');
+            messageText.textContent = message;
+            
+            const closeButton = document.createElement('button');
+            closeButton.className = 'notification-close';
+            closeButton.innerHTML = '×';
+            closeButton.onclick = () => removeNotification(notification);
+            
+            notification.appendChild(icon);
+            notification.appendChild(messageText);
+            notification.appendChild(closeButton);
+            
+            // Add to container
+            const container = document.getElementById('notification-container');
+            if (container) {
+                container.appendChild(notification);
+                
+                // Trigger animation
+                setTimeout(() => notification.classList.add('show'), 10);
+                
+                // Auto-remove after duration
+                if (duration > 0) {
+                    setTimeout(() => removeNotification(notification), duration);
+                }
+            } else {
+                // Fallback to console/alert if container doesn't exist
+                if (type === 'error') {
+                    alert(`Error: ${message}`);
+                } else {
+                    console.log(`${type}: ${message}`);
+                }
+            }
+        }
+        
+        function getNotificationIcon(type) {
+            const icon = document.createElement('span');
+            icon.style.fontSize = '16px';
+            
+            switch (type) {
+                case 'success':
+                    icon.innerHTML = '✓';
+                    break;
+                case 'error':
+                    icon.innerHTML = '✕';
+                    break;
+                case 'info':
+                    icon.innerHTML = 'ℹ';
+                    break;
+                default:
+                    icon.innerHTML = '•';
+            }
+            
+            return icon;
+        }
+        
+        function removeNotification(notification) {
+            if (notification && notification.parentNode) {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }
+        }
+
         // Initialize sidebar selection
         document.addEventListener('DOMContentLoaded', function() {
             setupSidebarDocumentSelection();
+            
+            // Setup page selection event listener
+            setupPageSelectionListener();
+            
+            // Load user documents dynamically if not already populated
+            const documentsList = document.getElementById('sidebar-documents-list');
+            const documentsContainer = documentsList ? documentsList.children : [];
+            
+            // Check if documents are already populated from server-side rendering
+            const hasDocuments = Array.from(documentsContainer).some(child => 
+                child.classList && child.classList.contains('document-item')
+            );
+            
+            if (!hasDocuments) {
+                console.log('[DOMContentLoaded] No documents found, loading via AJAX');
+                loadUserDocuments();
+            } else {
+                console.log('[DOMContentLoaded] Documents already loaded from server');
+            }
             
             // Set initial browser history state
             if (currentFolder || currentPage) {
@@ -805,12 +1385,140 @@
             }
         });
 
+        // Function to load user documents via AJAX
+        function loadUserDocuments() {
+            console.log('[loadUserDocuments] Loading user documents via AJAX');
+            
+            const sidebarLoading = document.getElementById('sidebar-loading');
+            const documentsList = document.getElementById('sidebar-documents-list');
+            
+            // Show loading state
+            if (sidebarLoading) {
+                sidebarLoading.style.display = 'block';
+            }
+            
+            const userId = '{{ session.get("user_id", "anonymous") }}';
+            const apiUrl = `{{ url_for('app.api_get_user_documents', user_id='__USER_ID__') }}`
+                .replace('__USER_ID__', encodeURIComponent(userId));
+            
+            fetch(apiUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('[loadUserDocuments] Received data:', data);
+                    
+                    // Hide loading state
+                    if (sidebarLoading) {
+                        sidebarLoading.style.display = 'none';
+                    }
+                    
+                    if (data.success && data.documents && Array.isArray(data.documents)) {
+                        // Clear existing content
+                        if (documentsList) {
+                            documentsList.innerHTML = '';
+                        }
+                        
+                        if (data.documents.length > 0) {
+                            // Populate with documents
+                            data.documents.forEach(doc => {
+                                if (doc.is_completed) { // Only show OCR-ready documents
+                                    const documentItem = createDocumentItem(doc);
+                                    if (documentsList) {
+                                        documentsList.appendChild(documentItem);
+                                    }
+                                }
+                            });
+                            
+                            // Re-setup event listeners
+                            setupSidebarDocumentSelection();
+                        } else {
+                            // Show no documents message
+                            if (documentsList) {
+                                documentsList.innerHTML = `
+                                    <div style="text-align: center; padding: 1rem; color: #666; font-size: 0.875rem;">
+                                        <p>No OCR-ready documents found.</p>
+                                        <p style="margin-top: 0.5rem; font-size: 0.8em;">Documents become OCR-ready after using the "Move to OCR" button in the Image Cropping Tool.</p>
+                                        <button onclick="navigateToEdit()" class="gradio-button gradio-button-primary" style="display: inline-block; margin-top: 0.5rem; font-size: 0.75rem; padding: 0.5rem 0.75rem; border: none; cursor: pointer;">Go to Image Cropping Tool</button>
+                                    </div>
+                                `;
+                            }
+                        }
+                    } else {
+                        throw new Error(data.error || 'Failed to load user documents');
+                    }
+                })
+                .catch(error => {
+                    console.error('[loadUserDocuments] Error:', error);
+                    
+                    // Hide loading state
+                    if (sidebarLoading) {
+                        sidebarLoading.style.display = 'none';
+                    }
+                    
+                    // Show error message
+                    if (documentsList) {
+                        documentsList.innerHTML = `
+                            <div style="text-align: center; padding: 1rem; color: #dc2626; font-size: 0.875rem;">
+                                <p>Error loading documents: ${error.message}</p>
+                                <button onclick="loadUserDocuments()" class="gradio-button gradio-button-secondary" style="margin-top: 0.5rem; font-size: 0.75rem; padding: 0.5rem 0.75rem;">Retry</button>
+                            </div>
+                        `;
+                    }
+                });
+        }
+
+        // Function to create a document item element
+        function createDocumentItem(doc) {
+            const documentItem = document.createElement('div');
+            documentItem.className = `document-item ${doc.name === currentFolder ? 'selected' : ''}`;
+            documentItem.setAttribute('data-document-name', doc.name);
+            
+            documentItem.innerHTML = `
+                <div class="document-header">
+                    <div class="document-name-section">
+                        <div class="document-name">${doc.name}</div>
+                        <div class="document-meta">
+                            <span>OCR Ready</span>
+                            <span class="document-status status-completed">Completed</span>
+                        </div>
+                    </div>
+                    <button class="document-delete-btn" 
+                            onclick="confirmDeleteDocumentFromOCR('${doc.name}')" 
+                            title="Delete ${doc.name}">
+                        🗑️
+                    </button>
+                </div>
+            `;
+            
+            return documentItem;
+        }
+
         // Add before DOMContentLoaded event listener
         function checkForExistingSegments(folder, pageFilename) {
             if (!folder || !pageFilename) {
                 console.error('[checkForExistingSegments] Missing required parameters:', { folder, pageFilename });
                 return Promise.reject(new Error('Missing parameters for checkForExistingSegments'));
             }
+            
+            // Pre-check that required elements exist
+            const lineSegmentsContainer = document.getElementById('line-segments-container');
+            const selectedLineImageEl = document.getElementById('sidebar-segment-image');
+            const selectedLineTextEl = document.getElementById('sidebar-segment-text');
+            
+            if (!lineSegmentsContainer || !selectedLineImageEl || !selectedLineTextEl) {
+                console.warn('[checkForExistingSegments] Required DOM elements not available, skipping segment check');
+                console.log('[checkForExistingSegments] Elements present:', {
+                    lineSegmentsContainer: !!lineSegmentsContainer,
+                    selectedLineImageEl: !!selectedLineImageEl,
+                    selectedLineTextEl: !!selectedLineTextEl
+                });
+                return Promise.resolve(); // Resolve gracefully instead of rejecting
+            }
+            
             const pageId = pageFilename.split('.')[0];
             console.log('[checkForExistingSegments] Checking segments for:', { folder, pageId, originalFilename: pageFilename });
             try {
@@ -835,7 +1543,23 @@
             
             if (selectedPng && selectedFolder) {
                 const pageId = selectedPng.split('.')[0];
-                checkForExistingSegments(selectedFolder, pageId);
+                
+                // Check if the required elements exist before calling checkForExistingSegments
+                const lineSegmentsContainer = document.getElementById('line-segments-container');
+                const selectedLineImageEl = document.getElementById('sidebar-segment-image');
+                const selectedLineTextEl = document.getElementById('sidebar-segment-text');
+                
+                if (lineSegmentsContainer && selectedLineImageEl && selectedLineTextEl) {
+                    console.log('[DOMContentLoaded] Required elements found, checking for existing segments');
+                    checkForExistingSegments(selectedFolder, pageId);
+                } else {
+                    console.warn('[DOMContentLoaded] Required segment elements not rendered (server-side conditional rendering)');
+                    console.log('[DOMContentLoaded] Elements present:', {
+                        lineSegmentsContainer: !!lineSegmentsContainer,
+                        selectedLineImageEl: !!selectedLineImageEl,
+                        selectedLineTextEl: !!selectedLineTextEl
+                    });
+                }
             }
 
             // Event listeners for new Prev/Next buttons
@@ -1142,9 +1866,25 @@
             const selectedLineTextEl = document.getElementById('sidebar-segment-text');
             const segmentCounter = document.getElementById('segment-counter');
             
-            if (!lineSegmentsContainer || !selectedLineImageEl || !selectedLineTextEl) {
-                console.error("[loadLineSegments] Critical HTML elements not found! Check IDs: line-segments-container, sidebar-segment-image, sidebar-segment-text");
-                return Promise.reject(new Error("Missing critical HTML elements for segment display."));
+            // Enhanced debugging
+            console.log('[loadLineSegments] Element check:', {
+                lineSegmentsContainer: !!lineSegmentsContainer,
+                selectedLineImageEl: !!selectedLineImageEl,
+                selectedLineTextEl: !!selectedLineTextEl,
+                segmentCounter: !!segmentCounter
+            });
+            
+            if (!lineSegmentsContainer) {
+                console.error("[loadLineSegments] Missing element: line-segments-container");
+                return Promise.reject(new Error("Missing element: line-segments-container"));
+            }
+            if (!selectedLineImageEl) {
+                console.error("[loadLineSegments] Missing element: sidebar-segment-image");
+                return Promise.reject(new Error("Missing element: sidebar-segment-image"));
+            }
+            if (!selectedLineTextEl) {
+                console.error("[loadLineSegments] Missing element: sidebar-segment-text");
+                return Promise.reject(new Error("Missing element: sidebar-segment-text"));
             }
 
             if (selectedLineImageEl.tagName === 'IMG') {
@@ -1392,8 +2132,8 @@
             let overlay = document.getElementById('preview-overlay');
             
             if (!previewImage) {
-                console.error('[initializePreviewOverlay] Preview image not found');
-                return;
+                console.warn('[initializePreviewOverlay] Preview image not found, skipping overlay initialization');
+                return false;
             }
             
             // Create overlay if it doesn't exist
@@ -1404,19 +2144,38 @@
                 overlay.style.top = '0';
                 overlay.style.left = '0';
                 overlay.style.pointerEvents = 'none';
-                previewImage.parentElement.style.position = 'relative';
-                previewImage.parentElement.appendChild(overlay);
+                
+                // Ensure parent container has relative positioning
+                const parentElement = previewImage.parentElement;
+                if (parentElement) {
+                    parentElement.style.position = 'relative';
+                    parentElement.appendChild(overlay);
+                } else {
+                    console.error('[initializePreviewOverlay] Preview image has no parent element');
+                    return false;
+                }
+            }
+            
+            // Function to update overlay dimensions
+            function updateOverlayDimensions() {
+                if (previewImage.complete && previewImage.naturalWidth > 0) {
+                    const rect = previewImage.getBoundingClientRect();
+                    overlay.style.width = rect.width + 'px';
+                    overlay.style.height = rect.height + 'px';
+                    overlay.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
+                    console.log('[initializePreviewOverlay] Overlay dimensions updated:', rect.width, 'x', rect.height);
+                }
             }
             
             // Update overlay dimensions when image loads
-            previewImage.onload = function() {
-                const rect = previewImage.getBoundingClientRect();
-                overlay.style.width = rect.width + 'px';
-                overlay.style.height = rect.height + 'px';
-                overlay.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
-            };
+            if (previewImage.complete) {
+                updateOverlayDimensions();
+            } else {
+                previewImage.onload = updateOverlayDimensions;
+            }
             
-            console.log('[initializePreviewOverlay] Overlay initialized');
+            console.log('[initializePreviewOverlay] Overlay initialized successfully');
+            return true;
         }
 
         function clearSegmentHighlight() {
@@ -1519,6 +2278,7 @@
                     
                     if (data.success) {
                         showSegmentOCRStatus('success', 'OCR processing completed successfully!');
+                        showAlert('success', 'OCR processing completed successfully!');
                         
                         // Collect all text lines from segments and concatenate with line feeds
                         const ocrResult = document.getElementById('ocr-result');
@@ -1990,8 +2750,25 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('[DEBUG] DOM content loaded');
             
-            // Initialize the preview overlay
-            initializePreviewOverlay();
+            // Check for preview image and initialize overlay
+            function tryInitializeOverlay() {
+                const previewImage = document.getElementById('preview-image');
+                if (previewImage) {
+                    console.log('[DEBUG] Preview image found, initializing overlay');
+                    const success = initializePreviewOverlay();
+                    if (success) {
+                        return true;
+                    }
+                } else {
+                    console.log('[DEBUG] No preview image found on initial load, overlay will be initialized when image is loaded');
+                }
+                return false;
+            }
+            
+            // Try immediately, then with a small delay if needed
+            if (!tryInitializeOverlay()) {
+                setTimeout(tryInitializeOverlay, 100);
+            }
             
             // Try to initialize bounding box canvas immediately
             setTimeout(() => {
@@ -2041,5 +2818,8 @@
             window.location.href = "{{ url_for('app.crop_image') }}";
         }
     </script>
+
+    <!-- Notification Container -->
+    <div id="notification-container" class="notification-container"></div>
 </body>
 </html>

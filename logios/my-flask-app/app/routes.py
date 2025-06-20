@@ -946,19 +946,20 @@ def get_segment_json(
 @app.route("/api/get_document_images/<user_id>/<document_folder_name>")
 def api_get_document_images(user_id, document_folder_name):
     """
-    AJAX endpoint to get PNG files for a specific document.
+    AJAX endpoint to get PNG files for a specific OCR-ready document.
     Returns JSON data for dynamic loading without page refresh.
+    This endpoint is specifically for the image_preview page which shows completed/OCR-ready documents.
     """
     try:
-        # Get PNG files for the document
-        current_png_dir = file_operations.get_document_png_dir(
-            current_app.config, user_id, document_folder_name
+        # Get PNG files from the TOOCR/PNG directory (for OCR-ready documents)
+        ocr_png_dir = file_operations.get_ocr_source_png_dir(
+            current_app.config, user_id, document_folder_name, is_completed=True
         )
 
         images_data = {"success": True, "images": [], "message": ""}
 
-        if os.path.exists(current_png_dir):
-            all_files_in_png_dir = os.listdir(current_png_dir)
+        if os.path.exists(ocr_png_dir):
+            all_files_in_png_dir = os.listdir(ocr_png_dir)
             png_files = [f for f in all_files_in_png_dir if f.lower().endswith(".png")]
             png_files.sort()
 
@@ -977,9 +978,17 @@ def api_get_document_images(user_id, document_folder_name):
                     {"filename": png_file, "display_name": display_name}
                 )
 
-            images_data["message"] = f"Found {len(png_files)} images"
+            images_data["message"] = (
+                f"Found {len(png_files)} images in TOOCR/PNG directory"
+            )
+            current_app.logger.info(f"Found {len(png_files)} images in {ocr_png_dir}")
         else:
-            images_data["message"] = "PNG directory does not exist"
+            images_data["message"] = (
+                f"TOOCR/PNG directory does not exist: {ocr_png_dir}"
+            )
+            current_app.logger.warning(
+                f"TOOCR/PNG directory does not exist: {ocr_png_dir}"
+            )
 
         return jsonify(images_data)
 
@@ -1271,13 +1280,16 @@ def api_delete_page():
         if not user_id or not document_name or not page_name:
             return (
                 jsonify(
-                    {"success": False, "message": "Missing user_id, document_name, or page_name"}
+                    {
+                        "success": False,
+                        "message": "Missing user_id, document_name, or page_name",
+                    }
                 ),
                 400,
             )
 
         # Verify user authorization (user can delete their own pages, admin can delete any)
-        if user_id != session.get('user_id') and not current_user.is_admin:
+        if user_id != session.get("user_id") and not current_user.is_admin:
             return jsonify({"success": False, "message": "Access denied"}), 403
 
         # Get PNG directory path
@@ -1327,19 +1339,24 @@ def api_delete_page():
 
         # Also remove from TOOCR/PNG directory if it exists
         toocr_directory = os.path.join(
-            file_operations.get_document_completed_dir(current_app.config, user_id, document_name),
-            "PNG"
+            file_operations.get_document_completed_dir(
+                current_app.config, user_id, document_name
+            ),
+            "PNG",
         )
         toocr_page_path = os.path.join(toocr_directory, page_name)
         if os.path.exists(toocr_page_path):
             os.remove(toocr_page_path)
-            current_app.logger.info(f"Also removed page from TOOCR directory: {toocr_page_path}")
+            current_app.logger.info(
+                f"Also removed page from TOOCR directory: {toocr_page_path}"
+            )
 
         # Get page base name to count remaining crops
         page_base = os.path.splitext(page_name)[0]
         all_files = os.listdir(png_directory)
         remaining_crops = [
-            f for f in all_files 
+            f
+            for f in all_files
             if f.startswith(f"{page_base}_crop_") and f.endswith(".png")
         ]
 
@@ -1355,16 +1372,14 @@ def api_delete_page():
             {
                 "success": True,
                 "message": success_message,
-                "remaining_crops": len(remaining_crops)
+                "remaining_crops": len(remaining_crops),
             }
         )
 
     except Exception as e:
         current_app.logger.error(f"Error deleting page: {str(e)}")
         return (
-            jsonify(
-                {"success": False, "message": f"Error deleting page: {str(e)}"}
-            ),
+            jsonify({"success": False, "message": f"Error deleting page: {str(e)}"}),
             500,
         )
 
@@ -2333,11 +2348,8 @@ def serve_completed_document_root_file(user_id, document_folder_name, filename):
 # Serving PNGs (originals/crops) after completion
 @app.route("/uploads/<user_id>/<document_folder_name>/TOOCR/PNG/<image_filename>")
 def serve_completed_document_png_file(user_id, document_folder_name, image_filename):
-    completed_png_dir = os.path.join(
-        file_operations.get_document_completed_dir(
-            current_app.config, user_id, document_folder_name
-        ),
-        "PNG",
+    completed_png_dir = file_operations.get_ocr_source_png_dir(
+        current_app.config, user_id, document_folder_name, is_completed=True
     )
     current_app.logger.info(
         f"Attempting to serve TOOCR PNG file: {image_filename} from {completed_png_dir}"
