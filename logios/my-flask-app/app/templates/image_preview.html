@@ -469,7 +469,7 @@
                 {% if folders %}
                 <div class="gradio-component-group" style="background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
                     <div style="margin-bottom: 1rem;">
-                        <div id="selected-document-info" style="{% if selected_folder %}display: block;{% else %}display: none;{% endif %}">
+                        <div id="selected-document-info" style="display: {{ 'block' if selected_folder else 'none' }}">
                             <h3 style="margin-top: 0; color: #1f2937;">Selected Document: <span id="current-document-name">{{ selected_folder or '' }}</span></h3>
                         </div>
                     </div>
@@ -512,6 +512,26 @@
                         <span style="font-family: monospace; word-break: break-all;">
                             TOOCR Path: /uploads/{{session.get('user_id', 'anonymous')}}/{{selected_folder}}/TOOCR/PNG/{{request.args.get('selected_png')}}
                         </span>
+                        {% if segments_data %}
+                        <br><strong>Segments Coordinates:</strong>
+                        <div style="font-family: monospace; font-size: 12px; max-height: 150px; overflow-y: auto; margin-top: 5px; padding: 5px; background-color: #f9f9f9; border: 1px solid #ccc;">
+                            {% for segment in segments_data %}
+                            <div style="margin-bottom: 3px;">
+                                <span style="color: #666;">Segment {{ segment.id }}:</span> 
+                                {% if segment.bbox and segment.bbox|length >= 4 %}
+                                <span style="color: #2563eb;">bbox=[{{ segment.bbox[0] }}, {{ segment.bbox[1] }}, {{ segment.bbox[2] }}, {{ segment.bbox[3] }}]</span>
+                                {% if segment.confidence %}
+                                <span style="color: #16a34a;">conf={{ "%.2f"|format(segment.confidence) }}</span>
+                                {% endif %}
+                                {% else %}
+                                <span style="color: #dc2626;">No coordinates</span>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <br><strong>Segments Coordinates:</strong> <span style="color: #666; font-style: italic;">No segment data available</span>
+                        {% endif %}
                     </div>
 
                     <div class="gradio-display-area" style="min-height: 40vh; padding:0; border: none; background: #fff;">
@@ -521,7 +541,9 @@
                                   user_id=session.get('user_id', 'anonymous'), 
                                   document_folder_name=selected_folder, 
                                   image_filename=request.args.get('selected_png')) }}"
-                                alt="Page Preview">
+                                alt="Page Preview"
+                                onload="handleImageLoaded()"
+                                onerror="handleImageError()">
                             <!-- Overlay canvas for bounding boxes -->
                             <canvas id="bounding-box-overlay" style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 10;"></canvas>
                         </div>
@@ -979,7 +1001,9 @@
                             <div id="image-container" style="position: relative; display: inline-block;">
                                 <img id="preview-image"
                                     src="${imageUrl}"
-                                    alt="Page Preview: ${pageName}">
+                                    alt="Page Preview: ${pageName}"
+                                    onload="handleImageLoaded()"
+                                    onerror="handleImageError()">
                                 <!-- Overlay canvas for bounding boxes -->
                                 <canvas id="bounding-box-overlay" style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 10;"></canvas>
                             </div>
@@ -1000,6 +1024,11 @@
                         console.log('[loadPage] Initializing preview overlay for dynamically loaded image');
                         initializePreviewOverlay();
                     }, 100); // Small delay to ensure DOM is updated
+                    
+                    // Load and display segments coordinates in debug info
+                    setTimeout(() => {
+                        loadAndDisplaySegmentsCoordinates(documentName, pageName);
+                    }, 200); // Small delay to ensure image is loaded
                     
                     // Check for existing segments for this page (after OCR controls are ready)
                     const pageId = pageName.split('.')[0];
@@ -2770,18 +2799,8 @@
                 setTimeout(tryInitializeOverlay, 100);
             }
             
-            // Try to initialize bounding box canvas immediately
-            setTimeout(() => {
-                console.log('[DEBUG] Attempting canvas initialization...');
-                const canvasInitialized = initializeBoundingBoxCanvas();
-                if (!canvasInitialized) {
-                    // If canvas not initialized, try again after more time
-                    setTimeout(() => {
-                        console.log('[DEBUG] Retrying canvas initialization...');
-                        initializeBoundingBoxCanvas();
-                    }, 1000);
-                }
-            }, 100);
+            // Canvas initialization is now handled by the image onload event
+            // to ensure proper timing
         });
         
         // Function to confirm document deletion from OCR page
@@ -2816,6 +2835,95 @@
         // Function to navigate to edit page
         function navigateToEdit() {
             window.location.href = "{{ url_for('app.crop_image') }}";
+        }
+        
+        // Function to load and display segments coordinates in debug info
+        function loadAndDisplaySegmentsCoordinates(documentName, pageName) {
+            console.log('[DEBUG] Loading segments coordinates for:', { documentName, pageName });
+            
+            const debugPathInfo = document.getElementById('debug-path-info');
+            if (!debugPathInfo) {
+                console.warn('[DEBUG] Debug path info element not found');
+                return;
+            }
+            
+            // Extract base filename (remove .png extension)
+            const pageImageFilenameBase = pageName.split('.')[0];
+            const userId = '{{ session.get("user_id", "anonymous") }}';
+            
+            // Make API call to get segments data
+            const segmentsUrl = `{{ url_for('app.get_segments', user_id='__USER_ID__', document_folder_name='__DOCUMENT_NAME__', page_image_filename_base='__PAGE_BASE__') }}`
+                .replace('__USER_ID__', encodeURIComponent(userId))
+                .replace('__DOCUMENT_NAME__', encodeURIComponent(documentName))
+                .replace('__PAGE_BASE__', encodeURIComponent(pageImageFilenameBase));
+            
+            fetch(segmentsUrl)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('[DEBUG] Segments data received:', data);
+                    
+                    // Find or create the segments coordinates section
+                    let segmentsSection = debugPathInfo.querySelector('.segments-coordinates-section');
+                    if (!segmentsSection) {
+                        segmentsSection = document.createElement('div');
+                        segmentsSection.className = 'segments-coordinates-section';
+                        debugPathInfo.appendChild(segmentsSection);
+                    }
+                    
+                    if (data.success && data.segments && data.segments.length > 0) {
+                        let segmentsHtml = '<br><strong>Segments Coordinates:</strong>';
+                        segmentsHtml += '<div style="font-family: monospace; font-size: 12px; max-height: 150px; overflow-y: auto; margin-top: 5px; padding: 5px; background-color: #f9f9f9; border: 1px solid #ccc;">';
+                        
+                        data.segments.forEach(segment => {
+                            segmentsHtml += '<div style="margin-bottom: 3px;">';
+                            segmentsHtml += `<span style="color: #666;">Segment ${segment.id}:</span> `;
+                            
+                            if (segment.bbox && segment.bbox.length >= 4) {
+                                segmentsHtml += `<span style="color: #2563eb;">bbox=[${segment.bbox[0]}, ${segment.bbox[1]}, ${segment.bbox[2]}, ${segment.bbox[3]}]</span>`;
+                                if (segment.confidence) {
+                                    segmentsHtml += ` <span style="color: #16a34a;">conf=${segment.confidence.toFixed(2)}</span>`;
+                                }
+                            } else {
+                                segmentsHtml += '<span style="color: #dc2626;">No coordinates</span>';
+                            }
+                            
+                            segmentsHtml += '</div>';
+                        });
+                        
+                        segmentsHtml += '</div>';
+                        segmentsSection.innerHTML = segmentsHtml;
+                    } else {
+                        segmentsSection.innerHTML = '<br><strong>Segments Coordinates:</strong> <span style="color: #666; font-style: italic;">No segment data available</span>';
+                    }
+                })
+                .catch(error => {
+                    console.error('[DEBUG] Error loading segments coordinates:', error);
+                    let segmentsSection = debugPathInfo.querySelector('.segments-coordinates-section');
+                    if (!segmentsSection) {
+                        segmentsSection = document.createElement('div');
+                        segmentsSection.className = 'segments-coordinates-section';
+                        debugPathInfo.appendChild(segmentsSection);
+                    }
+                    segmentsSection.innerHTML = '<br><strong>Segments Coordinates:</strong> <span style="color: #dc2626; font-style: italic;">Error loading segments</span>';
+                });
+        }
+        
+        // Handle image load success
+        function handleImageLoaded() {
+            console.log('[DEBUG] Image loaded successfully');
+            // Initialize canvas after image loads
+            setTimeout(() => {
+                initializeBoundingBoxCanvas();
+            }, 100);
+        }
+        
+        // Handle image load error
+        function handleImageError() {
+            console.error('[DEBUG] Image failed to load');
+            const img = document.getElementById('preview-image');
+            if (img) {
+                console.error('[DEBUG] Image src:', img.src);
+            }
         }
     </script>
 

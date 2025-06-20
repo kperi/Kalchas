@@ -287,6 +287,7 @@ def image_preview():
     selected_png_filename = request.args.get("selected_png")
 
     png_files_in_completed_doc = []
+    segments_data = []
 
     if (
         selected_document_folder
@@ -319,6 +320,26 @@ def image_preview():
                         f"Error listing PNG files from {completed_png_dir}: {str(e)}"
                     )
 
+            # If a PNG is selected, load its segment data
+            if selected_png_filename:
+                # Extract base filename (remove .png extension)
+                page_image_filename_base = os.path.splitext(selected_png_filename)[0]
+                try:
+                    segments_data = file_operations.fetch_page_segments_data(
+                        current_app.config,
+                        user_id,
+                        selected_document_folder,
+                        page_image_filename_base,
+                        is_document_completed=True,
+                    )
+                    if segments_data is None:
+                        segments_data = []
+                except Exception as e:
+                    current_app.logger.error(
+                        f"Error loading segments for {selected_png_filename}: {str(e)}"
+                    )
+                    segments_data = []
+
     return render_template(
         "image_preview.html",
         folders=completed_document_folders,
@@ -326,6 +347,7 @@ def image_preview():
         png_files=png_files_in_completed_doc,
         selected_png=selected_png_filename,
         selected_segment=request.args.get("selected_segment"),
+        segments_data=segments_data,
     )
 
 
@@ -946,20 +968,33 @@ def get_segment_json(
 @app.route("/api/get_document_images/<user_id>/<document_folder_name>")
 def api_get_document_images(user_id, document_folder_name):
     """
-    AJAX endpoint to get PNG files for a specific OCR-ready document.
+    AJAX endpoint to get PNG files for a specific document.
     Returns JSON data for dynamic loading without page refresh.
-    This endpoint is specifically for the image_preview page which shows completed/OCR-ready documents.
     """
     try:
-        # Get PNG files from the TOOCR/PNG directory (for OCR-ready documents)
-        ocr_png_dir = file_operations.get_ocr_source_png_dir(
-            current_app.config, user_id, document_folder_name, is_completed=True
+        # Check if this is a completed document (has TOOCR folder)
+        doc_info = file_operations.get_document_info(
+            current_app.config, user_id, document_folder_name
         )
+
+        if doc_info["is_completed"]:
+            # For completed documents, look in TOOCR/PNG directory
+            current_png_dir = os.path.join(
+                file_operations.get_document_completed_dir(
+                    current_app.config, user_id, document_folder_name
+                ),
+                "PNG",
+            )
+        else:
+            # For in-progress documents, look in regular PNG directory
+            current_png_dir = file_operations.get_document_png_dir(
+                current_app.config, user_id, document_folder_name
+            )
 
         images_data = {"success": True, "images": [], "message": ""}
 
-        if os.path.exists(ocr_png_dir):
-            all_files_in_png_dir = os.listdir(ocr_png_dir)
+        if os.path.exists(current_png_dir):
+            all_files_in_png_dir = os.listdir(current_png_dir)
             png_files = [f for f in all_files_in_png_dir if f.lower().endswith(".png")]
             png_files.sort()
 
@@ -978,17 +1013,13 @@ def api_get_document_images(user_id, document_folder_name):
                     {"filename": png_file, "display_name": display_name}
                 )
 
-            images_data["message"] = (
-                f"Found {len(png_files)} images in TOOCR/PNG directory"
+            images_data["message"] = f"Found {len(png_files)} images"
+            current_app.logger.info(
+                f"Successfully loaded {len(png_files)} images from {current_png_dir}"
             )
-            current_app.logger.info(f"Found {len(png_files)} images in {ocr_png_dir}")
         else:
-            images_data["message"] = (
-                f"TOOCR/PNG directory does not exist: {ocr_png_dir}"
-            )
-            current_app.logger.warning(
-                f"TOOCR/PNG directory does not exist: {ocr_png_dir}"
-            )
+            images_data["message"] = f"PNG directory does not exist: {current_png_dir}"
+            current_app.logger.warning(f"PNG directory not found: {current_png_dir}")
 
         return jsonify(images_data)
 
@@ -2348,8 +2379,11 @@ def serve_completed_document_root_file(user_id, document_folder_name, filename):
 # Serving PNGs (originals/crops) after completion
 @app.route("/uploads/<user_id>/<document_folder_name>/TOOCR/PNG/<image_filename>")
 def serve_completed_document_png_file(user_id, document_folder_name, image_filename):
-    completed_png_dir = file_operations.get_ocr_source_png_dir(
-        current_app.config, user_id, document_folder_name, is_completed=True
+    completed_png_dir = os.path.join(
+        file_operations.get_document_completed_dir(
+            current_app.config, user_id, document_folder_name
+        ),
+        "PNG",
     )
     current_app.logger.info(
         f"Attempting to serve TOOCR PNG file: {image_filename} from {completed_png_dir}"
