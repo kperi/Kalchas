@@ -376,15 +376,7 @@
             <div class="gradio-component-group" style="max-width: 1200px; margin-left: auto; margin-right: auto;">
                 <h1>OCR Document Preview</h1>
                 
-                <!-- DEBUG INFO - Remove this later -->
-                <div style="background: #f0f0f0; padding: 10px; margin: 10px 0; font-family: monospace; font-size: 0.8em;">
-                    <strong>Debug Info:</strong><br>
-                    folders: {{ folders | length if folders else 'None' }} items<br>
-                    selected_folder: "{{ selected_folder or 'None' }}"<br>
-                    png_files: {{ png_files | length if png_files else 'None' }} items<br>
-                    selected_png: "{{ request.args.get('selected_png') or 'None' }}"<br>
-                    request.args: {{ request.args }}
-                </div>
+          
             </div>
 
             {% if folders %}
@@ -441,12 +433,16 @@
                 {% if selected_folder and request.args.get('selected_png') %}
                 <div class="gradio-display-area" style="flex-direction: column; align-items: stretch; gap: 1.5rem;">
                     <div class="gradio-display-area" style="min-height: 40vh; padding:0; border: none; background: #fff;"> <!-- Inner display for main page image -->
-                         <img id="preview-image"
-                             src="{{ url_for('app.serve_completed_document_png_file', 
-                               user_id=session.get('user_id', 'anonymous'), 
-                               document_folder_name=selected_folder, 
-                               image_filename=request.args.get('selected_png')) }}"
-                             alt="Page Preview">
+                        <div id="image-container" style="position: relative; display: inline-block;">
+                            <img id="preview-image"
+                                src="{{ url_for('app.serve_completed_document_png_file', 
+                                  user_id=session.get('user_id', 'anonymous'), 
+                                  document_folder_name=selected_folder, 
+                                  image_filename=request.args.get('selected_png')) }}"
+                                alt="Page Preview">
+                            <!-- Overlay canvas for bounding boxes -->
+                            <canvas id="bounding-box-overlay" style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 10;"></canvas>
+                        </div>
                     </div>
 
                     <!-- Segment Selection Form -->
@@ -984,15 +980,29 @@
 
         // Update the displaySegmentByIndex function
         function displaySegmentByIndex(index, updateUrl = true) {
+            console.log('[DEBUG] displaySegmentByIndex called with index:', index);
+            console.log('[DEBUG] currentSegmentsList:', currentSegmentsList);
+            
             if (index >= 0 && index < currentSegmentsList.length) {
                 currentSegmentDisplayIndex = index;
                 const segment = currentSegmentsList[index];
+                console.log('[DEBUG] Displaying segment:', segment);
                 
                 // Clear existing highlight
                 clearSegmentHighlight();
+                clearBoundingBoxes();
                 
-                // Update highlight if segment has coordinates
+                // Draw bounding box if segment has bbox coordinates
+                if (segment.bbox) {
+                    console.log('[DEBUG] Drawing bounding box from displaySegmentByIndex');
+                    drawSegmentBoundingBox(segment);
+                } else {
+                    console.log('[DEBUG] No bbox found in segment:', segment);
+                }
+                
+                // Fallback: Update highlight if segment has coords (old format)
                 if (segment.coords && Array.isArray(segment.coords) && segment.coords.length === 4) {
+                    console.log('[DEBUG] Using fallback coords highlight');
                     highlightSegment(segment.coords);
                 }
                 
@@ -1137,6 +1147,38 @@
                     if (data && data.success === true && data.segments && Array.isArray(data.segments) && data.segments.length > 0) {
                         currentSegmentsList = data.segments;
                         
+                        // Collect all text lines from segments and update the OCR result textarea
+                        const ocrResult = document.getElementById('ocr-result');
+                        if (ocrResult) {
+                            const textLines = [];
+                            
+                            data.segments.forEach((segment, index) => {
+                                if (segment.text) {
+                                    let segmentText = '';
+                                    
+                                    if (typeof segment.text === 'string') {
+                                        segmentText = segment.text;
+                                    } else if (Array.isArray(segment.text) && segment.text.length > 0) {
+                                        // If text is an array [text, confidence], take the first element
+                                        segmentText = String(segment.text[0]);
+                                    } else {
+                                        // Fallback: convert to string
+                                        segmentText = String(segment.text);
+                                    }
+                                    
+                                    // Clean and add the text if not empty
+                                    segmentText = segmentText.trim();
+                                    if (segmentText) {
+                                        textLines.push(segmentText);
+                                    }
+                                }
+                            });
+                            
+                            // Join all text lines with line feeds and set in textarea
+                            const allText = textLines.join('\n');
+                            ocrResult.value = allText;
+                        }
+                        
                         // Populate the dropdown
                         const segmentSelect = document.getElementById('segment-select');
                         const segmentLoading = document.getElementById('segment-loading');
@@ -1180,7 +1222,11 @@
                             }
                         }
                         
-                        displaySegmentByIndex(initialIndex, false);
+                        // Initialize canvas after segments are loaded
+                        setTimeout(() => {
+                            initializeBoundingBoxCanvas();
+                            displaySegmentByIndex(initialIndex, false);
+                        }, 100);
                     } else {
                         // Update loading message and clear dropdown
                         const segmentLoading = document.getElementById('segment-loading');
@@ -1441,10 +1487,48 @@
                     if (data.success) {
                         showSegmentOCRStatus('success', 'OCR processing completed successfully!');
                         
-                        // Update the OCR result textarea with the text
+                        // Collect all text lines from segments and concatenate with line feeds
                         const ocrResult = document.getElementById('ocr-result');
-                        if (ocrResult && data.text) {
-                            ocrResult.value = data.text;
+                        if (ocrResult) {
+                            let allText = '';
+                            
+                            // First try to get text from data.segments if available
+                            if (data.segments && Array.isArray(data.segments) && data.segments.length > 0) {
+                                const textLines = [];
+                                
+                                data.segments.forEach((segment, index) => {
+                                    if (segment.text) {
+                                        let segmentText = '';
+                                        
+                                        if (typeof segment.text === 'string') {
+                                            segmentText = segment.text;
+                                        } else if (Array.isArray(segment.text) && segment.text.length > 0) {
+                                            // If text is an array [text, confidence], take the first element
+                                            segmentText = String(segment.text[0]);
+                                        } else {
+                                            // Fallback: convert to string
+                                            segmentText = String(segment.text);
+                                        }
+                                        
+                                        // Clean and add the text if not empty
+                                        segmentText = segmentText.trim();
+                                        if (segmentText) {
+                                            textLines.push(segmentText);
+                                        }
+                                    }
+                                });
+                                
+                                // Join all text lines with line feeds
+                                allText = textLines.join('\n');
+                            }
+                            
+                            // Fallback to data.text if no segments text was found
+                            if (!allText && data.text) {
+                                allText = data.text;
+                            }
+                            
+                            // Set the concatenated text in the textarea
+                            ocrResult.value = allText;
                         }
                         
                         // Populate the segment dropdown with the new segments
@@ -1564,25 +1648,330 @@
         // Function to handle segment selection from dropdown
         function handleSegmentSelection(event) {
             const selectedSegmentIndex = event.target.value;
-            if (selectedSegmentIndex === '' || !currentFolder || !currentPage) return;
+            console.log('[DEBUG] Segment selected from dropdown:', selectedSegmentIndex);
             
-            // Convert index to segment ID (000, 001, etc.)
-            const segmentId = String(selectedSegmentIndex).padStart(3, '0');
+            if (selectedSegmentIndex === '' || !currentFolder || !currentPage) {
+                console.log('[DEBUG] Clearing bounding boxes - no segment selected');
+                clearBoundingBoxes();
+                return;
+            }
             
-            // Navigate to the selected segment
-            const pageId = currentPage.split('.')[0];
-            const newUrl = `{{ url_for('app.image_preview') }}?selected_folder=${encodeURIComponent(currentFolder)}&selected_png=${encodeURIComponent(currentPage)}&selected_segment=${encodeURIComponent(segmentId)}`;
-            window.location.href = newUrl;
+            // Draw bounding box for selected segment
+            const segmentIndex = parseInt(selectedSegmentIndex);
+            console.log('[DEBUG] Parsed segment index:', segmentIndex);
+            console.log('[DEBUG] Current segments list:', currentSegmentsList);
+            
+            if (currentSegmentsList && segmentIndex >= 0 && segmentIndex < currentSegmentsList.length) {
+                const segment = currentSegmentsList[segmentIndex];
+                console.log('[DEBUG] Drawing bounding box for segment:', segment);
+                drawSegmentBoundingBox(segment);
+            } else {
+                console.error('[DEBUG] Invalid segment index or no segments list');
+            }
+            
+            // Don't reload the page, just update the display locally
+            // The bounding box is already drawn above
+            console.log('[DEBUG] Segment selection handled locally, no page reload needed');
         }
+        
+        // Function to initialize the bounding box canvas
+        function initializeBoundingBoxCanvas() {
+            console.log('[DEBUG] Initializing bounding box canvas...');
+            const previewImage = document.getElementById('preview-image');
+            const canvas = document.getElementById('bounding-box-overlay');
+            
+            console.log('[DEBUG] Elements found:', { previewImage: !!previewImage, canvas: !!canvas });
+            
+            if (!previewImage || !canvas) {
+                console.error('[DEBUG] Missing elements for bounding box canvas');
+                return false;
+            }
+            
+            function resizeCanvas() {
+                // Set canvas size to match image display size exactly
+                const imageDisplayWidth = previewImage.offsetWidth;
+                const imageDisplayHeight = previewImage.offsetHeight;
+                
+                // Set canvas internal dimensions (affects coordinate system)
+                canvas.width = imageDisplayWidth;
+                canvas.height = imageDisplayHeight;
+                
+                // Set canvas display size (affects visual size)
+                canvas.style.width = imageDisplayWidth + 'px';
+                canvas.style.height = imageDisplayHeight + 'px';
+                
+                console.log('[DEBUG] Canvas resized to match image:', {
+                    canvasInternalSize: { width: canvas.width, height: canvas.height },
+                    canvasDisplaySize: { width: canvas.style.width, height: canvas.style.height },
+                    imageDisplaySize: { width: imageDisplayWidth, height: imageDisplayHeight },
+                    imageNaturalSize: { width: previewImage.naturalWidth, height: previewImage.naturalHeight }
+                });
+                
+                // Clear any existing drawings when resizing
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+            }
+            
+            // Wait for image to load to get correct dimensions
+            if (previewImage.complete && previewImage.naturalWidth > 0) {
+                console.log('[DEBUG] Image already loaded, resizing canvas immediately');
+                resizeCanvas();
+            } else {
+                console.log('[DEBUG] Waiting for image to load...');
+                previewImage.onload = function() {
+                    console.log('[DEBUG] Image loaded, now resizing canvas');
+                    resizeCanvas();
+                };
+                
+                // Fallback: try to resize after a delay even if onload doesn't fire
+                setTimeout(() => {
+                    if (previewImage.naturalWidth > 0) {
+                        console.log('[DEBUG] Image loaded (fallback), resizing canvas');
+                        resizeCanvas();
+                    }
+                }, 500);
+            }
+            
+            // Resize canvas when window resizes
+            window.addEventListener('resize', resizeCanvas);
+            return true;
+        }
+        
+        // Function to draw bounding box for a segment
+        function drawSegmentBoundingBox(segment) {
+            console.log('[DEBUG] Drawing bounding box for segment:', segment);
+            const canvas = document.getElementById('bounding-box-overlay');
+            const previewImage = document.getElementById('preview-image');
+            
+            console.log('[DEBUG] Canvas element:', canvas);
+            console.log('[DEBUG] Preview image element:', previewImage);
+            
+            if (!canvas || !previewImage) {
+                console.error('[DEBUG] Missing canvas or preview image');
+                return;
+            }
+            
+            if (!segment.bbox) {
+                console.warn('[DEBUG] Segment has no bbox:', segment);
+                return;
+            }
+            
+            console.log('[DEBUG] Canvas and image found, bbox:', segment.bbox);
+            const ctx = canvas.getContext('2d');
+            
+            if (!ctx) {
+                console.error('[DEBUG] Could not get canvas 2D context');
+                return;
+            }
+            
+            // Clear previous drawings (only if explicitly drawing a new bbox)
+            console.log('[DEBUG] About to clear canvas and draw new bbox');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Get image display dimensions (how big the image appears on screen)
+            const imageDisplayWidth = previewImage.offsetWidth;
+            const imageDisplayHeight = previewImage.offsetHeight;
+            
+            // Get actual image dimensions (the original image size that coords reference)
+            const imageActualWidth = previewImage.naturalWidth;
+            const imageActualHeight = previewImage.naturalHeight;
+            
+            // Calculate scale factors to convert from original coords to display coords
+            const scaleX = imageDisplayWidth / imageActualWidth;
+            const scaleY = imageDisplayHeight / imageActualHeight;
+            
+            console.log('[DEBUG] Scale calculation:', {
+                imageDisplaySize: { width: imageDisplayWidth, height: imageDisplayHeight },
+                imageActualSize: { width: imageActualWidth, height: imageActualHeight },
+                scaleFactors: { scaleX, scaleY }
+            });
+            
+            // Log scaling information
+            console.log('[DEBUG] Image dimensions:', {
+                displayWidth: imageDisplayWidth,
+                displayHeight: imageDisplayHeight,
+                actualWidth: imageActualWidth,
+                actualHeight: imageActualHeight,
+                scaleX: scaleX,
+                scaleY: scaleY
+            });
+            
+            // Extract bounding box coordinates from original image coordinates
+            // Most common format is [x1, y1, x2, y2] in original image coordinates
+            let x, y, width, height;
+            
+            console.log('[DEBUG] Raw bbox from segment:', segment.bbox);
+            
+            if (Array.isArray(segment.bbox) && segment.bbox.length === 4) {
+                const [val1, val2, val3, val4] = segment.bbox;
+                console.log('[DEBUG] Processing bbox array:', segment.bbox);
+                
+                // Assume [x1, y1, x2, y2] format (most common for OCR)
+                // Convert from original image coordinates to display coordinates
+                const x1_original = val1;
+                const y1_original = val2; 
+                const x2_original = val3;
+                const y2_original = val4;
+                
+                // Scale to display coordinates
+                const x1_display = x1_original * scaleX;
+                const y1_display = y1_original * scaleY;
+                const x2_display = x2_original * scaleX;
+                const y2_display = y2_original * scaleY;
+                
+                // Calculate final rectangle coordinates
+                x = Math.min(x1_display, x2_display);
+                y = Math.min(y1_display, y2_display);
+                width = Math.abs(x2_display - x1_display);
+                height = Math.abs(y2_display - y1_display);
+                
+                console.log('[DEBUG] Coordinate conversion:', {
+                    original: { x1: x1_original, y1: y1_original, x2: x2_original, y2: y2_original },
+                    scaled: { x1: x1_display, y1: y1_display, x2: x2_display, y2: y2_display },
+                    final: { x, y, width, height }
+                });
+                
+            } else if (typeof segment.bbox === 'object' && segment.bbox.x !== undefined) {
+                // Format: {x, y, width, height} object in original coordinates
+                console.log('[DEBUG] Detected {x, y, width, height} object format');
+                x = segment.bbox.x * scaleX;
+                y = segment.bbox.y * scaleY;
+                width = segment.bbox.width * scaleX;
+                height = segment.bbox.height * scaleY;
+            } else {
+                console.warn('[DEBUG] Unsupported bbox format:', segment.bbox);
+                return;
+            }
+            
+            // Validate calculated coordinates
+            console.log('[DEBUG] Calculated coordinates:', {
+                x: x,
+                y: y,
+                width: width,
+                height: height,
+                canvasWidth: canvas.width,
+                canvasHeight: canvas.height
+            });
+            
+            // Ensure coordinates are within canvas bounds
+            if (x < 0 || y < 0 || width <= 0 || height <= 0) {
+                console.warn('[DEBUG] Invalid coordinates calculated:', { x, y, width, height });
+                return;
+            }
+            
+            // Draw red bounding box
+            ctx.strokeStyle = '#dc2626'; // Red color
+            ctx.lineWidth = 3;
+            ctx.setLineDash([]);
+            
+            // Draw rectangle
+            ctx.strokeRect(x, y, width, height);
+            
+            // Optional: Add semi-transparent fill
+            ctx.fillStyle = 'rgba(220, 38, 38, 0.1)'; // Light red fill
+            ctx.fillRect(x, y, width, height);
+            
+            console.log('[DEBUG] Successfully drew bounding box:', { 
+                x, y, width, height, 
+                bbox: segment.bbox,
+                canvasSize: { width: canvas.width, height: canvas.height }
+            });
+            
+            // Mark that canvas has been drawn to (for debugging)
+            canvas.setAttribute('data-has-drawing', 'true');
+        }
+        
+        // Function to clear all bounding boxes
+        function clearBoundingBoxes() {
+            const canvas = document.getElementById('bounding-box-overlay');
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                canvas.removeAttribute('data-has-drawing');
+                console.log('[DEBUG] Cleared bounding boxes');
+            } else {
+                console.log('[DEBUG] No canvas found to clear');
+            }
+        }
+        
+        // Function to test canvas drawing (for debugging)
+        function testCanvasDrawing() {
+            console.log('[DEBUG] Testing canvas drawing...');
+            const canvas = document.getElementById('bounding-box-overlay');
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.strokeStyle = '#00ff00'; // Green for test
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(50, 50, 100, 100);
+                    console.log('[DEBUG] Test rectangle drawn at (50,50) 100x100 on canvas:', {
+                        canvasWidth: canvas.width,
+                        canvasHeight: canvas.height,
+                        visible: canvas.style.display !== 'none'
+                    });
+                    
+                    // Set a timeout to check if the test rectangle is still there
+                    setTimeout(() => {
+                        const hasDrawing = canvas.getAttribute('data-has-drawing');
+                        console.log('[DEBUG] Canvas state after 2 seconds:', {
+                            hasDrawing: hasDrawing,
+                            canvasStillExists: !!document.getElementById('bounding-box-overlay')
+                        });
+                    }, 2000);
+                } else {
+                    console.error('[DEBUG] Could not get canvas 2D context');
+                }
+            } else {
+                console.error('[DEBUG] Canvas not found for testing');
+            }
+        }
+        
+        // Function to manually test bounding box drawing
+        function testBoundingBoxDrawing() {
+            console.log('[DEBUG] Testing bounding box drawing with sample data...');
+            const previewImage = document.getElementById('preview-image');
+            if (previewImage && previewImage.naturalWidth > 0) {
+                // Create test coordinates relative to original image size
+                const testSegment = {
+                    bbox: [
+                        previewImage.naturalWidth * 0.1,  // x1 (10% from left)
+                        previewImage.naturalHeight * 0.1, // y1 (10% from top)
+                        previewImage.naturalWidth * 0.5,  // x2 (50% from left) 
+                        previewImage.naturalHeight * 0.3  // y2 (30% from top)
+                    ]
+                };
+                console.log('[DEBUG] Test segment bbox:', testSegment.bbox);
+                drawSegmentBoundingBox(testSegment);
+            } else {
+                console.error('[DEBUG] Cannot test - image not loaded or has no natural dimensions');
+            }
+        }
+        
+        // Make functions available globally for manual testing
+        window.testBoundingBoxDrawing = testBoundingBoxDrawing;
+        window.testCanvasDrawing = testCanvasDrawing;
 
         // Add to DOMContentLoaded event listener
         document.addEventListener('DOMContentLoaded', function() {
-            // ...existing code...
+            console.log('[DEBUG] DOM content loaded');
             
             // Initialize the preview overlay
             initializePreviewOverlay();
             
-            // ...rest of existing code...
+            // Try to initialize bounding box canvas immediately
+            setTimeout(() => {
+                console.log('[DEBUG] Attempting canvas initialization...');
+                const canvasInitialized = initializeBoundingBoxCanvas();
+                if (!canvasInitialized) {
+                    // If canvas not initialized, try again after more time
+                    setTimeout(() => {
+                        console.log('[DEBUG] Retrying canvas initialization...');
+                        initializeBoundingBoxCanvas();
+                    }, 1000);
+                }
+            }, 100);
         });
         
         // Function to confirm document deletion from OCR page
