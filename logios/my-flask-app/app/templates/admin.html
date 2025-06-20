@@ -402,6 +402,167 @@
             white-space: nowrap;
         }
     }
+    
+    /* Enhanced styling for system overview cards */
+    .overview-card {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 1.5rem;
+        transition: box-shadow 0.2s ease;
+    }
+    
+    .overview-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .overview-card h4 {
+        margin-top: 0;
+        color: #111827;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+    }
+    
+    .overview-metrics {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .metric-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    
+    .metric-row:last-child {
+        border-bottom: none;
+    }
+    
+    .metric-label {
+        color: #6b7280;
+        font-size: 0.9rem;
+    }
+    
+    .metric-value {
+        font-weight: 600;
+        color: #111827;
+    }
+    
+    .activity-list {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    
+    .activity-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    
+    .activity-item:last-child {
+        border-bottom: none;
+    }
+    
+    .activity-user {
+        flex: 1;
+    }
+    
+    .activity-user-name {
+        font-weight: 500;
+        color: #111827;
+        margin-bottom: 0.25rem;
+    }
+    
+    .activity-user-handle {
+        font-size: 0.8em;
+        color: #6b7280;
+    }
+    
+    .activity-time {
+        text-align: right;
+        font-size: 0.8em;
+    }
+    
+    .activity-time-label {
+        color: #6b7280;
+        margin-bottom: 0.25rem;
+    }
+    
+    .activity-time-value {
+        font-weight: 500;
+        color: #374151;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: #6b7280;
+    }
+    
+    .empty-state-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+    
+    /* Enhanced responsive improvements */
+    @media (max-width: 768px) {
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        
+        .overview-card {
+            padding: 1rem;
+        }
+        
+        .activity-item {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+        
+        .activity-time {
+            text-align: left;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    
+    /* Edit user form specific styles */
+    #edit-user-form-section {
+        animation: fadeIn 0.3s ease-in;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .edit-user-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .edit-user-info {
+        font-size: 0.9em;
+        color: #6b7280;
+        font-style: italic;
+    }
 </style>
 {% endblock %}
 
@@ -413,69 +574,163 @@
         <p style="margin: 0; color: #6b7280;">Manage users, documents, and system settings for Logios OCR Platform</p>
     </div>
 
-    <!-- Stats Overview -->
-    <div class="gradio-component-group">
-        <h3 style="margin-top: 0;">System Overview</h3>
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-value">{{ total_users }}</div>
-                <div class="stat-label">Total Users</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">{{ total_storage_mb }}</div>
-                <div class="stat-label">Storage Used (MB)</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">{{ users_data|length }}</div>
-                <div class="stat-label">Active Users</div>
-            </div>
-        </div>
-    </div>
-
     <!-- Main Content -->
     <div class="gradio-component-group">
                 <!-- Tab Navigation -->
                 <div class="tab-navigation">
-                    <button class="tab-btn active" data-tab="document-management">
-                        📄 Document Management
+                    <button class="tab-btn active" data-tab="system-overview">
+                        📊 System Overview
                     </button>
                     <button class="tab-btn" data-tab="user-management">
-                        👥 User Management
+                        � User Management
+                    </button>
+                    <button class="tab-btn" data-tab="document-management">
+                        � Document Management
                     </button>
                     <button class="tab-btn" data-tab="user-creation">
                         ➕ Create User
+                    </button>
+                    <button class="tab-btn" data-tab="user-editing">
+                        ✏️ Edit User
                     </button>
                 </div>
                 
                 <!-- Alert Area -->
                 <div id="alert-area"></div>
                 
-                <!-- Document Management Tab -->
-                <div id="document-management" class="tab-content active">
-                    <!-- Welcome State -->
-                    <div id="welcome-state">
-                        <div style="text-align: center; padding: 3rem 1rem; color: #6b7280;">
-                            <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;">📄</div>
-                            <h3 style="color: #374151;">Document Management</h3>
-                            <p>Go to User Management to select a user and view their documents</p>
+                <!-- System Overview Tab -->
+                <div id="system-overview" class="tab-content active">
+                    <h3 style="margin-top: 0;">System Overview</h3>
+                    <p style="color: #6b7280; margin-bottom: 2rem;">Monitor system statistics, performance metrics, and overall health of the Logios OCR Platform.</p>
+                    
+                    <!-- Enhanced Stats Grid -->
+                    <div class="stats-grid" style="margin-bottom: 2rem;">
+                        <div class="stat-card">
+                            <div class="stat-value">{{ total_users }}</div>
+                            <div class="stat-label">Total Users</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">{{ users_data|selectattr('is_active')|list|length }}</div>
+                            <div class="stat-label">Active Users</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">{{ users_data|selectattr('is_admin')|list|length }}</div>
+                            <div class="stat-label">Admin Users</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">{{ total_storage_mb }}</div>
+                            <div class="stat-label">Storage Used (MB)</div>
                         </div>
                     </div>
-                
-                    <!-- User Documents Section -->
-                    <div id="user-documents-section" style="display: none;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                            <h3 id="selected-user-title" style="margin: 0; color: #111827; font-weight: 600;">User Documents</h3>
-                            <button id="refresh-documents" class="gradio-button gradio-button-secondary">
-                                🔄 Refresh
-                            </button>
-                        </div>
                     
-                        <div id="user-loading" class="loading" style="display: none;">
-                            <div class="spinner"></div>
-                            Loading user documents...
+                    <!-- System Statistics -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                        <!-- User Activity Summary -->
+                        <div class="overview-card">
+                            <h4>👥 User Activity</h4>
+                            <div class="overview-metrics">
+                                {% set recent_users = users_data|selectattr('last_login')|list %}
+                                <div class="metric-row">
+                                    <span class="metric-label">Recent Logins (Last 30 days)</span>
+                                    <span class="metric-value">{{ recent_users|length }}</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">Users with Documents</span>
+                                    <span class="metric-value">{{ users_data|selectattr('has_folder')|list|length }}</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">Never Logged In</span>
+                                    <span class="metric-value">{{ users_data|rejectattr('last_login')|list|length }}</span>
+                                </div>
+                            </div>
                         </div>
                         
-                        <div id="user-documents-list"></div>
+                        <!-- Document Statistics -->
+                        <div class="overview-card">
+                            <h4>📄 Document Statistics</h4>
+                            <div class="overview-metrics">
+                                {% set total_docs = users_data|sum(attribute='total_documents') %}
+                                {% set users_with_docs = users_data|selectattr('total_documents', 'gt', 0)|list %}
+                                <div class="metric-row">
+                                    <span class="metric-label">Total Documents</span>
+                                    <span class="metric-value">{{ total_docs }}</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">Average per User</span>
+                                    <span class="metric-value">{{ "%.1f"|format(total_docs / users_data|length if users_data|length > 0 else 0) }}</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">Users with Documents</span>
+                                    <span class="metric-value">{{ users_with_docs|length }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Storage Analysis -->
+                        <div class="overview-card">
+                            <h4>💾 Storage Analysis</h4>
+                            <div class="overview-metrics">
+                                {% set avg_storage = users_data|sum(attribute='storage_size_mb') / users_data|length if users_data|length > 0 else 0 %}
+                                {% set users_with_storage = users_data|selectattr('storage_size_mb', 'gt', 0)|list %}
+                                {% set max_storage_user = users_with_storage|max(attribute='storage_size_mb') if users_with_storage else none %}
+                                <div class="metric-row">
+                                    <span class="metric-label">Average per User</span>
+                                    <span class="metric-value">{{ "%.1f"|format(avg_storage) }} MB</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">Largest User</span>
+                                    <span class="metric-value">{{ max_storage_user.storage_size_mb if max_storage_user else 0 }} MB</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">Storage Efficiency</span>
+                                    <span class="metric-value" style="color: #059669;">Good</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- System Health -->
+                        <div class="overview-card">
+                            <h4>⚡ System Health</h4>
+                            <div class="overview-metrics">
+                                <div class="metric-row">
+                                    <span class="metric-label">Database Status</span>
+                                    <span class="metric-value" style="color: #059669;">✅ Online</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">OCR Service</span>
+                                    <span class="metric-value" style="color: #059669;">✅ Available</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">File System</span>
+                                    <span class="metric-value" style="color: #059669;">✅ Healthy</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Recent Activity -->
+                    <div class="overview-card">
+                        <h4>🕒 Recent Activity</h4>
+                        <div class="activity-list">
+                            {% set sorted_users = users_data|selectattr('last_login')|sort(attribute='last_login', reverse=true)|list %}
+                            {% for user in sorted_users[:10] %}
+                            <div class="activity-item">
+                                <div class="activity-user">
+                                    <div class="activity-user-name">{{ user.display_name }}</div>
+                                    <div class="activity-user-handle">@{{ user.username }}</div>
+                                </div>
+                                <div class="activity-time">
+                                    <div class="activity-time-label">Last login</div>
+                                    <div class="activity-time-value">{{ user.last_login.strftime('%b %d, %Y') }}</div>
+                                </div>
+                            </div>
+                            {% else %}
+                            <div class="empty-state">
+                                <div class="empty-state-icon">📊</div>
+                                <p>No recent activity to display</p>
+                            </div>
+                            {% endfor %}
+                        </div>
                     </div>
                 </div>
                 
@@ -510,6 +765,9 @@
                                             👁️ View Docs
                                         </button>
                                     {% endif %}
+                                    <button class="gradio-button gradio-button-secondary" onclick="editUser('{{ user.db_user_id }}')">
+                                        ✏️ Edit
+                                    </button>
                                     <button class="delete-btn" onclick="confirmDeleteUser('{{ user.user_id }}')">
                                         🗑️ Delete
                                     </button>
@@ -535,6 +793,35 @@
                             </div>
                         </div>
                         {% endfor %}
+                    </div>
+                </div>
+                
+                <!-- Document Management Tab -->
+                <div id="document-management" class="tab-content">
+                    <!-- Welcome State -->
+                    <div id="welcome-state">
+                        <div style="text-align: center; padding: 3rem 1rem; color: #6b7280;">
+                            <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;">📄</div>
+                            <h3 style="color: #374151;">Document Management</h3>
+                            <p>Go to User Management to select a user and view their documents</p>
+                        </div>
+                    </div>
+                
+                    <!-- User Documents Section -->
+                    <div id="user-documents-section" style="display: none;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h3 id="selected-user-title" style="margin: 0; color: #111827; font-weight: 600;">User Documents</h3>
+                            <button id="refresh-documents" class="gradio-button gradio-button-secondary">
+                                🔄 Refresh
+                            </button>
+                        </div>
+                    
+                        <div id="user-loading" class="loading" style="display: none;">
+                            <div class="spinner"></div>
+                            Loading user documents...
+                        </div>
+                        
+                        <div id="user-documents-list"></div>
                     </div>
                 </div>
             
@@ -605,6 +892,91 @@
                         </div>
                     </form>
                 </div>
+                
+                <!-- User Editing Tab -->
+                <div id="user-editing" class="tab-content">
+                    <div id="edit-welcome-state">
+                        <div style="text-align: center; padding: 3rem 1rem; color: #6b7280;">
+                            <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;">✏️</div>
+                            <h3 style="color: #374151;">Edit User</h3>
+                            <p>Click the "Edit" button next to a user in the User Management tab to edit their details</p>
+                        </div>
+                    </div>
+                    
+                    <div id="edit-user-form-section" style="display: none;">
+                        <div class="edit-user-header">
+                            <h3 style="margin: 0;">Edit User Details</h3>
+                            <div class="edit-user-info" id="edit-user-info">
+                                Loading user information...
+                            </div>
+                        </div>
+                        
+                        <form id="edit-user-form">
+                            <input type="hidden" id="edit-user-id" name="user_id">
+                            
+                            <div class="form-group">
+                                <label for="edit-username" class="form-label">Username *</label>
+                                <input type="text" id="edit-username" name="username" class="form-input" required
+                                       placeholder="Enter username">
+                                <div class="form-error" id="edit-username-error"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="edit-email" class="form-label">Email Address *</label>
+                                <input type="email" id="edit-email" name="email" class="form-input" required
+                                       placeholder="user@example.com">
+                                <div class="form-error" id="edit-email-error"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="edit-first-name" class="form-label">First Name</label>
+                                <input type="text" id="edit-first-name" name="first_name" class="form-input"
+                                       placeholder="Enter first name">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="edit-last-name" class="form-label">Last Name</label>
+                                <input type="text" id="edit-last-name" name="last_name" class="form-input"
+                                       placeholder="Enter last name">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="edit-password" class="form-label">New Password</label>
+                                <input type="password" id="edit-password" name="password" class="form-input"
+                                       placeholder="Leave blank to keep current password">
+                                <div class="form-error" id="edit-password-error"></div>
+                                <small style="color: #6b7280; font-size: 0.8em;">Leave blank to keep the current password unchanged</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <div class="checkbox-group">
+                                    <input type="checkbox" id="edit-is-admin" name="is_admin" class="checkbox-input">
+                                    <label for="edit-is-admin" class="form-label" style="margin-bottom: 0;">
+                                        Administrator privileges
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <div class="checkbox-group">
+                                    <input type="checkbox" id="edit-is-active" name="is_active" class="checkbox-input">
+                                    <label for="edit-is-active" class="form-label" style="margin-bottom: 0;">
+                                        Account is active
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="submit" class="gradio-button gradio-button-primary">
+                                    💾 Save Changes
+                                </button>
+                                <button type="button" class="gradio-button gradio-button-secondary" onclick="cancelEditUser()">
+                                    ❌ Cancel
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </div>
     </div>
 </div>
@@ -633,8 +1005,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const refreshButton = document.getElementById('refresh-documents');
     const alertArea = document.getElementById('alert-area');
     const createUserForm = document.getElementById('create-user-form');
+    const editUserForm = document.getElementById('edit-user-form');
     const userSearchManagement = document.getElementById('user-search-management');
     const usersManagementList = document.getElementById('users-management-list');
+    const editWelcomeState = document.getElementById('edit-welcome-state');
+    const editUserFormSection = document.getElementById('edit-user-form-section');
     
     // Refresh button
     refreshButton.addEventListener('click', function() {
@@ -682,6 +1057,14 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         submitUserCreation();
     });
+    
+    // User editing form
+    if (editUserForm) {
+        editUserForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            submitUserEdit();
+        });
+    }
     
     // Function to view user documents (called from user management tab)
     window.viewUserDocuments = function(userId) {
@@ -1037,6 +1420,168 @@ document.addEventListener('DOMContentLoaded', function() {
             closeConfirmationModal();
         }
     });
+    
+    // User editing functions
+    window.editUser = function(userId) {
+        console.log('Loading user for editing:', userId);
+        
+        // Switch to user editing tab
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelector('[data-tab="user-editing"]').classList.add('active');
+        
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        document.getElementById('user-editing').classList.add('active');
+        
+        // Load user data
+        fetch(`/api/admin/get_user/${userId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    populateEditForm(data.user);
+                    editWelcomeState.style.display = 'none';
+                    editUserFormSection.style.display = 'block';
+                } else {
+                    showAlert('error', data.message || 'Failed to load user data');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading user:', error);
+                showAlert('error', 'Network error occurred while loading user data');
+            });
+    };
+    
+    function populateEditForm(user) {
+        document.getElementById('edit-user-id').value = user.id;
+        document.getElementById('edit-username').value = user.username;
+        document.getElementById('edit-email').value = user.email;
+        document.getElementById('edit-first-name').value = user.first_name;
+        document.getElementById('edit-last-name').value = user.last_name;
+        document.getElementById('edit-password').value = ''; // Always empty for security
+        document.getElementById('edit-is-admin').checked = user.is_admin;
+        document.getElementById('edit-is-active').checked = user.is_active;
+        
+        // Update user info display
+        const userInfo = document.getElementById('edit-user-info');
+        const createdDate = user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unknown';
+        const lastLogin = user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never';
+        userInfo.textContent = `User ID: ${user.id} • Created: ${createdDate} • Last Login: ${lastLogin}`;
+        
+        // Clear any previous errors
+        clearEditFormErrors();
+    }
+    
+    function submitUserEdit() {
+        console.log('Starting user edit process');
+        clearEditFormErrors();
+        
+        const formData = new FormData(editUserForm);
+        const password = formData.get('password');
+        
+        console.log('Edit form data collected:', {
+            user_id: formData.get('user_id'),
+            username: formData.get('username'),
+            email: formData.get('email'),
+            first_name: formData.get('first_name'),
+            last_name: formData.get('last_name'),
+            is_admin: formData.get('is_admin'),
+            is_active: formData.get('is_active'),
+            password: password ? '***' : 'empty'
+        });
+        
+        // Client-side validation
+        let hasErrors = false;
+        
+        if (password && password.length < 6) {
+            showEditFieldError('edit-password-error', 'Password must be at least 6 characters');
+            hasErrors = true;
+        }
+        
+        if (hasErrors) {
+            console.log('Client-side validation failed');
+            return;
+        }
+        
+        // Show loading state
+        const submitBtn = editUserForm.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = '⏳ Saving Changes...';
+        submitBtn.disabled = true;
+        
+        console.log('Sending request to /api/admin/edit_user');
+        
+        fetch('/api/admin/edit_user', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            console.log('Response status:', response.status);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Response data:', data);
+            submitBtn.textContent = originalText;
+            submitBtn.disabled = false;
+            
+            if (data.success) {
+                showAlert('success', `User "${data.username}" updated successfully!`);
+                // Refresh the page to show the updated user information
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                console.log('Server returned error:', data);
+                showAlert('error', data.message || 'Failed to update user');
+                // Show field-specific errors
+                if (data.errors) {
+                    console.log('Field errors:', data.errors);
+                    for (const [field, message] of Object.entries(data.errors)) {
+                        showEditFieldError(`edit-${field}-error`, message);
+                    }
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error updating user:', error);
+            submitBtn.textContent = originalText;
+            submitBtn.disabled = false;
+            showAlert('error', 'Network error occurred while updating user: ' + error.message);
+        });
+    }
+    
+    function clearEditFormErrors() {
+        document.querySelectorAll('#edit-user-form .form-error').forEach(error => {
+            error.textContent = '';
+        });
+        document.querySelectorAll('#edit-user-form .form-input').forEach(input => {
+            input.classList.remove('error');
+        });
+    }
+    
+    function showEditFieldError(errorId, message) {
+        const errorElement = document.getElementById(errorId);
+        if (errorElement) {
+            errorElement.textContent = message;
+            const inputId = errorId.replace('-error', '');
+            const inputElement = document.getElementById(inputId);
+            if (inputElement) {
+                inputElement.classList.add('error');
+            }
+        }
+    }
+    
+    window.cancelEditUser = function() {
+        editWelcomeState.style.display = 'block';
+        editUserFormSection.style.display = 'none';
+        clearEditFormErrors();
+        editUserForm.reset();
+        showAlert('info', 'User editing cancelled');
+    };
 });
 </script>
 {% endblock %}

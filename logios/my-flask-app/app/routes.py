@@ -1296,125 +1296,6 @@ def api_admin_get_user_documents(user_id):
         return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
 
 
-@app.route("/api/delete_page", methods=["POST"])
-@login_required
-def api_delete_page():
-    """
-    AJAX endpoint to delete a specific page but keep its cropped files.
-    Returns JSON data with success/error information.
-    """
-    try:
-        user_id = request.form.get("user_id")
-        document_name = request.form.get("document_name")
-        page_name = request.form.get("page_name")
-
-        if not user_id or not document_name or not page_name:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "message": "Missing user_id, document_name, or page_name",
-                    }
-                ),
-                400,
-            )
-
-        # Verify user authorization (user can delete their own pages, admin can delete any)
-        if user_id != session.get("user_id") and not current_user.is_admin:
-            return jsonify({"success": False, "message": "Access denied"}), 403
-
-        # Get PNG directory path
-        png_directory = file_operations.get_document_png_dir(
-            current_app.config, user_id, document_name
-        )
-
-        if not os.path.exists(png_directory):
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "message": f"Document '{document_name}' not found for user '{user_id}'",
-                    }
-                ),
-                404,
-            )
-
-        # Get the full path to the page file
-        page_file_path = os.path.join(png_directory, page_name)
-
-        if not os.path.exists(page_file_path):
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "message": f"Page '{page_name}' not found",
-                    }
-                ),
-                404,
-            )
-
-        # Check if this is a crop file (don't allow deleting crops this way)
-        if "_crop_" in page_name:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "message": "Cannot delete crop files using this endpoint. Use the crop management interface instead.",
-                    }
-                ),
-                400,
-            )
-
-        # Delete only the original page file, keeping all crop files
-        os.remove(page_file_path)
-
-        # Also remove from TOOCR/PNG directory if it exists
-        toocr_directory = os.path.join(
-            file_operations.get_document_completed_dir(
-                current_app.config, user_id, document_name
-            ),
-            "PNG",
-        )
-        toocr_page_path = os.path.join(toocr_directory, page_name)
-        if os.path.exists(toocr_page_path):
-            os.remove(toocr_page_path)
-            current_app.logger.info(
-                f"Also removed page from TOOCR directory: {toocr_page_path}"
-            )
-
-        # Get page base name to count remaining crops
-        page_base = os.path.splitext(page_name)[0]
-        all_files = os.listdir(png_directory)
-        remaining_crops = [
-            f
-            for f in all_files
-            if f.startswith(f"{page_base}_crop_") and f.endswith(".png")
-        ]
-
-        success_message = f"Page '{page_name}' deleted successfully"
-        if remaining_crops:
-            success_message += f" (kept {len(remaining_crops)} associated crop files)"
-
-        current_app.logger.info(
-            f"User '{user_id}' deleted page '{page_name}' from document '{document_name}' (kept {len(remaining_crops)} crops)"
-        )
-
-        return jsonify(
-            {
-                "success": True,
-                "message": success_message,
-                "remaining_crops": len(remaining_crops),
-            }
-        )
-
-    except Exception as e:
-        current_app.logger.error(f"Error deleting page: {str(e)}")
-        return (
-            jsonify({"success": False, "message": f"Error deleting page: {str(e)}"}),
-            500,
-        )
-
-
 @app.route("/api/admin/delete_document", methods=["POST"])
 @login_required
 def api_admin_delete_document():
@@ -1746,6 +1627,7 @@ def api_admin_get_uploaded_files():
     try:
         from app.models import UploadedFile, User
         from sqlalchemy import func
+        from app import db
 
         # Get query parameters for filtering
         user_id = request.args.get("user_id")  # Filter by specific user ID
@@ -2429,3 +2311,159 @@ def ocr():
         "user_id": user_id,
     }
     return render_template("ocr.html", **context)
+
+
+@app.route("/api/admin/edit_user", methods=["POST"])
+@login_required
+def api_admin_edit_user():
+    """Edit an existing user (admin only)"""
+    if not current_user.is_admin:
+        return jsonify({"success": False, "message": "Access denied"}), 403
+
+    try:
+        from app.models import User
+        from app import db
+        from werkzeug.security import generate_password_hash
+        from datetime import datetime
+
+        # Get form data
+        user_id = request.form.get("user_id")
+        username = request.form.get("username", "").strip()
+        email = request.form.get("email", "").strip()
+        first_name = request.form.get("first_name", "").strip()
+        last_name = request.form.get("last_name", "").strip()
+        password = request.form.get("password", "").strip()
+        is_admin = request.form.get("is_admin") == "on"
+        is_active = request.form.get("is_active") == "on"
+
+        current_app.logger.info(
+            f"Admin {current_user.username} attempting to edit user {user_id}"
+        )
+
+        # Validation
+        errors = {}
+        if not user_id:
+            errors["user_id"] = "User ID is required"
+
+        # Find the user to edit
+        user_to_edit = User.query.filter_by(id=user_id).first()
+        if not user_to_edit:
+            return jsonify({"success": False, "message": "User not found"}), 404
+
+        # Prevent admin from removing their own admin privileges
+        if user_to_edit.id == current_user.id and not is_admin:
+            errors["is_admin"] = "You cannot remove your own admin privileges"
+
+        # Validate username if changed
+        if username and username != user_to_edit.username:
+            if len(username) < 3:
+                errors["username"] = "Username must be at least 3 characters"
+            elif User.query.filter_by(username=username).first():
+                errors["username"] = "Username already exists"
+
+        # Validate email if changed
+        if email and email != user_to_edit.email:
+            if "@" not in email:
+                errors["email"] = "Please enter a valid email address"
+            elif User.query.filter_by(email=email).first():
+                errors["email"] = "Email already exists"
+
+        # Validate password if provided
+        if password:
+            if len(password) < 6:
+                errors["password"] = "Password must be at least 6 characters"
+
+        if errors:
+            return (
+                jsonify(
+                    {"success": False, "message": "Validation failed", "errors": errors}
+                ),
+                400,
+            )
+
+        # Update user fields
+        if username:
+            user_to_edit.username = username
+        if email:
+            user_to_edit.email = email
+        if first_name is not None:  # Allow empty string to clear the field
+            user_to_edit.first_name = first_name if first_name else None
+        if last_name is not None:  # Allow empty string to clear the field
+            user_to_edit.last_name = last_name if last_name else None
+        if password:
+            user_to_edit.password_hash = generate_password_hash(password)
+
+        user_to_edit.is_admin = is_admin
+        user_to_edit.is_active = is_active
+        user_to_edit.updated_at = datetime.utcnow()
+
+        # Save changes
+        db.session.commit()
+
+        current_app.logger.info(
+            f"User {user_to_edit.username} successfully updated by admin {current_user.username}"
+        )
+
+        return jsonify(
+            {
+                "success": True,
+                "message": f"User {user_to_edit.username} updated successfully",
+                "username": user_to_edit.username,
+                "display_name": user_to_edit.display_name,
+                "email": user_to_edit.email,
+            }
+        )
+
+    except Exception as e:
+        current_app.logger.error(f"Error editing user: {str(e)}")
+        db.session.rollback()
+        return (
+            jsonify({"success": False, "message": f"Error editing user: {str(e)}"}),
+            500,
+        )
+
+
+@app.route("/api/admin/get_user/<int:user_id>", methods=["GET"])
+@login_required
+def api_admin_get_user(user_id):
+    """Get user details for editing (admin only)"""
+    if not current_user.is_admin:
+        return jsonify({"success": False, "message": "Access denied"}), 403
+
+    try:
+        from app.models import User
+
+        user = User.query.filter_by(id=user_id).first()
+        if not user:
+            return jsonify({"success": False, "message": "User not found"}), 404
+
+        return jsonify(
+            {
+                "success": True,
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email,
+                    "first_name": user.first_name or "",
+                    "last_name": user.last_name or "",
+                    "is_admin": user.is_admin,
+                    "is_active": user.is_active,
+                    "created_at": (
+                        user.created_at.isoformat() if user.created_at else None
+                    ),
+                    "last_login": (
+                        user.last_login.isoformat() if user.last_login else None
+                    ),
+                    "display_name": user.display_name,
+                },
+            }
+        )
+
+    except Exception as e:
+        current_app.logger.error(f"Error getting user details: {str(e)}")
+        return (
+            jsonify(
+                {"success": False, "message": f"Error getting user details: {str(e)}"}
+            ),
+            500,
+        )
