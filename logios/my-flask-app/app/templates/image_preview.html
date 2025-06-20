@@ -469,12 +469,14 @@
                 {% if folders %}
                 <div class="gradio-component-group" style="background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
                     <div style="margin-bottom: 1rem;">
-                        <div id="selected-document-info" style="display: {{ 'block' if selected_folder else 'none' }}">
+                        <div id="selected-document-info" {% if selected_folder %}style="display: block"{% else %}style="display: none"{% endif %}>
                             <h3 style="margin-top: 0; color: #1f2937;">Selected Document: <span id="current-document-name">{{ selected_folder or '' }}</span></h3>
                         </div>
                     </div>
                     
-                    <div id="page-selection-container" class="{% if selected_folder %}fade-in show{% else %}fade-in{% endif %} smooth-transition" style="margin-bottom: 1rem; {% if selected_folder %}display: block;{% else %}display: none;{% endif %}">
+                    <div id="page-selection-container" 
+                         class="{% if selected_folder %}fade-in show{% else %}fade-in{% endif %} smooth-transition" 
+                         style="margin-bottom: 1rem;" {% if selected_folder %}style="display: block"{% else %}style="display: none"{% endif %}>
                         <label for="png-select">Select Page/Crop:</label>
                         <select name="selected_png" id="png-select">
                             <option value="">-- Select Page --</option>
