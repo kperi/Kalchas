@@ -625,7 +625,6 @@ def move_to_ocr():
         flash(f"Successfully copied {copied_files} files to the OCR folder", "success")
 
         # Optional: Redirect to a new OCR processing page if you have one
-        # return redirect(url_for("app.process_ocr", folder=folder))
 
         # For now, redirect back to the crop page
         return redirect(url_for("app.crop_image", selected_folder=folder))
@@ -2140,8 +2139,8 @@ def api_move_to_ocr():
                 f"User {user_id} moved document {folder_name} to OCR via AJAX"
             )
 
-            # Generate redirect URL for OCR page
-            redirect_url = url_for("app.ocr", selected_folder=folder_name)
+            # Generate redirect URL for image preview page
+            redirect_url = url_for("app.image_preview", selected_folder=folder_name)
 
             return jsonify(
                 {
@@ -2235,40 +2234,6 @@ def serve_completed_document_png_file(user_id, document_folder_name, image_filen
         return "File not found", 404
     return send_from_directory(completed_png_dir, image_filename)
 
-
-@app.route("/ocr", methods=["GET", "POST"])
-@login_required
-def ocr():
-    """Render the OCR page with user documents and handle file uploads"""
-    if request.method == "POST":
-        # Handle OCR file upload logic here
-        # This is where you'd process uploaded files
-        pass
-
-    user_id = current_user.get_user_folder_name()
-
-    # Get user documents for sidebar
-    documents_data = file_operations.get_user_documents_list(
-        current_app.config, user_id, include_completed=True, include_in_progress=True
-    )
-
-    # Get detailed info for each document
-    documents_with_info = []
-    for doc_name in documents_data["all"]:
-        doc_info = file_operations.get_document_info(
-            current_app.config, user_id, doc_name
-        )
-        if doc_info:
-            documents_with_info.append(doc_info)
-
-    context = {
-        "page_title": "OCR - Optical Character Recognition",
-        "supported_formats": ["PDF", "PNG", "JPG", "JPEG", "TIFF", "BMP"],
-        "max_file_size": "10MB",
-        "documents": documents_with_info,
-        "user_id": user_id,
-    }
-    return render_template("image_preview.html", **context)
 
 
 @app.route("/api/admin/edit_user", methods=["POST"])
