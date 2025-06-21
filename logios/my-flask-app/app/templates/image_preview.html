@@ -403,6 +403,86 @@
                 flex: none;
             }
         }
+        
+        /* Delete confirmation modal styles */
+        .delete-confirmation-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+        
+        .delete-modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 2rem;
+            border-radius: 8px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .delete-modal-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+            justify-content: flex-end;
+        }
+        
+        .btn-cancel, .btn-confirm-delete {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: background-color 0.2s ease;
+        }
+        
+        .btn-cancel {
+            background-color: #6b7280;
+            color: white;
+        }
+        
+        .btn-cancel:hover {
+            background-color: #4b5563;
+        }
+        
+        .btn-confirm-delete {
+            background-color: #dc2626;
+            color: white;
+        }
+        
+        .btn-confirm-delete:hover {
+            background-color: #b91c1c;
+        }
+        
+        /* Alert styles for sidebar */
+        .sidebar-alert {
+            padding: 0.75rem;
+            margin: 0.5rem 0;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            border: 1px solid transparent;
+        }
+        
+        .sidebar-alert-success {
+            background-color: #dcfce7;
+            border-color: #bbf7d0;
+            color: #166534;
+        }
+        
+        .sidebar-alert-error {
+            background-color: #fee2e2;
+            border-color: #fca5a5;
+            color: #dc2626;
+        }
     </style>
 </head>
 <body>
@@ -2518,31 +2598,125 @@
         
         // Function to confirm document deletion from OCR page
         function confirmDeleteDocumentFromOCR(documentName) {
-            if (confirm(`Are you sure you want to delete the OCR-ready document "${documentName}"? This will remove all processed OCR data.`)) {
+            const modal = document.getElementById('delete-confirmation-modal');
+            const title = document.getElementById('delete-modal-title');
+            const message = document.getElementById('delete-modal-message');
+            const confirmButton = document.getElementById('confirm-delete-button');
+            
+            title.textContent = 'Delete Document';
+            message.textContent = `Are you sure you want to delete "${documentName}" and all its OCR data? This action cannot be undone.`;
+            
+            // Set up confirmation button
+            confirmButton.onclick = function() {
+                closeDeleteConfirmationModal();
                 deleteDocumentFromOCR(documentName);
-            }
+            };
+            
+            modal.style.display = 'block';
+        }
+        
+        // Function to close the delete confirmation modal
+        function closeDeleteConfirmationModal() {
+            document.getElementById('delete-confirmation-modal').style.display = 'none';
         }
         
         // Function to delete document from OCR page
         function deleteDocumentFromOCR(documentName) {
             console.log('Deleting OCR document:', documentName);
+            showSidebarAlert('processing', 'Deleting document...');
             
-            // For now, show an alert - you can implement the actual deletion logic
-            alert('Document deletion from OCR page is not yet implemented. This would delete the TOOCR folder and redirect back to the crop page.');
+            const userId = '{{ session.get("user_id", "anonymous") }}';
+            const formData = new FormData();
+            formData.append('user_id', userId);
+            formData.append('document_name', documentName);
             
-            // TODO: Implement AJAX call to delete the TOOCR folder
-            // fetch('/api/delete_ocr_document', {
-            //     method: 'POST',
-            //     headers: { 'Content-Type': 'application/json' },
-            //     body: JSON.stringify({ document_name: documentName })
-            // }).then(response => response.json())
-            //   .then(data => {
-            //       if (data.success) {
-            //           window.location.href = '/crop_image';
-            //       } else {
-            //           alert('Error deleting document: ' + data.error);
-            //       }
-            //   });
+            fetch('/api/admin/delete_document', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showSidebarAlert('success', data.message);
+                    
+                    // Remove document from sidebar
+                    const documentElement = document.querySelector(`[data-document-name="${documentName}"]`);
+                    if (documentElement) {
+                        documentElement.style.transition = 'all 0.3s ease';
+                        documentElement.style.opacity = '0';
+                        documentElement.style.transform = 'translateX(-20px)';
+                        
+                        setTimeout(() => {
+                            documentElement.remove();
+                            
+                            // Check if this was the selected document
+                            if (currentFolder === documentName) {
+                                // Clear current selection and reset main content
+                                currentFolder = '';
+                                currentPage = '';
+                                hidePageSelection();
+                                hideDocumentDisplay();
+                                clearSegmentData();
+                                
+                                if (selectedDocumentInfo) {
+                                    selectedDocumentInfo.style.display = 'none';
+                                }
+                            }
+                            
+                            // Check if no documents left
+                            const remainingDocs = document.querySelectorAll('.document-item').length;
+                            if (remainingDocs === 0) {
+                                const documentsList = document.getElementById('sidebar-documents-list');
+                                documentsList.innerHTML = `
+                                    <div style="text-align: center; padding: 1rem; color: #666; font-size: 0.875rem;">
+                                        <p>No OCR-ready documents found.</p>
+                                        <p style="margin-top: 0.5rem; font-size: 0.8em;">Documents become OCR-ready after using the "Move to OCR" button in the Image Cropping Tool.</p>
+                                        <button onclick="navigateToEdit()" class="gradio-button gradio-button-primary" style="display: inline-block; margin-top: 0.5rem; font-size: 0.75rem; padding: 0.5rem 0.75rem; border: none; cursor: pointer;">Go to Image Cropping Tool</button>
+                                    </div>
+                                `;
+                            }
+                        }, 300);
+                    }
+                } else {
+                    showSidebarAlert('error', data.message || 'Failed to delete document');
+                }
+            })
+            .catch(error => {
+                console.error('Error deleting document:', error);
+                showSidebarAlert('error', 'Network error occurred while deleting document');
+            });
+        }
+        
+        // Function to show sidebar alerts
+        function showSidebarAlert(type, message) {
+            const sidebarAlertArea = document.getElementById('sidebar-alert-area');
+            if (!sidebarAlertArea) {
+                console.warn('Sidebar alert area not found');
+                return;
+            }
+            
+            let alertClass = 'sidebar-alert-error';
+            if (type === 'success') {
+                alertClass = 'sidebar-alert-success';
+            } else if (type === 'processing') {
+                alertClass = 'sidebar-alert-success';
+            }
+            
+            sidebarAlertArea.innerHTML = `
+                <div class="sidebar-alert ${alertClass}">
+                    ${type === 'processing' ? '<span class="loading-spinner"></span>' : ''}
+                    ${message}
+                </div>
+            `;
+            
+            // Auto-hide success and processing alerts
+            if (type === 'success') {
+                setTimeout(() => {
+                    sidebarAlertArea.innerHTML = '';
+                }, 5000);
+            } else if (type === 'processing') {
+                // Processing alerts are hidden when the operation completes
+            }
         }
         
         // Function to navigate to edit page
@@ -2638,7 +2812,31 @@
                 console.error('[DEBUG] Image src:', img.src);
             }
         }
+        
+        // Close modal when clicking outside
+        document.addEventListener('DOMContentLoaded', function() {
+            const modal = document.getElementById('delete-confirmation-modal');
+            if (modal) {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        closeDeleteConfirmationModal();
+                    }
+                });
+            }
+        });
     </script>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-confirmation-modal" class="delete-confirmation-modal">
+        <div class="delete-modal-content">
+            <h3 id="delete-modal-title">Confirm Deletion</h3>
+            <p id="delete-modal-message">Are you sure you want to delete this document?</p>
+            <div class="delete-modal-buttons">
+                <button class="btn-cancel" onclick="closeDeleteConfirmationModal()">Cancel</button>
+                <button class="btn-confirm-delete" id="confirm-delete-button">Delete</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Notification Container -->
     <div id="notification-container" class="notification-container"></div>
