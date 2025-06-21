@@ -98,7 +98,7 @@ def show_upload_page():
                     mime_type=mime_type,
                     document_folder=doc_folder_name,
                     file_path=relative_file_path,
-                    processing_status="uploaded",
+                    processing_status="in_progress",
                 )
                 db.session.add(uploaded_file_record)
                 db.session.commit()
@@ -115,11 +115,8 @@ def show_upload_page():
                     f"Starting PDF to PNG conversion for: {saved_pdf_path}"
                 )
 
-                # Update processing status
-                try:
-                    uploaded_file_record.update_processing_status("processing")
-                except:
-                    pass
+                # Keep status as "in_progress" during PDF conversion (don't change to "under_ocr")
+                # The status will only change to "under_ocr" when user clicks "Move to OCR"
 
                 success_conversion, png_message_or_paths = (
                     file_operations.convert_pdf_to_png_pages(
@@ -131,9 +128,8 @@ def show_upload_page():
                         f"Successfully converted PDF to {len(png_message_or_paths)} PNGs for document {doc_folder_name}."
                     )
 
-                    # Update processing status and page count
+                    # Update page count but keep status as "in_progress"
                     try:
-                        uploaded_file_record.update_processing_status("completed")
                         uploaded_file_record.page_count = len(png_message_or_paths)
                         db.session.commit()
                     except:
@@ -148,7 +144,7 @@ def show_upload_page():
                         f"Error converting PDF to PNG for {doc_folder_name}: {png_message_or_paths}"
                     )
 
-                    # Update processing status to failed
+                    # Update processing status to failed only if conversion fails
                     try:
                         uploaded_file_record.update_processing_status("failed")
                     except:
@@ -160,12 +156,7 @@ def show_upload_page():
                     )
                     return redirect(request.url)
             else:
-                # For images, mark as completed immediately
-                try:
-                    uploaded_file_record.update_processing_status("completed")
-                except:
-                    pass
-
+                # For images, keep status as "uploaded" (will change to "processing" when moved to OCR)
                 flash(
                     f"Image '{original_filename}' uploaded successfully!",
                     "success",
@@ -182,6 +173,10 @@ def show_upload_page():
 @app.route("/crop_image", methods=["GET"])
 @login_required
 def crop_image():
+    """
+    Render the crop image page showing only in-progress documents.
+    Completed documents cannot be cropped as they have been moved to OCR processing.
+    """
     user_id = current_user.get_user_folder_name()
 
     user_workspace_info = file_operations.get_user_workspace_info(
@@ -189,18 +184,21 @@ def crop_image():
     )
     logger.info(user_workspace_info)
 
-    # Get all documents for the user (both in-progress and completed can be cropped)
+    # Get only in-progress documents for cropping (completed documents cannot be cropped)
     documents_data = file_operations.get_user_documents_list(
-        current_app.config, user_id, include_completed=True, include_in_progress=True
+        current_app.config, user_id, include_completed=False, include_in_progress=True
     )
 
-    # Get all documents with their detailed info
+    # Get detailed info for in-progress documents only
     documents_with_info = []
-    for doc_name in documents_data["all"]:
+    for doc_name in documents_data["in_progress"]:
         doc_info = file_operations.get_document_info(
             current_app.config, user_id, doc_name
         )
-        documents_with_info.append(doc_info)
+        if (
+            doc_info and not doc_info["is_completed"]
+        ):  # Double-check that document is not completed
+            documents_with_info.append(doc_info)
 
     selected_document_folder = request.args.get("selected_folder")
     image_to_crop_filename = request.args.get("image_file")
@@ -210,6 +208,17 @@ def crop_image():
     cropped_images = []
 
     if selected_document_folder:
+        # Security check: Ensure the selected document is in the in-progress list
+        if selected_document_folder not in documents_data["in_progress"]:
+            current_app.logger.warning(
+                f"User {user_id} attempted to access completed document '{selected_document_folder}' for cropping"
+            )
+            flash(
+                "Cannot crop images in completed documents. Please select an in-progress document.",
+                "warning",
+            )
+            return redirect(url_for("app.crop_image"))
+
         # Get the info for the selected document
         for doc_info in documents_with_info:
             if doc_info["name"] == selected_document_folder:
@@ -667,6 +676,7 @@ def process_cropped_image():
 
 
 @app.route("/move_to_ocr", methods=["POST"])
+@login_required
 def move_to_ocr():
     """Copy cropped images to a TOOCR folder with standardized naming"""
     # Get the selected folder
@@ -677,20 +687,26 @@ def move_to_ocr():
         return redirect(url_for("app.crop_image"))
 
     # Get user ID
-    user_id = session.get("user_id", "anonymous")
+    user_id = current_user.get_user_folder_name()
 
     # Define paths
     folder_path = os.path.join(
         current_app.config["UPLOAD_FOLDER"], str(user_id), folder
     )
-    cropped_path = os.path.join(folder_path, "cropped")
+    png_source_path = os.path.join(folder_path, "PNG")  # Source PNG files
+    cropped_path = os.path.join(
+        folder_path, "cropped"
+    )  # Legacy cropped images (if any)
     toocr_path = os.path.join(folder_path, "TOOCR")
 
-    # Create TOOCR directory if it doesn't exist
+    # Create TOOCR directory structure if it doesn't exist
     os.makedirs(toocr_path, exist_ok=True)
+    toocr_png_path = os.path.join(toocr_path, "PNG")
+    os.makedirs(toocr_png_path, exist_ok=True)
+    current_app.logger.info(f"Created TOOCR directory structure: {toocr_png_path}")
 
     try:
-        # Group existing cropped images by page number
+        # Group existing cropped images by page number (from legacy cropped directory if it exists)
         page_crops = defaultdict(list)
 
         if os.path.exists(cropped_path):
@@ -708,39 +724,52 @@ def move_to_ocr():
         # Track number of processed files
         copied_files = 0
 
-        # Process all original images
-        for filename in os.listdir(folder_path):
+        # Process all images from the PNG source directory
+        if not os.path.exists(png_source_path):
+            current_app.logger.error(
+                f"PNG source directory does not exist: {png_source_path}"
+            )
+            flash("No PNG files found to move to OCR.", "warning")
+            return redirect(url_for("app.crop_image", selected_folder=folder))
+
+        for filename in os.listdir(png_source_path):
             if not filename.endswith(".png") or filename.startswith("."):
                 continue
 
             # Get original page number (without extension)
             page_base = os.path.splitext(filename)[0]
 
-            if page_crops[page_base]:
-                # This page has crops - copy each with new naming convention
-                for i, crop_file in enumerate(sorted(page_crops[page_base]), 1):
-                    src_path = os.path.join(cropped_path, crop_file)
-                    # Format: page_001_crop_001.png
-                    dest_filename = f"page_{page_base}_crop_{i:03d}.png"
-                    dest_path = os.path.join(toocr_path, dest_filename)
+            # Copy the file to TOOCR/PNG directory
+            src_path = os.path.join(png_source_path, filename)
+            dest_path = os.path.join(toocr_png_path, filename)
 
-                    shutil.copy2(src_path, dest_path)
-                    copied_files += 1
-                    current_app.logger.info(
-                        f"Copied cropped file: {crop_file} -> {dest_filename}"
-                    )
-            else:
-                # No crops for this page - copy the original image
-                src_path = os.path.join(folder_path, filename)
-                # Format: page_001.png
-                dest_filename = f"page_{page_base}.png"
-                dest_path = os.path.join(toocr_path, dest_filename)
+            shutil.copy2(src_path, dest_path)
+            copied_files += 1
+            current_app.logger.info(f"Copied file: {filename} from PNG/ to TOOCR/PNG/")
 
-                shutil.copy2(src_path, dest_path)
-                copied_files += 1
+        # Update database status for all files in this document folder
+        from app.models import UploadedFile, db
+
+        try:
+            # Find all uploaded files for this document folder and user
+            uploaded_files = UploadedFile.query.filter_by(
+                document_folder=folder, user_id=current_user.id
+            ).all()
+
+            # Update status to 'processing' for all files in this document
+            for uploaded_file in uploaded_files:
+                uploaded_file.update_processing_status("processing")
                 current_app.logger.info(
-                    f"Copied original file: {filename} -> {dest_filename}"
+                    f"Updated status to 'processing' for file: {uploaded_file.original_filename}"
                 )
+
+            current_app.logger.info(
+                f"Updated {len(uploaded_files)} files to 'processing' status for document folder: {folder}"
+            )
+
+        except Exception as db_error:
+            current_app.logger.error(f"Error updating database status: {str(db_error)}")
+            # Don't fail the entire operation if database update fails
 
         flash(f"Successfully copied {copied_files} files to the OCR folder", "success")
 
@@ -823,6 +852,34 @@ def process_ocr():
             actual_ocr_result_data,  # Pass the actual data part
             is_document_completed=True,
         )
+
+        # Update database status to "completed" after successful OCR processing
+        from app.models import UploadedFile, db
+
+        try:
+            # Find all uploaded files for this document folder and user
+            uploaded_files = UploadedFile.query.filter_by(
+                document_folder=document_folder_name, user_id=current_user.id
+            ).all()
+
+            # Keep status as 'under_ocr' - do not automatically mark as completed
+            # OCR completion should be handled separately by user action
+            for uploaded_file in uploaded_files:
+                uploaded_file.ocr_completed = True
+                current_app.logger.info(
+                    f"Marked OCR as completed for file: {uploaded_file.original_filename} (status remains 'under_ocr')"
+                )
+
+            db.session.commit()
+            current_app.logger.info(
+                f"Marked OCR as completed for {len(uploaded_files)} files in document folder: {document_folder_name}"
+            )
+
+        except Exception as db_error:
+            current_app.logger.error(
+                f"Error updating database status after OCR: {str(db_error)}"
+            )
+            # Don't fail the entire operation if database update fails
 
         return jsonify(
             {
@@ -977,23 +1034,39 @@ def api_get_document_images(user_id, document_folder_name):
             current_app.config, user_id, document_folder_name
         )
 
+        # Try both possible PNG locations and use the one that exists and has files
+        completed_png_dir = None
+        in_progress_png_dir = None
+        current_png_dir = None
+
         if doc_info["is_completed"]:
             # For completed documents, look in TOOCR/PNG directory
-            current_png_dir = os.path.join(
+            completed_png_dir = os.path.join(
                 file_operations.get_document_completed_dir(
                     current_app.config, user_id, document_folder_name
                 ),
                 "PNG",
             )
-        else:
-            # For in-progress documents, look in regular PNG directory
-            current_png_dir = file_operations.get_document_png_dir(
+            if os.path.exists(completed_png_dir):
+                current_png_dir = completed_png_dir
+                current_app.logger.info(
+                    f"Using completed PNG directory: {current_png_dir}"
+                )
+
+        if not current_png_dir:
+            # For in-progress documents, or fallback if completed directory doesn't exist
+            in_progress_png_dir = file_operations.get_document_png_dir(
                 current_app.config, user_id, document_folder_name
             )
+            if os.path.exists(in_progress_png_dir):
+                current_png_dir = in_progress_png_dir
+                current_app.logger.info(
+                    f"Using in-progress PNG directory: {current_png_dir}"
+                )
 
         images_data = {"success": True, "images": [], "message": ""}
 
-        if os.path.exists(current_png_dir):
+        if current_png_dir and os.path.exists(current_png_dir):
             all_files_in_png_dir = os.listdir(current_png_dir)
             png_files = [f for f in all_files_in_png_dir if f.lower().endswith(".png")]
             png_files.sort()
@@ -1018,8 +1091,22 @@ def api_get_document_images(user_id, document_folder_name):
                 f"Successfully loaded {len(png_files)} images from {current_png_dir}"
             )
         else:
-            images_data["message"] = f"PNG directory does not exist: {current_png_dir}"
-            current_app.logger.warning(f"PNG directory not found: {current_png_dir}")
+            # Provide detailed debug information
+            debug_info = []
+            if completed_png_dir:
+                debug_info.append(
+                    f"Completed PNG dir ({completed_png_dir}): {'exists' if os.path.exists(completed_png_dir) else 'missing'}"
+                )
+            if in_progress_png_dir:
+                debug_info.append(
+                    f"In-progress PNG dir ({in_progress_png_dir}): {'exists' if os.path.exists(in_progress_png_dir) else 'missing'}"
+                )
+
+            debug_message = "; ".join(debug_info)
+            images_data["message"] = f"No PNG directory found. Debug: {debug_message}"
+            current_app.logger.warning(
+                f"No PNG directory found for document {document_folder_name}. {debug_message}"
+            )
 
         return jsonify(images_data)
 
@@ -1688,6 +1775,12 @@ def api_admin_get_uploaded_files():
             "total_files": UploadedFile.query.count(),
             "pdf_files": UploadedFile.query.filter_by(file_type="pdf").count(),
             "image_files": UploadedFile.query.filter_by(file_type="image").count(),
+            "in_progress_files": UploadedFile.query.filter_by(
+                processing_status="in_progress"
+            ).count(),
+            "under_ocr_files": UploadedFile.query.filter_by(
+                processing_status="under_ocr"
+            ).count(),
             "completed_files": UploadedFile.query.filter_by(
                 processing_status="completed"
             ).count(),
@@ -1995,7 +2088,7 @@ def process_upload_with_progress(upload_id, uploaded_file_storage, user, app_con
                     mime_type=mime_type,
                     document_folder=doc_folder_name,
                     file_path=relative_file_path,
-                    processing_status="uploaded",
+                    processing_status="in_progress",
                 )
                 db.session.add(uploaded_file_record)
                 db.session.commit()
@@ -2010,11 +2103,8 @@ def process_upload_with_progress(upload_id, uploaded_file_storage, user, app_con
             if original_filename.lower().endswith(".pdf"):
                 progress["current_message"] = "Starting PDF page extraction..."
 
-                # Update processing status
-                try:
-                    uploaded_file_record.update_processing_status("processing")
-                except:
-                    pass
+                # Keep status as "in_progress" during PDF conversion
+                # Status will only change to "under_ocr" when user clicks "Move to OCR"
 
                 # Custom PDF conversion with progress tracking
                 success_conversion, png_paths_or_message = (
@@ -2028,9 +2118,8 @@ def process_upload_with_progress(upload_id, uploaded_file_storage, user, app_con
                         f"Successfully converted PDF to {len(png_paths_or_message)} PNGs"
                     )
 
-                    # Update processing status and page count
+                    # Update page count but keep status as "in_progress"
                     try:
-                        uploaded_file_record.update_processing_status("completed")
                         uploaded_file_record.page_count = len(png_paths_or_message)
                         db.session.commit()
                     except:
@@ -2043,7 +2132,7 @@ def process_upload_with_progress(upload_id, uploaded_file_storage, user, app_con
                 else:
                     app.logger.error(f"Error converting PDF: {png_paths_or_message}")
 
-                    # Update processing status to failed
+                    # Update processing status to failed only if conversion fails
                     try:
                         uploaded_file_record.update_processing_status("failed")
                     except:
@@ -2054,12 +2143,7 @@ def process_upload_with_progress(upload_id, uploaded_file_storage, user, app_con
                         f"PDF conversion failed: {png_paths_or_message}"
                     )
             else:
-                # For images, mark as completed immediately
-                try:
-                    uploaded_file_record.update_processing_status("completed")
-                except:
-                    pass
-
+                # For images, keep status as "in_progress" (will change to "under_ocr" when moved to OCR)
                 progress["status"] = "completed"
                 progress["current_message"] = "Image upload completed successfully"
 
@@ -2178,6 +2262,31 @@ def api_move_to_ocr():
         )
 
         if success:
+            # Update database status for all files in this document folder
+            from app.models import UploadedFile, db
+
+            try:
+                # Find all uploaded files for this document folder and user
+                uploaded_files = UploadedFile.query.filter_by(
+                    document_folder=folder_name, user_id=current_user.id
+                ).all()
+
+                # Update status to 'under_ocr' for all files in this document
+                for uploaded_file in uploaded_files:
+                    uploaded_file.update_processing_status("under_ocr")
+                    current_app.logger.info(
+                        f"Updated status to 'under_ocr' for file: {uploaded_file.original_filename}"
+                    )
+
+                current_app.logger.info(
+                    f"Updated {len(uploaded_files)} files to 'under_ocr' status for document folder: {folder_name}"
+                )
+
+            except Exception as db_error:
+                current_app.logger.error(
+                    f"Error updating database status: {str(db_error)}"
+                )
+                # Don't fail the entire operation if database update fails
             current_app.logger.info(
                 f"User {user_id} moved document {folder_name} to OCR via AJAX"
             )
@@ -2310,7 +2419,7 @@ def ocr():
         "documents": documents_with_info,
         "user_id": user_id,
     }
-    return render_template("ocr.html", **context)
+    return render_template("image_preview.html", **context)
 
 
 @app.route("/api/admin/edit_user", methods=["POST"])
@@ -2464,6 +2573,221 @@ def api_admin_get_user(user_id):
         return (
             jsonify(
                 {"success": False, "message": f"Error getting user details: {str(e)}"}
+            ),
+            500,
+        )
+
+
+@app.route("/api/delete_page", methods=["POST"])
+@login_required
+def api_delete_page():
+    """
+    AJAX endpoint to delete a specific page (PNG file) from a document.
+    Returns JSON data with success/error information.
+    """
+    try:
+        user_id = request.form.get("user_id")
+        document_name = request.form.get("document_name")
+        page_name = request.form.get("page_name")
+
+        if not user_id or not document_name or not page_name:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Missing required parameters: user_id, document_name, or page_name",
+                    }
+                ),
+                400,
+            )
+
+        # Security check: ensure the current user owns this document
+        current_user_folder = current_user.get_user_folder_name()
+        if user_id != current_user_folder:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Access denied: You can only delete pages from your own documents",
+                    }
+                ),
+                403,
+            )
+
+        # Get document info to determine PNG directory location
+        doc_info = file_operations.get_document_info(
+            current_app.config, user_id, document_name
+        )
+
+        # Find the correct PNG directory (completed or in-progress)
+        png_dir = None
+        if doc_info["is_completed"]:
+            # For completed documents, look in TOOCR/PNG directory
+            completed_png_dir = os.path.join(
+                file_operations.get_document_completed_dir(
+                    current_app.config, user_id, document_name
+                ),
+                "PNG",
+            )
+            if os.path.exists(completed_png_dir):
+                png_dir = completed_png_dir
+
+        if not png_dir:
+            # For in-progress documents, or fallback if completed directory doesn't exist
+            in_progress_png_dir = file_operations.get_document_png_dir(
+                current_app.config, user_id, document_name
+            )
+            if os.path.exists(in_progress_png_dir):
+                png_dir = in_progress_png_dir
+
+        if not png_dir or not os.path.exists(png_dir):
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": f"PNG directory not found for document '{document_name}'",
+                    }
+                ),
+                404,
+            )
+
+        # Construct the full path to the page file
+        page_file_path = os.path.join(png_dir, page_name)
+
+        # Check if the page file exists
+        if not os.path.exists(page_file_path):
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": f"Page '{page_name}' not found in document '{document_name}'",
+                    }
+                ),
+                404,
+            )
+
+        # Delete the page file
+        # NOTE: This only deletes the specific page file, not associated crops or OCR segments
+        # - Crop files (page_X_crop_Y.png) are preserved as independent entities
+        # - OCR segment directories (PNG/page_X/) are preserved as they contain processed data
+        os.remove(page_file_path)
+
+        current_app.logger.info(
+            f"User {user_id} deleted page '{page_name}' from document '{document_name}'"
+        )
+
+        message = f"Page '{page_name}' deleted successfully"
+
+        return jsonify({"success": True, "message": message})
+
+    except Exception as e:
+        current_app.logger.error(f"Error deleting page: {str(e)}")
+        return (
+            jsonify({"success": False, "message": f"Error deleting page: {str(e)}"}),
+            500,
+        )
+
+
+@app.route("/api/mark_document_completed", methods=["POST"])
+@login_required
+def api_mark_document_completed():
+    """
+    AJAX endpoint to manually mark a document as completed after OCR validation.
+    This is the final step in the workflow.
+    Returns JSON response with success/error information.
+    """
+    try:
+        user_id = request.form.get("user_id")
+        document_name = request.form.get("document_name")
+
+        if not user_id or not document_name:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Missing required parameters: user_id or document_name",
+                    }
+                ),
+                400,
+            )
+
+        # Security check: ensure the current user owns this document
+        current_user_folder = current_user.get_user_folder_name()
+        if user_id != current_user_folder:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Access denied: You can only complete your own documents",
+                    }
+                ),
+                403,
+            )
+
+        # Find all uploaded files for this document folder and user
+        from app.models import UploadedFile, db
+
+        uploaded_files = UploadedFile.query.filter_by(
+            document_folder=document_name, user_id=current_user.id
+        ).all()
+
+        if not uploaded_files:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": f"No files found for document '{document_name}'",
+                    }
+                ),
+                404,
+            )
+
+        # Check if documents are in the correct state (should be 'under_ocr')
+        invalid_status_files = [
+            f for f in uploaded_files if f.processing_status != "under_ocr"
+        ]
+
+        if invalid_status_files:
+            invalid_statuses = list(
+                set([f.processing_status for f in invalid_status_files])
+            )
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": f"Document cannot be marked as completed. Some files have invalid status: {', '.join(invalid_statuses)}. Only documents with 'under_ocr' status can be completed.",
+                    }
+                ),
+                400,
+            )
+
+        # Update status to 'completed' for all files in this document
+        for uploaded_file in uploaded_files:
+            uploaded_file.update_processing_status("completed")
+            current_app.logger.info(
+                f"Manually marked as completed for file: {uploaded_file.original_filename}"
+            )
+
+        current_app.logger.info(
+            f"User {current_user_folder} manually marked document '{document_name}' as completed ({len(uploaded_files)} files)"
+        )
+
+        return jsonify(
+            {
+                "success": True,
+                "message": f"Document '{document_name}' has been marked as completed successfully",
+                "files_updated": len(uploaded_files),
+            }
+        )
+
+    except Exception as e:
+        current_app.logger.error(f"Error marking document as completed: {str(e)}")
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "message": f"Error marking document as completed: {str(e)}",
+                }
             ),
             500,
         )

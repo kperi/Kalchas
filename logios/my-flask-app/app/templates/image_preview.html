@@ -438,7 +438,6 @@
                                             <div class="document-name">{{ folder }}</div>
                                             <div class="document-meta">
                                                 <span>OCR Ready</span>
-                                                <span class="document-status status-completed">Completed</span>
                                             </div>
                                         </div>
                                         <button class="document-delete-btn" 
@@ -643,30 +642,7 @@
                     <pre id="segment-json-content" style="white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; background-color: #fff; padding:10px; border-radius: 3px; margin-bottom: 0;"></pre>
                 </div>
 
-                <!-- START: Preview for Segment Selected from Sidebar Dropdown - MOVED HERE -->
-                {% if selected_segment %} {# selected_segment is passed from routes.py context #}
-                    <div id="sidebar-selected-segment-preview-legacy" class="gradio-component-group" style="background-color: #fdfdfd; padding: 1rem;">
-                        {% if segment_data and segment_data.text %}
-                            <div style="padding: 0.5rem; background-color: #f0f0f0; border-radius: 3px;">
-                                <p style="font-family: monospace; white-space: pre-wrap; font-size: 0.9em; margin:0; color: #333;">
-                                    {% if segment_data.text is string %}
-                                        {{ segment_data.text }}
-                                    {% elif segment_data.text is iterable and segment_data.text[0] is string %}
-                                        {{ segment_data.text[0] }}
-                                        {% if segment_data.text[1] is number %}
-                                            (Confidence: {{ "%.3f"|format(segment_data.text[1]) }})
-                                        {% endif %}
-                                    {% else %}
-                                        {{ segment_data.text | tojson }}
-                                    {% endif %}
-                                </p>
-                            </div>
-                        {% elif segment_data %}
-                            <p style="font-size: 0.9em; color: #6c757d; margin-top: 0.5rem;">(No text data available for this segment in the JSON)</p>
-                        {% endif %}
-                    </div>
-                {% endif %}
-                <!-- END: Preview for Segment Selected from Sidebar Dropdown -->
+
                 {% else %}
                 <div class="gradio-component-group" style="background-color: #f9fafb; padding: 1rem;">
                     <p class="gradio-placeholder-text">Select a document and page to access OCR controls.</p>
@@ -1020,10 +996,10 @@
                     // Clear any existing segments and OCR results
                     clearSegmentData();
                     
-                    // Initialize the preview overlay now that the image exists
+                    // Initialize canvas after image loads
                     setTimeout(() => {
-                        console.log('[loadPage] Initializing preview overlay for dynamically loaded image');
-                        initializePreviewOverlay();
+                        console.log('[loadPage] Initializing canvas for dynamically loaded image');
+                        initializeBoundingBoxCanvas();
                     }, 100); // Small delay to ensure DOM is updated
                     
                     // Load and display segments coordinates in debug info
@@ -1512,7 +1488,6 @@
                         <div class="document-name">${doc.name}</div>
                         <div class="document-meta">
                             <span>OCR Ready</span>
-                            <span class="document-status status-completed">Completed</span>
                         </div>
                     </div>
                     <button class="document-delete-btn" 
@@ -1775,7 +1750,6 @@
                 console.log('[DEBUG] Displaying segment:', segment);
                 
                 // Clear existing highlight
-                clearSegmentHighlight();
                 clearBoundingBoxes();
                 
                 // Draw bounding box if segment has bbox coordinates
@@ -1784,12 +1758,6 @@
                     drawSegmentBoundingBox(segment);
                 } else {
                     console.log('[DEBUG] No bbox found in segment:', segment);
-                }
-                
-                // Fallback: Update highlight if segment has coords (old format)
-                if (segment.coords && Array.isArray(segment.coords) && segment.coords.length === 4) {
-                    console.log('[DEBUG] Using fallback coords highlight');
-                    highlightSegment(segment.coords);
                 }
                 
                 // Update navigation buttons state
@@ -1828,11 +1796,6 @@
                     const segmentId = segment.id !== undefined ? String(segment.id) : 
                                     index.toString().padStart(3, '0');
             
-                    // OLD URL construction (commented out for reference):
-                    // const imageUrl = `/uploads/{{ session.get('user_id', 'anonymous') }}/${encodeURIComponent(currentSegmentFolderGlobal)}/TOOCR/${encodeURIComponent(currentSegmentPageIdGlobal)}/${encodeURIComponent(segmentId)}.png`;
-
-                    // NEW URL construction using url_for pattern:
-                    // The placeholders like '__USER_ID__' will be replaced by JavaScript.
                     const imageUrl = `{{ url_for('app.get_segment_image', user_id='__USER_ID__', document_folder_name='__FOLDER__', page_image_filename_base='__PAGE_ID__', segment_id_str='__SEGMENT_ID__') }}`
                         .replace('__USER_ID__', encodeURIComponent("{{ session.get('user_id', 'anonymous') }}"))
                         .replace('__FOLDER__', encodeURIComponent(currentSegmentFolderGlobal))
@@ -1877,8 +1840,8 @@
                 });
             } else {
                 console.warn('[displaySegmentByIndex] Invalid segment index:', index);
-                // Clear highlight if index is invalid
-                clearSegmentHighlight();
+                // Clear bounding boxes if index is invalid
+                clearBoundingBoxes();
                 
                 // Hide preview container
                 const previewContainer = document.getElementById('sidebar-selected-segment-preview');
@@ -1888,14 +1851,13 @@
             }
         }
 
-        // Update the loadLineSegments function to remove segment buttons creation
+        // Update the loadLineSegments function
         function loadLineSegments(folder, pageId) {
             const lineSegmentsContainer = document.getElementById('line-segments-container');
             const selectedLineImageEl = document.getElementById('sidebar-segment-image');
             const selectedLineTextEl = document.getElementById('sidebar-segment-text');
             const segmentCounter = document.getElementById('segment-counter');
             
-            // Enhanced debugging
             console.log('[loadLineSegments] Element check:', {
                 lineSegmentsContainer: !!lineSegmentsContainer,
                 selectedLineImageEl: !!selectedLineImageEl,
@@ -1949,7 +1911,7 @@
                     if (data && data.success === true && data.segments && Array.isArray(data.segments) && data.segments.length > 0) {
                         currentSegmentsList = data.segments;
                         
-                        // Collect all text lines from segments and update the OCR result textarea
+                        // Update OCR result textarea with all segment text
                         const ocrResult = document.getElementById('ocr-result');
                         if (ocrResult) {
                             const textLines = [];
@@ -1961,14 +1923,11 @@
                                     if (typeof segment.text === 'string') {
                                         segmentText = segment.text;
                                     } else if (Array.isArray(segment.text) && segment.text.length > 0) {
-                                        // If text is an array [text, confidence], take the first element
                                         segmentText = String(segment.text[0]);
                                     } else {
-                                        // Fallback: convert to string
                                         segmentText = String(segment.text);
                                     }
                                     
-                                    // Clean and add the text if not empty
                                     segmentText = segmentText.trim();
                                     if (segmentText) {
                                         textLines.push(segmentText);
@@ -1976,9 +1935,7 @@
                                 }
                             });
                             
-                            // Join all text lines with line feeds and set in textarea
-                            const allText = textLines.join('\n');
-                            ocrResult.value = allText;
+                            ocrResult.value = textLines.join('\n');
                         }
                         
                         // Populate the dropdown
@@ -1986,7 +1943,7 @@
                         const segmentLoading = document.getElementById('segment-loading');
                         
                         if (segmentSelect) {
-                            // Clear existing options except the first one (placeholder)
+                            // Clear existing options except the first one
                             while (segmentSelect.options.length > 1) {
                                 segmentSelect.remove(1);
                             }
@@ -1996,7 +1953,6 @@
                                 const option = document.createElement('option');
                                 option.value = index;
                                 
-                                // Create display text
                                 let displayText = `Segment ${index + 1}`;
                                 if (segment.text) {
                                     const textPreview = Array.isArray(segment.text) ? segment.text[0] : segment.text;
@@ -2024,13 +1980,13 @@
                             }
                         }
                         
-                        // Initialize canvas after segments are loaded
+                        // Initialize canvas and display first segment
                         setTimeout(() => {
                             initializeBoundingBoxCanvas();
                             displaySegmentByIndex(initialIndex, false);
                         }, 100);
                     } else {
-                        // Update loading message and clear dropdown
+                        // No segments found
                         const segmentLoading = document.getElementById('segment-loading');
                         const segmentSelect = document.getElementById('segment-select');
                         
@@ -2049,13 +2005,13 @@
                         } else {
                             selectedLineImageEl.innerHTML = '<p style="color:#6c757d;">No segments available</p>';
                         }
-                        selectedLineTextEl.textContent = 'No segments were detected for this page.'; // Use textContent
+                        selectedLineTextEl.textContent = 'No segments were detected for this page.';
                         if (segmentCounter) segmentCounter.textContent = 'No segments found';
                         updateNavigationButtons();
                     }
                 })
                 .catch(error => {
-                    // Update error state in dropdown
+                    // Handle errors
                     const segmentLoading = document.getElementById('segment-loading');
                     const segmentSelect = document.getElementById('segment-select');
                     
@@ -2076,21 +2032,21 @@
                     } else {
                         selectedLineImageEl.innerHTML = '<p style="color:red;">Error loading segments</p>';
                     }
-                    selectedLineTextEl.textContent = `Error: ${error.message}`; // Use textContent
+                    selectedLineTextEl.textContent = `Error: ${error.message}`;
                     if (segmentCounter) segmentCounter.textContent = 'Error loading segments';
                     updateNavigationButtons();
                 });
         }
 
-        function showSelectedSegment(folder, pageId, segment) { // folder and pageId are now passed correctly
-            // CORRECTED SELECTORS:
-            const selectedLineImageContainer = document.getElementById('sidebar-segment-image'); // Was: document.querySelector('.selected-line-image');
-            const selectedLineTextContainer = document.getElementById('sidebar-segment-text');   // Was: document.querySelector('.selected-line-text');
+        function showSelectedSegment(folder, pageId, segment) {
+            const selectedLineImageContainer = document.getElementById('sidebar-segment-image');
+            const selectedLineTextContainer = document.getElementById('sidebar-segment-text');
             
             if (!selectedLineImageContainer || !selectedLineTextContainer) {
-                console.error('[showSelectedSegment] HTML elements for displaying selected segment not found! Check IDs: sidebar-segment-image, sidebar-segment-text');
+                console.error('[showSelectedSegment] HTML elements for displaying selected segment not found!');
                 return;
             }
+            
             if (!segment || typeof segment !== 'object') {
                 console.error('[showSelectedSegment] Invalid segment data provided:', segment);
                 if (selectedLineImageContainer.tagName === 'IMG') {
@@ -2099,9 +2055,10 @@
                 } else {
                     selectedLineImageContainer.innerHTML = `<p style="font-size:0.9em; color:red;">Error: Invalid segment data.</p>`;
                 }
-                selectedLineTextContainer.textContent = 'Error: Invalid segment data.'; // Use textContent
+                selectedLineTextContainer.textContent = 'Error: Invalid segment data.';
                 return;
             }
+            
             console.log('[showSelectedSegment] Displaying segment:', JSON.stringify(segment));
  
             if (segment.has_image === true && (segment.id !== null && segment.id !== undefined)) {
@@ -2111,23 +2068,22 @@
                     .replace('__FOLDER__', encodeURIComponent(folder))
                     .replace('__PAGE_ID__', encodeURIComponent(pageId))
                     .replace('__SEGMENT_ID__', encodeURIComponent(segmentIdStr));
+                    
                 console.log('[showSelectedSegment] Image URL:', imageUrl);
+                
                 if (selectedLineImageContainer.tagName === 'IMG') {
                     selectedLineImageContainer.src = imageUrl;
                     selectedLineImageContainer.alt = `Line segment ${segmentIdStr}`;
                     selectedLineImageContainer.onerror = function() {
-                        this.onerror=null; 
-                        this.alt='Image not found or error loading.'; 
-                        this.src=''; 
-                        // Optionally, display error message in a different way if it's an img tag
-                        // For example, by updating a sibling element or a parent's content.
-                        // For simplicity, we'll just set alt text.
+                        this.onerror = null; 
+                        this.alt = 'Image not found or error loading.'; 
+                        this.src = ''; 
                         console.error(`Image not found: ${segmentIdStr}.png (Path: ${imageUrl})`);
                     };
                 } else {
                      selectedLineImageContainer.innerHTML = `
                         <img src="${imageUrl}" alt="Line segment ${segmentIdStr}" style="max-width: 100%; max-height:150px; border: 1px solid #dee2e6; object-fit: contain; background-color: #fff;"
-                             onerror="this.onerror=null; this.alt='Image not found or error loading.'; this.src=''; this.parentElement.innerHTML='<p style=\\'font-size:0.9em; color:red;\\'>Image not found: ${segmentIdStr}.png (Path: ${imageUrl})</p>';">`;
+                             onerror="this.onerror=null; this.alt='Image not found or error loading.'; this.src=''; this.parentElement.innerHTML='<p style=\\'font-size:0.9em; color:red;\\'>Image not found: ${segmentIdStr}.png</p>';">`;
                 }
             } else {
                 console.log(`[showSelectedSegment] No image for this segment. has_image: ${segment.has_image}, id: ${segment.id}`);
@@ -2152,117 +2108,11 @@
                  displayText = `Coordinates: [${segment.coords.join(', ')}] (No text recognized)`;
             }
             
-            selectedLineTextContainer.textContent = displayText; // Use textContent
+            selectedLineTextContainer.textContent = displayText;
             console.log('[showSelectedSegment] Displayed text:', displayText);
         }
 
-        function initializePreviewOverlay() {
-            const previewImage = document.getElementById('preview-image');
-            let overlay = document.getElementById('preview-overlay');
-            
-            if (!previewImage) {
-                console.warn('[initializePreviewOverlay] Preview image not found, skipping overlay initialization');
-                return false;
-            }
-            
-            // Create overlay if it doesn't exist
-            if (!overlay) {
-                overlay = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-                overlay.id = 'preview-overlay';
-                overlay.style.position = 'absolute';
-                overlay.style.top = '0';
-                overlay.style.left = '0';
-                overlay.style.pointerEvents = 'none';
-                
-                // Ensure parent container has relative positioning
-                const parentElement = previewImage.parentElement;
-                if (parentElement) {
-                    parentElement.style.position = 'relative';
-                    parentElement.appendChild(overlay);
-                } else {
-                    console.error('[initializePreviewOverlay] Preview image has no parent element');
-                    return false;
-                }
-            }
-            
-            // Function to update overlay dimensions
-            function updateOverlayDimensions() {
-                if (previewImage.complete && previewImage.naturalWidth > 0) {
-                    const rect = previewImage.getBoundingClientRect();
-                    overlay.style.width = rect.width + 'px';
-                    overlay.style.height = rect.height + 'px';
-                    overlay.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
-                    console.log('[initializePreviewOverlay] Overlay dimensions updated:', rect.width, 'x', rect.height);
-                }
-            }
-            
-            // Update overlay dimensions when image loads
-            if (previewImage.complete) {
-                updateOverlayDimensions();
-            } else {
-                previewImage.onload = updateOverlayDimensions;
-            }
-            
-            console.log('[initializePreviewOverlay] Overlay initialized successfully');
-            return true;
-        }
 
-        function clearSegmentHighlight() {
-            const overlay = document.getElementById('preview-overlay');
-            if (overlay) {
-                while (overlay.firstChild) {
-                    overlay.removeChild(overlay.firstChild);
-                }
-            }
-        }
-
-        function highlightSegment(coords) {
-            const overlay = document.getElementById('preview-overlay');
-            const previewImage = document.getElementById('preview-image');
-            
-            if (!overlay || !previewImage || !Array.isArray(coords) || coords.length !== 4) {
-                console.warn('[highlightSegment] Invalid parameters:', { overlay: !!overlay, coords });
-                return;
-            }
-
-            // Clear existing highlights
-            clearSegmentHighlight();
-
-            // Get image dimensions for scaling
-            const imageRect = previewImage.getBoundingClientRect();
-            const scaleX = imageRect.width / previewImage.naturalWidth;
-            const scaleY = imageRect.height / previewImage.naturalHeight;
-            
-            // Create rectangle element
-            const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-            
-            // Calculate coordinates (assuming coords are [x1, y1, x2, y2])
-            const [x1, y1, x2, y2] = coords;
-            const scaledX = Math.min(x1, x2) * scaleX;
-            const scaledY = Math.min(y1, y2) * scaleY;
-            const width = Math.abs(x2 - x1) * scaleX;
-            const height = Math.abs(y2 - y1) * scaleY;
-            
-            // Set rectangle attributes
-            rect.setAttribute("x", scaledX);
-            rect.setAttribute("y", scaledY);
-            rect.setAttribute("width", width);
-            rect.setAttribute("height", height);
-            
-            // Style the highlight
-            rect.setAttribute("class", "segment-highlight");
-            rect.setAttribute("fill", "rgba(255, 255, 0, 0.2)");
-            rect.setAttribute("stroke", "rgba(255, 200, 0, 0.8)");
-            rect.setAttribute("stroke-width", "2");
-            
-            // Add the highlight to the overlay
-            overlay.appendChild(rect);
-            
-            console.log('[highlightSegment] Added highlight:', {
-                original: coords,
-                scaled: { x: scaledX, y: scaledY, width, height }
-            });
-        }
 
         // Segment & OCR functionality
         function performSegmentOCR() {
@@ -2567,9 +2417,6 @@
             const canvas = document.getElementById('bounding-box-overlay');
             const previewImage = document.getElementById('preview-image');
             
-            console.log('[DEBUG] Canvas element:', canvas);
-            console.log('[DEBUG] Preview image element:', previewImage);
-            
             if (!canvas || !previewImage) {
                 console.error('[DEBUG] Missing canvas or preview image');
                 return;
@@ -2580,7 +2427,6 @@
                 return;
             }
             
-            console.log('[DEBUG] Canvas and image found, bbox:', segment.bbox);
             const ctx = canvas.getContext('2d');
             
             if (!ctx) {
@@ -2588,54 +2434,22 @@
                 return;
             }
             
-            // Clear previous drawings (only if explicitly drawing a new bbox)
-            console.log('[DEBUG] About to clear canvas and draw new bbox');
+            // Clear previous drawings
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Get image display dimensions (how big the image appears on screen)
+            // Calculate scale factors to convert from original coords to display coords
             const imageDisplayWidth = previewImage.offsetWidth;
             const imageDisplayHeight = previewImage.offsetHeight;
-            
-            // Get actual image dimensions (the original image size that coords reference)
             const imageActualWidth = previewImage.naturalWidth;
             const imageActualHeight = previewImage.naturalHeight;
-            
-            // Calculate scale factors to convert from original coords to display coords
             const scaleX = imageDisplayWidth / imageActualWidth;
             const scaleY = imageDisplayHeight / imageActualHeight;
             
-            console.log('[DEBUG] Scale calculation:', {
-                imageDisplaySize: { width: imageDisplayWidth, height: imageDisplayHeight },
-                imageActualSize: { width: imageActualWidth, height: imageActualHeight },
-                scaleFactors: { scaleX, scaleY }
-            });
-            
-            // Log scaling information
-            console.log('[DEBUG] Image dimensions:', {
-                displayWidth: imageDisplayWidth,
-                displayHeight: imageDisplayHeight,
-                actualWidth: imageActualWidth,
-                actualHeight: imageActualHeight,
-                scaleX: scaleX,
-                scaleY: scaleY
-            });
-            
-            // Extract bounding box coordinates from original image coordinates
-            // Most common format is [x1, y1, x2, y2] in original image coordinates
+            // Extract bounding box coordinates
             let x, y, width, height;
             
-            console.log('[DEBUG] Raw bbox from segment:', segment.bbox);
-            
             if (Array.isArray(segment.bbox) && segment.bbox.length === 4) {
-                const [val1, val2, val3, val4] = segment.bbox;
-                console.log('[DEBUG] Processing bbox array:', segment.bbox);
-                
-                // Assume [x1, y1, x2, y2] format (most common for OCR)
-                // Convert from original image coordinates to display coordinates
-                const x1_original = val1;
-                const y1_original = val2; 
-                const x2_original = val3;
-                const y2_original = val4;
+                const [x1_original, y1_original, x2_original, y2_original] = segment.bbox;
                 
                 // Scale to display coordinates
                 const x1_display = x1_original * scaleX;
@@ -2649,15 +2463,8 @@
                 width = Math.abs(x2_display - x1_display);
                 height = Math.abs(y2_display - y1_display);
                 
-                console.log('[DEBUG] Coordinate conversion:', {
-                    original: { x1: x1_original, y1: y1_original, x2: x2_original, y2: y2_original },
-                    scaled: { x1: x1_display, y1: y1_display, x2: x2_display, y2: y2_display },
-                    final: { x, y, width, height }
-                });
-                
             } else if (typeof segment.bbox === 'object' && segment.bbox.x !== undefined) {
                 // Format: {x, y, width, height} object in original coordinates
-                console.log('[DEBUG] Detected {x, y, width, height} object format');
                 x = segment.bbox.x * scaleX;
                 y = segment.bbox.y * scaleY;
                 width = segment.bbox.width * scaleX;
@@ -2667,41 +2474,25 @@
                 return;
             }
             
-            // Validate calculated coordinates
-            console.log('[DEBUG] Calculated coordinates:', {
-                x: x,
-                y: y,
-                width: width,
-                height: height,
-                canvasWidth: canvas.width,
-                canvasHeight: canvas.height
-            });
-            
-            // Ensure coordinates are within canvas bounds
+            // Validate coordinates
             if (x < 0 || y < 0 || width <= 0 || height <= 0) {
                 console.warn('[DEBUG] Invalid coordinates calculated:', { x, y, width, height });
                 return;
             }
             
             // Draw red bounding box
-            ctx.strokeStyle = '#dc2626'; // Red color
+            ctx.strokeStyle = '#dc2626';
             ctx.lineWidth = 3;
             ctx.setLineDash([]);
-            
-            // Draw rectangle
             ctx.strokeRect(x, y, width, height);
             
-            // Optional: Add semi-transparent fill
-            ctx.fillStyle = 'rgba(220, 38, 38, 0.1)'; // Light red fill
+            // Add semi-transparent fill
+            ctx.fillStyle = 'rgba(220, 38, 38, 0.1)';
             ctx.fillRect(x, y, width, height);
             
-            console.log('[DEBUG] Successfully drew bounding box:', { 
-                x, y, width, height, 
-                bbox: segment.bbox,
-                canvasSize: { width: canvas.width, height: canvas.height }
-            });
+            console.log('[DEBUG] Successfully drew bounding box');
             
-            // Mark that canvas has been drawn to (for debugging)
+            // Mark that canvas has been drawn to
             canvas.setAttribute('data-has-drawing', 'true');
         }
         
@@ -2718,89 +2509,11 @@
             }
         }
         
-        // Function to test canvas drawing (for debugging)
-        function testCanvasDrawing() {
-            console.log('[DEBUG] Testing canvas drawing...');
-            const canvas = document.getElementById('bounding-box-overlay');
-            if (canvas) {
-                const ctx = canvas.getContext('2d');
-                if (ctx) {
-                    ctx.strokeStyle = '#00ff00'; // Green for test
-                    ctx.lineWidth = 3;
-                    ctx.strokeRect(50, 50, 100, 100);
-                    console.log('[DEBUG] Test rectangle drawn at (50,50) 100x100 on canvas:', {
-                        canvasWidth: canvas.width,
-                        canvasHeight: canvas.height,
-                        visible: canvas.style.display !== 'none'
-                    });
-                    
-                    // Set a timeout to check if the test rectangle is still there
-                    setTimeout(() => {
-                        const hasDrawing = canvas.getAttribute('data-has-drawing');
-                        console.log('[DEBUG] Canvas state after 2 seconds:', {
-                            hasDrawing: hasDrawing,
-                            canvasStillExists: !!document.getElementById('bounding-box-overlay')
-                        });
-                    }, 2000);
-                } else {
-                    console.error('[DEBUG] Could not get canvas 2D context');
-                }
-            } else {
-                console.error('[DEBUG] Canvas not found for testing');
-            }
-        }
-        
-        // Function to manually test bounding box drawing
-        function testBoundingBoxDrawing() {
-            console.log('[DEBUG] Testing bounding box drawing with sample data...');
-            const previewImage = document.getElementById('preview-image');
-            if (previewImage && previewImage.naturalWidth > 0) {
-                // Create test coordinates relative to original image size
-                const testSegment = {
-                    bbox: [
-                        previewImage.naturalWidth * 0.1,  // x1 (10% from left)
-                        previewImage.naturalHeight * 0.1, // y1 (10% from top)
-                        previewImage.naturalWidth * 0.5,  // x2 (50% from left) 
-                        previewImage.naturalHeight * 0.3  // y2 (30% from top)
-                    ]
-                };
-                console.log('[DEBUG] Test segment bbox:', testSegment.bbox);
-                drawSegmentBoundingBox(testSegment);
-            } else {
-                console.error('[DEBUG] Cannot test - image not loaded or has no natural dimensions');
-            }
-        }
-        
-        // Make functions available globally for manual testing
-        window.testBoundingBoxDrawing = testBoundingBoxDrawing;
-        window.testCanvasDrawing = testCanvasDrawing;
+
 
         // Add to DOMContentLoaded event listener
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('[DEBUG] DOM content loaded');
-            
-            // Check for preview image and initialize overlay
-            function tryInitializeOverlay() {
-                const previewImage = document.getElementById('preview-image');
-                if (previewImage) {
-                    console.log('[DEBUG] Preview image found, initializing overlay');
-                    const success = initializePreviewOverlay();
-                    if (success) {
-                        return true;
-                    }
-                } else {
-                    console.log('[DEBUG] No preview image found on initial load, overlay will be initialized when image is loaded');
-                }
-                return false;
-            }
-            
-            // Try immediately, then with a small delay if needed
-            if (!tryInitializeOverlay()) {
-                setTimeout(tryInitializeOverlay, 100);
-            }
-            
-            // Canvas initialization is now handled by the image onload event
-            // to ensure proper timing
+            console.log('[DEBUG] DOM content loaded - Canvas initialization handled by image onload events');
         });
         
         // Function to confirm document deletion from OCR page

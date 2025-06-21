@@ -1323,7 +1323,7 @@
                     
                     title.textContent = 'Delete Page';
                     if (isOriginalPage) {
-                        message.textContent = `Are you sure you want to delete "${displayName}" and all its associated crops? This action cannot be undone.`;
+                        message.textContent = `Are you sure you want to delete "${displayName}"? This will only delete the original page file. Any cropped segments from this page will be preserved. This action cannot be undone.`;
                     } else {
                         message.textContent = `Are you sure you want to delete "${displayName}"? This action cannot be undone.`;
                     }

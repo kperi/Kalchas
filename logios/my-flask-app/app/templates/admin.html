@@ -538,31 +538,6 @@
             grid-template-columns: 1fr;
         }
     }
-    
-    /* Edit user form specific styles */
-    #edit-user-form-section {
-        animation: fadeIn 0.3s ease-in;
-    }
-    
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    
-    .edit-user-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 1.5rem;
-        padding-bottom: 1rem;
-        border-bottom: 1px solid #e5e7eb;
-    }
-    
-    .edit-user-info {
-        font-size: 0.9em;
-        color: #6b7280;
-        font-style: italic;
-    }
 </style>
 {% endblock %}
 
@@ -904,12 +879,7 @@
                     </div>
                     
                     <div id="edit-user-form-section" style="display: none;">
-                        <div class="edit-user-header">
-                            <h3 style="margin: 0;">Edit User Details</h3>
-                            <div class="edit-user-info" id="edit-user-info">
-                                Loading user information...
-                            </div>
-                        </div>
+                        <h3 style="margin-top: 0;">Edit User Details</h3>
                         
                         <form id="edit-user-form">
                             <input type="hidden" id="edit-user-id" name="user_id">
@@ -1005,11 +975,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const refreshButton = document.getElementById('refresh-documents');
     const alertArea = document.getElementById('alert-area');
     const createUserForm = document.getElementById('create-user-form');
-    const editUserForm = document.getElementById('edit-user-form');
     const userSearchManagement = document.getElementById('user-search-management');
     const usersManagementList = document.getElementById('users-management-list');
-    const editWelcomeState = document.getElementById('edit-welcome-state');
-    const editUserFormSection = document.getElementById('edit-user-form-section');
     
     // Refresh button
     refreshButton.addEventListener('click', function() {
@@ -1057,14 +1024,6 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         submitUserCreation();
     });
-    
-    // User editing form
-    if (editUserForm) {
-        editUserForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            submitUserEdit();
-        });
-    }
     
     // Function to view user documents (called from user management tab)
     window.viewUserDocuments = function(userId) {
@@ -1421,11 +1380,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // User editing functions
+    // Edit user functionality
     window.editUser = function(userId) {
         console.log('Loading user for editing:', userId);
         
-        // Switch to user editing tab
+        // Switch to edit user tab
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
         document.querySelector('[data-tab="user-editing"]').classList.add('active');
         
@@ -1440,8 +1399,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 if (data.success) {
                     populateEditForm(data.user);
-                    editWelcomeState.style.display = 'none';
-                    editUserFormSection.style.display = 'block';
+                    showEditForm();
                 } else {
                     showAlert('error', data.message || 'Failed to load user data');
                 }
@@ -1458,23 +1416,67 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('edit-email').value = user.email;
         document.getElementById('edit-first-name').value = user.first_name;
         document.getElementById('edit-last-name').value = user.last_name;
-        document.getElementById('edit-password').value = ''; // Always empty for security
+        document.getElementById('edit-password').value = ''; // Always start with empty password
         document.getElementById('edit-is-admin').checked = user.is_admin;
         document.getElementById('edit-is-active').checked = user.is_active;
-        
-        // Update user info display
-        const userInfo = document.getElementById('edit-user-info');
-        const createdDate = user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unknown';
-        const lastLogin = user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never';
-        userInfo.textContent = `User ID: ${user.id} • Created: ${createdDate} • Last Login: ${lastLogin}`;
         
         // Clear any previous errors
         clearEditFormErrors();
     }
     
+    function showEditForm() {
+        document.getElementById('edit-welcome-state').style.display = 'none';
+        document.getElementById('edit-user-form-section').style.display = 'block';
+    }
+    
+    function hideEditForm() {
+        document.getElementById('edit-welcome-state').style.display = 'block';
+        document.getElementById('edit-user-form-section').style.display = 'none';
+    }
+    
+    window.cancelEditUser = function() {
+        hideEditForm();
+        document.getElementById('edit-user-form').reset();
+        clearEditFormErrors();
+    };
+    
+    function clearEditFormErrors() {
+        document.querySelectorAll('#edit-user-form .form-error').forEach(error => {
+            error.textContent = '';
+        });
+        document.querySelectorAll('#edit-user-form .form-input').forEach(input => {
+            input.classList.remove('error');
+        });
+    }
+    
+    function showEditFieldError(errorId, message) {
+        const errorElement = document.getElementById(errorId);
+        if (errorElement) {
+            errorElement.textContent = message;
+            const inputId = errorId.replace('-error', '');
+            const inputElement = document.getElementById(inputId);
+            if (inputElement) {
+                inputElement.classList.add('error');
+            }
+        }
+    }
+    
+    // Handle edit user form submission
+    document.getElementById('edit-user-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        submitUserEdit();
+    });
+    
     function submitUserEdit() {
         console.log('Starting user edit process');
         clearEditFormErrors();
+        
+        const editUserForm = document.getElementById('edit-user-form');
+        if (!editUserForm) {
+            console.error('Edit user form not found');
+            showAlert('error', 'Form not found. Please refresh the page.');
+            return;
+        }
         
         const formData = new FormData(editUserForm);
         const password = formData.get('password');
@@ -1491,15 +1493,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         // Client-side validation
-        let hasErrors = false;
-        
         if (password && password.length < 6) {
             showEditFieldError('edit-password-error', 'Password must be at least 6 characters');
-            hasErrors = true;
-        }
-        
-        if (hasErrors) {
-            console.log('Client-side validation failed');
             return;
         }
         
@@ -1530,7 +1525,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (data.success) {
                 showAlert('success', `User "${data.username}" updated successfully!`);
-                // Refresh the page to show the updated user information
+                hideEditForm();
+                // Refresh the page to show updated user info
                 setTimeout(() => {
                     window.location.reload();
                 }, 2000);
@@ -1553,35 +1549,6 @@ document.addEventListener('DOMContentLoaded', function() {
             showAlert('error', 'Network error occurred while updating user: ' + error.message);
         });
     }
-    
-    function clearEditFormErrors() {
-        document.querySelectorAll('#edit-user-form .form-error').forEach(error => {
-            error.textContent = '';
-        });
-        document.querySelectorAll('#edit-user-form .form-input').forEach(input => {
-            input.classList.remove('error');
-        });
-    }
-    
-    function showEditFieldError(errorId, message) {
-        const errorElement = document.getElementById(errorId);
-        if (errorElement) {
-            errorElement.textContent = message;
-            const inputId = errorId.replace('-error', '');
-            const inputElement = document.getElementById(inputId);
-            if (inputElement) {
-                inputElement.classList.add('error');
-            }
-        }
-    }
-    
-    window.cancelEditUser = function() {
-        editWelcomeState.style.display = 'block';
-        editUserFormSection.style.display = 'none';
-        clearEditFormErrors();
-        editUserForm.reset();
-        showAlert('info', 'User editing cancelled');
-    };
 });
 </script>
 {% endblock %}

@@ -366,12 +366,8 @@ def handle_pdf_upload_with_auto_folder(app_config, user_id, uploaded_pdf_file_st
         os.makedirs(png_dir, exist_ok=True)
         logger.info(f"Created PNG subfolder: {png_dir}")
 
-        # Create TOOCR subfolder for processed images
-        toocr_dir = get_document_completed_dir(
-            app_config, user_id, document_folder_name
-        )
-        os.makedirs(toocr_dir, exist_ok=True)
-        logger.info(f"Created TOOCR subfolder: {toocr_dir}")
+        # Note: TOOCR directory will be created later when user explicitly moves document to OCR processing
+        # This ensures documents are correctly identified as "in-progress" until explicitly completed
 
         # Save the PDF file in the document folder with original filename
         saved_pdf_path = os.path.join(document_folder_path, original_filename)
@@ -475,12 +471,8 @@ def handle_pdf_upload_with_auto_folder_no_sanitize(
         os.makedirs(png_dir, exist_ok=True)
         logger.info(f"Created PNG subfolder: {png_dir}")
 
-        # Create TOOCR subfolder for processed images
-        toocr_dir = get_document_completed_dir(
-            app_config, user_id, document_folder_name
-        )
-        os.makedirs(toocr_dir, exist_ok=True)
-        logger.info(f"Created TOOCR subfolder: {toocr_dir}")
+        # Note: TOOCR directory will be created later when user explicitly moves document to OCR processing
+        # This ensures documents are correctly identified as "in-progress" until explicitly completed
 
         # Save the PDF file in the document folder with ORIGINAL filename (no sanitization)
         saved_pdf_path = os.path.join(document_folder_path, original_filename)
@@ -971,15 +963,15 @@ def get_document_info(app_config, user_id, document_folder_name):
             else:
                 logger.info(f"PNG folder not yet created for document: {png_dir}")
 
-        # Additional document analysis
+        # Additional document analysis based on file structure
         if info["original_png_count"] == 0 and len(info["pdf_files"]) > 0:
             info["status"] = (
-                "uploaded" if not info["is_completed"] else "completed_no_conversion"
+                "in_progress" if not info["is_completed"] else "completed_no_conversion"
             )
         elif info["original_png_count"] > 0 and info["crop_count"] == 0:
-            info["status"] = "converted" if not info["is_completed"] else "completed"
+            info["status"] = "in_progress" if not info["is_completed"] else "completed"
         elif info["crop_count"] > 0:
-            info["status"] = "edited" if not info["is_completed"] else "completed"
+            info["status"] = "in_progress" if not info["is_completed"] else "completed"
 
         logger.info(
             f"Document info for {document_folder_name}: Status={info['status']}, PDFs={len(info['pdf_files'])}, PNGs={info['total_png_count']} ({info['original_png_count']} originals, {info['crop_count']} crops)"
@@ -1013,9 +1005,9 @@ def get_document_summary_stats(app_config, user_id):
         "total_pngs": 0,
         "total_crops": 0,
         "status_breakdown": {
-            "uploaded": 0,  # PDF uploaded, not converted
-            "converted": 0,  # PDF converted to PNGs
-            "edited": 0,  # Has cropped images
+            "in_progress": 0,  # PDF uploaded, being processed
+            "under_ocr": 0,  # Moved to OCR, awaiting completion
+            "completed": 0,  # Manually marked as completed
             "completed": 0,  # Marked as completed
             "error": 0,  # Error state
             "missing": 0,  # Missing files
