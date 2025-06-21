@@ -1,10 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crop Image - Logios App</title>
-    {% block head_extra %}
+{% extends "layout.html" %}
+
+{% block title %}Crop Image - Logios App{% endblock %}
+
+{% block head %}
+    {{ super() }}
     <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
     <style>
@@ -429,10 +428,9 @@
             }
         }
     </style>
-    {% endblock %}
-</head>
-<body>
-    {% include 'layout.html' %}
+{% endblock %}
+
+{% block content %}
     <div class="page-layout">
         <!-- Sidebar -->
         <div class="sidebar">
@@ -495,10 +493,19 @@
         
         <!-- Main Content -->
         <div class="main-content">
-            {% block content %}
             <div class="gradio-component-group" style="max-width: 1000px; margin-left: auto; margin-right: auto;">
                 <h1>Image Cropping Tool</h1>
 
+            <!-- Debug info for documents -->
+            <div id="debug-documents-info" style="margin-bottom: 10px; padding: 5px; border: 1px solid #ddd; background-color: #f0f0f0; font-size: 0.8em;">
+                <strong>Debug:</strong> 
+                Documents count: {{ documents|length if documents else 0 }}
+                {% if selected_folder %} | Selected folder: {{ selected_folder }}{% endif %}
+                {% if documents %}
+                    | Document names: {% for doc in documents %}{{ doc.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+                {% endif %}
+            </div>
+            
             {% if documents %}
             <div class="gradio-component-group" style="background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
                 <div style="margin-bottom: 1rem;">
@@ -554,6 +561,25 @@
                     </div>
                 </noscript>
             </div>
+            {% else %}
+                <!-- No documents found -->
+                <div class="gradio-component-group" style="background-color: #fef3c7; padding: 1rem; margin-bottom: 1.5rem; border: 1px solid #f59e0b; border-radius: 6px;">
+                    {% if selected_folder %}
+                        <h3 style="color: #92400e; margin-top: 0;">Document Not Found</h3>
+                        <p style="color: #92400e;">The document "{{ selected_folder }}" was not found or is still being processed.</p>
+                        <p style="color: #92400e;">If you just uploaded a PDF, please wait a moment for processing to complete, then refresh the page.</p>
+                        <div style="margin-top: 1rem;">
+                            <button onclick="window.location.reload()" class="gradio-button gradio-button-primary" style="margin-right: 0.5rem;">Refresh Page</button>
+                            <button onclick="navigateToUpload()" class="gradio-button">Upload New Document</button>
+                        </div>
+                    {% else %}
+                        <h3 style="color: #92400e; margin-top: 0;">No Documents Found</h3>
+                        <p style="color: #92400e;">No documents are available for cropping. Please upload a PDF document first.</p>
+                        <div style="margin-top: 1rem;">
+                            <button onclick="navigateToUpload()" class="gradio-button gradio-button-primary">Upload Document</button>
+                        </div>
+                    {% endif %}
+                </div>
             {% endif %}
 
             <!-- Dynamic content area for selected image -->
@@ -732,6 +758,26 @@
                     setTimeout(() => {
                         initializeCropperForImage();
                     }, 100);
+                } else if (currentFolder && !currentImage) {
+                    // Document is selected but no image yet - show document info and load images
+                    if (currentDocumentName) {
+                        currentDocumentName.textContent = currentFolder;
+                    }
+                    if (selectedDocumentInfo) {
+                        selectedDocumentInfo.style.display = 'block';
+                    }
+                    
+                    // Update sidebar selection to match current folder
+                    document.querySelectorAll('.document-item').forEach(item => {
+                        item.classList.remove('selected');
+                    });
+                    const selectedItem = document.querySelector(`[data-document-name="${currentFolder}"]`);
+                    if (selectedItem) {
+                        selectedItem.classList.add('selected');
+                    }
+                    
+                    // Load document images to populate the dropdown
+                    loadDocumentImages(currentFolder);
                 } else if (!currentFolder) {
                     // Hide image-related UI if no document is selected
                     hideImageSelection();
@@ -1662,9 +1708,6 @@
                 </div>
             </div>
         </div>
-            </div>
-            {% endblock %}
         </div>
     </div>
-</body>
-</html>
+{% endblock %}
