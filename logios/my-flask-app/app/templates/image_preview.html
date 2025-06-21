@@ -644,9 +644,7 @@
             <!-- Right Column: OCR Controls and Segments -->
             <div class="main-right-column">
                 {% if selected_folder and request.args.get('selected_png') %}
-                <!-- Segment Selection Form -->
                 <div id="segment-selection-container" class="gradio-component-group" style="background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
-                    <h4>Segment Selection</h4>
                     <form id="segment-form" onsubmit="return false;">
                         <input type="hidden" name="selected_folder" value="{{ selected_folder }}">
                         <input type="hidden" name="selected_png" value="{{ request.args.get('selected_png') }}">
@@ -1136,9 +1134,8 @@
             }
             
             rightColumn.innerHTML = `
-                <!-- Segment Selection Form -->
+              
                 <div id="segment-selection-container" class="gradio-component-group" style="background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
-                    <h4>Segment Selection</h4>
                     <form id="segment-form" onsubmit="return false;">
                         <input type="hidden" name="selected_folder" value="${documentName}">
                         <input type="hidden" name="selected_png" value="${pageName}">
@@ -2420,10 +2417,7 @@
             } else {
                 console.error('[DEBUG] Invalid segment index or no segments list');
             }
-            
-            // Don't reload the page, just update the display locally
-            // The bounding box is already drawn above
-            console.log('[DEBUG] Segment selection handled locally, no page reload needed');
+             
         }
         
         // Function to initialize the bounding box canvas
