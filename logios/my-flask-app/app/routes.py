@@ -11,14 +11,17 @@ from flask import (
     send_from_directory,
 )
 from flask_login import login_required, current_user
-from werkzeug.utils import secure_filename
 
+import mimetypes
 import os
 import re  # Still used in process_ocr for data from OCR service
 import requests
 import shutil
+import tempfile
+import threading
+import time
+import uuid
 
-from loguru import logger
 from collections import defaultdict
 
 from . import file_operations
@@ -54,7 +57,6 @@ def show_upload_page():
         if uploaded_file_storage and allowed_file(uploaded_file_storage.filename):
             from app.models import UploadedFile, db
             from datetime import datetime
-            import mimetypes
 
             user_id = current_user.get_user_folder_name()
             original_filename = uploaded_file_storage.filename  # No sanitization
@@ -182,7 +184,7 @@ def crop_image():
     user_workspace_info = file_operations.get_user_workspace_info(
         current_app.config, user_id
     )
-    logger.info(user_workspace_info)
+    current_app.logger.info(user_workspace_info)
 
     # Get only in-progress documents for cropping (completed documents cannot be cropped)
     documents_data = file_operations.get_user_documents_list(
@@ -358,157 +360,6 @@ def image_preview():
         selected_segment=request.args.get("selected_segment"),
         segments_data=segments_data,
     )
-
-
-@app.route(
-    "/crop_1", methods=["GET"]
-)  # Assuming GET for now, POST would handle crop submission
-def crop_image_1():
-    user_id = current_user.get_user_folder_name()
-
-    # Get all document folders for the user for the dropdown
-    user_upload_dir = file_operations.get_user_upload_dir(current_app.config, user_id)
-    document_folders = []
-    if os.path.exists(user_upload_dir):
-        document_folders = [
-            name
-            for name in os.listdir(user_upload_dir)
-            if os.path.isdir(os.path.join(user_upload_dir, name))
-            and not os.path.exists(
-                os.path.join(user_upload_dir, name, "TOOCR")
-            )  # List only non-completed folders
-        ]
-        document_folders.sort()
-
-    selected_document_folder = request.args.get("selected_folder")
-    image_to_crop_filename = request.args.get("image_file")  # e.g., page_001.png
-
-    original_pngs_for_cropping = []  # PNGs from <selected_document_folder>/PNG/
-    # Cropped images are also in <selected_document_folder>/PNG/ but named like page_00X_crop_YYY.png
-    # The template might need to distinguish these or list all and allow selection.
-    # For simplicity, let's list all PNGs from the PNG subfolder.
-
-    if selected_document_folder:
-        # PNGs for a document *before* completion are in <user_id>/<selected_document_folder>/PNG/
-        current_png_dir = file_operations.get_document_png_dir(
-            current_app.config, user_id, selected_document_folder
-        )
-        if os.path.exists(current_png_dir):
-            try:
-                all_files_in_png_dir = os.listdir(current_png_dir)
-                original_pngs_for_cropping = [
-                    f for f in all_files_in_png_dir if f.lower().endswith(".png")
-                ]
-                # A natural sort might be better if page numbers can exceed 999 or have inconsistent padding
-                original_pngs_for_cropping.sort()
-            except Exception as e:
-                current_app.logger.error(
-                    f"Error listing PNG files from {current_png_dir}: {str(e)}"
-                )
-
-    # The `cropped_images` list in the old template was for a separate `cropped` dir.
-    # Now, crops are mixed in the `PNG` dir. The template needs to handle this.
-    # We can pass `original_pngs_for_cropping` which contains both originals and their crops.
-
-    return render_template(
-        "crop_menu.html",  # Assuming crop_menu.html is adapted
-        document_folders=document_folders,
-        selected_folder=selected_document_folder,
-        # Pass all PNGs (originals and crops) from the PNG subfolder
-        available_png_files=original_pngs_for_cropping,
-        image_to_crop_filename=image_to_crop_filename,
-    )
-
-
-@app.route("/uploads/<user_id>/<folder>/<filename>")
-def uploaded_file(user_id, folder, filename):
-    # First log exactly what we received
-    current_app.logger.info(
-        f"File request received - user_id: '{user_id}', folder: '{folder}', filename: '{filename}'"
-    )
-
-    # UPLOAD_FOLDER should be the path *inside the container*, e.g., /app/uploads
-    upload_dir_base = current_app.config["UPLOAD_FOLDER"]
-
-    # Add debug info about config
-    current_app.logger.info(f"UPLOAD_FOLDER config: {upload_dir_base}")
-
-    # Construct the path to the directory containing the user's specific folder of images
-    # This is the directory from which send_from_directory will serve 'filename'
-    directory_to_serve_from = os.path.join(upload_dir_base, str(user_id), folder)
-
-    current_app.logger.info(f"Attempting to serve file: {filename}")
-    current_app.logger.info(f"From directory: {directory_to_serve_from}")
-    current_app.logger.info(
-        f"Full expected path: {os.path.join(directory_to_serve_from, filename)}"
-    )
-
-    # Check if directory exists and list contents for debugging
-    if os.path.exists(directory_to_serve_from):
-        current_app.logger.info(
-            f"Directory exists. Contents: {os.listdir(directory_to_serve_from)}"
-        )
-    else:
-        current_app.logger.error(f"Directory does not exist: {directory_to_serve_from}")
-        # Check parent directories
-        parent_dir = os.path.dirname(directory_to_serve_from)
-        if os.path.exists(parent_dir):
-            current_app.logger.info(
-                f"Parent directory exists. Contents: {os.listdir(parent_dir)}"
-            )
-
-    if not os.path.exists(os.path.join(directory_to_serve_from, filename)):
-        current_app.logger.error(
-            f"File NOT FOUND at: {os.path.join(directory_to_serve_from, filename)}"
-        )
-        return "File not found", 404
-
-    try:
-        return send_from_directory(directory_to_serve_from, filename)
-    except Exception as e:
-        current_app.logger.error(f"Error in send_from_directory: {str(e)}")
-        import traceback
-
-        current_app.logger.error(f"Traceback: {traceback.format_exc()}")
-        return "Error serving file", 500
-
-
-@app.route("/uploads/<user_id>/<folder>/cropped/<filename>")
-def uploaded_cropped_file(user_id, folder, filename):
-    """Serve cropped image files from the cropped subdirectory"""
-    upload_dir_base = current_app.config["UPLOAD_FOLDER"]
-    # Path to the cropped folder containing the requested file
-    directory_to_serve_from = os.path.join(
-        upload_dir_base, str(user_id), folder, "cropped"
-    )
-
-    current_app.logger.info(f"Attempting to serve cropped file: {filename}")
-    current_app.logger.info(f"From cropped directory: {directory_to_serve_from}")
-
-    try:
-        return send_from_directory(directory_to_serve_from, filename)
-    except Exception as e:
-        current_app.logger.error(f"Error serving cropped file: {str(e)}")
-        return "Error serving cropped file", 500
-
-
-@app.route("/uploads/<user_id>/<folder>/TOOCR/<filename>")
-def uploaded_toocr_file(user_id, folder, filename):
-    """Serve OCR-ready image files from the TOOCR subdirectory"""
-    upload_dir_base = current_app.config["UPLOAD_FOLDER"]
-    # Path to the TOOCR folder containing the requested file
-    directory_to_serve_from = os.path.join(
-        upload_dir_base, str(user_id), folder, "TOOCR"
-    )
-
-    current_app.logger.info(f"Attempting to serve TOOCR file: {filename}")
-    current_app.logger.info(f"From TOOCR directory: {directory_to_serve_from}")
-
-    try:
-        return send_from_directory(directory_to_serve_from, filename)
-    except Exception as e:
-        current_app.logger.error(f"Error serving TOOCR file: {str(e)}")
-        return "Error serving OCR file", 500
 
 
 @app.route("/admin")
@@ -2034,7 +1885,6 @@ def process_upload_with_progress(upload_id, uploaded_file_storage, user, app_con
     """
     from app.models import UploadedFile, db
     from app import create_app
-    import mimetypes
 
     # Create app context for background thread
     app = create_app()
@@ -2164,7 +2014,6 @@ def convert_pdf_with_progress_tracking(
     """
     try:
         from pdf2image import convert_from_path
-        import tempfile
 
         progress = upload_progress_store[upload_id]
 
