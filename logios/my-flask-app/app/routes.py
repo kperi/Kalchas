@@ -2235,7 +2235,6 @@ def serve_completed_document_png_file(user_id, document_folder_name, image_filen
     return send_from_directory(completed_png_dir, image_filename)
 
 
-
 @app.route("/api/admin/edit_user", methods=["POST"])
 @login_required
 def api_admin_edit_user():
@@ -2605,3 +2604,70 @@ def api_mark_document_completed():
             ),
             500,
         )
+
+
+@app.route("/api/save_final_segment_text", methods=["POST"])
+@login_required
+def save_final_segment_text():
+    """
+    Save the final text for a segment to a .final file in the same directory as the segment JSON.
+    Expects JSON body with: user_id, document_folder, page_image_filename_base, segment_id_str, final_text
+    """
+    try:
+        data = request.json
+        user_id = data.get("user_id")
+        document_folder = data.get("document_folder")
+        page_image_filename_base = data.get("page_image_filename_base")
+        segment_id_str = data.get("segment_id_str")
+        final_text = data.get("final_text", "")
+
+        if not all(
+            [user_id, document_folder, page_image_filename_base, segment_id_str]
+        ):
+            return (
+                jsonify({"success": False, "message": "Missing required parameters"}),
+                400,
+            )
+
+        # Get the segments directory
+        segments_storage_dir = file_operations.get_ocr_output_segments_base_dir(
+            current_app.config,
+            user_id,
+            document_folder,
+            page_image_filename_base,
+            is_document_completed=True,
+        )
+
+        try:
+
+            final_filename = f"{int(segment_id_str):03d}.final"
+        except ValueError:
+            if segment_id_str.lower().endswith(".json"):
+                final_filename = segment_id_str.replace(".json", ".final")
+            else:
+                return (
+                    jsonify({"success": False, "message": "Invalid segment_id format"}),
+                    400,
+                )
+
+        final_path = os.path.join(segments_storage_dir, final_filename)
+
+        # Save the text to the .final file (UTF-8)
+        with open(final_path, "w", encoding="utf-8") as f:
+            f.write(final_text)
+
+        current_app.logger.info(
+            f"Saved final segment text to {final_path} for user {user_id}, doc {document_folder}, page {page_image_filename_base}, segment {segment_id_str}"
+        )
+
+        return jsonify(
+            {
+                "success": True,
+                "message": "Final segment text saved",
+                "final_path": final_path,
+            }
+        )
+
+    except Exception as e:
+        current_app.logger.error(f"Error saving final segment text: {str(e)}")
+        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
