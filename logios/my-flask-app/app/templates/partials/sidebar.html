@@ -1,0 +1,50 @@
+    <div class="sidebar">
+            <div class="sidebar-section">
+                <h3>User Workspace</h3>
+                <p style="font-family: monospace; background-color: #ffffff; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; margin: 0; word-break: break-all; font-size: 0.75rem;">
+                    User: {{ session.get('user_id', 'anonymous') }}
+                </p>
+            </div>
+            
+            <div class="sidebar-section">
+                <h3>OCR-Ready Documents</h3>
+                
+                <!-- Alert area for sidebar notifications -->
+                <div id="sidebar-alert-area"></div>
+                
+                <div id="sidebar-documents-container">
+                    <div id="sidebar-loading" class="sidebar-loading" style="display: none;">
+                        <span class="loading-spinner"></span>
+                        <div>Loading documents...</div>
+                    </div>
+                    <div id="sidebar-documents-list">
+                        {% if folders %}
+                            {% for folder in folders %}
+                                <div class="document-item {% if folder == selected_folder %}selected{% endif %}" 
+                                     data-document-name="{{ folder }}">
+                                    <div class="document-header">
+                                        <div class="document-name-section">
+                                            <div class="document-name">{{ folder }}</div>
+                                            <div class="document-meta">
+                                                <span>OCR Ready</span>
+                                            </div>
+                                        </div>
+                                        <button class="document-delete-btn" 
+                                                onclick="confirmDeleteDocumentFromOCR('{{ folder }}')" 
+                                                title="Delete {{ folder }}">
+                                            🗑️
+                                        </button>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div style="text-align: center; padding: 1rem; color: #666; font-size: 0.875rem;">
+                                <p>No OCR-ready documents found.</p>
+                                <p style="margin-top: 0.5rem; font-size: 0.8em;">Documents become OCR-ready after using the "Move to OCR" button in the Image Cropping Tool.</p>
+                                <button onclick="navigateToEdit()" class="gradio-button gradio-button-primary" style="display: inline-block; margin-top: 0.5rem; font-size: 0.75rem; padding: 0.5rem 0.75rem; border: none; cursor: pointer;">Go to Image Cropping Tool</button>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
