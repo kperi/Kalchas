@@ -83,6 +83,39 @@ def get_ocr_source_png_dir(
         return get_document_png_dir(app_config, user_id, document_folder_name)
 
 
+def get_ocr_output_segments_base_dir(
+    app_config,
+    user_id,
+    document_folder_name,
+    page_image_filename_base,
+    is_document_completed=True,
+):
+    """
+    Directory containing OCR segment JSON files for a specific page.
+    Pattern: /uploads/{user_id}/{document_folder}/TOOCR/PNG/{page_image_filename_base}/
+
+    Args:
+        app_config: Flask app configuration
+        user_id: The ID of the user
+        document_folder_name: Name of the document folder
+        page_image_filename_base: Base filename of the page (e.g., "page_001" or "page_001_crop_001")
+        is_document_completed: Whether document is in TOOCR folder
+
+    Returns:
+        str: Path to the segments directory for the specific page
+    """
+    if is_document_completed:
+        base_dir = get_document_completed_dir(app_config, user_id, document_folder_name)
+    else:
+        base_dir = get_document_png_dir(app_config, user_id, document_folder_name)
+
+    # Create the full path: base_dir/PNG/page_image_filename_base/
+    png_subdir = os.path.join(base_dir, "PNG")
+    segments_dir = os.path.join(png_subdir, page_image_filename_base)
+
+    return segments_dir
+
+
 # --- Task 1: PDF File Upload and Folder Creation ---
 
 

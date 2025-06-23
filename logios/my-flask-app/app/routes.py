@@ -12,6 +12,7 @@ from flask import (
 )
 from flask_login import login_required, current_user
 
+import json
 import mimetypes
 import os
 import re  # Still used in process_ocr for data from OCR service
@@ -2670,4 +2671,108 @@ def save_final_segment_text():
 
     except Exception as e:
         current_app.logger.error(f"Error saving final segment text: {str(e)}")
+        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
+
+
+@app.route("/api/get_final_segment_text", methods=["GET"])
+@login_required
+def get_final_segment_text():
+    """
+    Get the final text for a segment from a .final file if it exists.
+    Expects query parameters: user_id, document_folder, page_image_filename_base, segment_id_str
+    """
+    try:
+        user_id = request.args.get("user_id")
+        document_folder = request.args.get("document_folder")
+        page_image_filename_base = request.args.get("page_image_filename_base")
+        segment_id_str = request.args.get("segment_id_str")
+
+        if not all(
+            [user_id, document_folder, page_image_filename_base, segment_id_str]
+        ):
+            return (
+                jsonify({"success": False, "message": "Missing required parameters"}),
+                400,
+            )
+
+        # Get the segments directory
+        segments_storage_dir = file_operations.get_ocr_output_segments_base_dir(
+            current_app.config,
+            user_id,
+            document_folder,
+            page_image_filename_base,
+            is_document_completed=True,
+        )
+
+        try:
+            final_filename = f"{int(segment_id_str):03d}.final"
+        except ValueError:
+            if segment_id_str.lower().endswith(".json"):
+                final_filename = segment_id_str.replace(".json", ".final")
+            else:
+                return (
+                    jsonify({"success": False, "message": "Invalid segment_id format"}),
+                    400,
+                )
+
+        final_path = os.path.join(segments_storage_dir, final_filename)
+
+        # Check if .final file exists
+        if not os.path.exists(final_path):
+            return jsonify(
+                {
+                    "success": True,
+                    "has_final": False,
+                    "message": "No final text file found",
+                }
+            )
+
+        # Read the final text
+        with open(final_path, "r", encoding="utf-8") as f:
+            final_text = f.read()
+
+        # Also get the original text from JSON file for comparison
+        json_filename = (
+            f"{int(segment_id_str):03d}.json"
+            if segment_id_str.isdigit()
+            else segment_id_str.replace(".final", ".json")
+        )
+        json_path = os.path.join(segments_storage_dir, json_filename)
+
+        original_text = ""
+        is_different = False
+
+        if os.path.exists(json_path):
+            with open(json_path, "r", encoding="utf-8") as f:
+                json_data = json.load(f)
+
+            # Extract text from JSON
+            if "text" in json_data:
+                if isinstance(json_data["text"], list) and len(json_data["text"]) > 0:
+                    original_text = json_data["text"][0]
+                elif isinstance(json_data["text"], str):
+                    original_text = json_data["text"]
+                else:
+                    original_text = str(json_data["text"])
+
+            # Compare texts
+            is_different = final_text.strip() != original_text.strip()
+
+        current_app.logger.info(
+            f"Retrieved final segment text from {final_path} for user {user_id}, doc {document_folder}, page {page_image_filename_base}, segment {segment_id_str}"
+        )
+
+        return jsonify(
+            {
+                "success": True,
+                "has_final": True,
+                "final_text": final_text,
+                "original_text": original_text,
+                "is_different": is_different,
+                "final_path": final_path,
+            }
+        )
+
+    except Exception as e:
+        current_app.logger.error(f"Error getting final segment text: {str(e)}")
         return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
