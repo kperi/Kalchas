@@ -89,32 +89,7 @@
                 <!-- Image Preview Area -->
                 <div id="document-display-container" class="fade-in show smooth-transition">
                     {% if selected_folder and request.args.get('selected_png') %}
-                    <div id="debug-path-info" style="margin-bottom: 10px; padding: 5px; border: 1px solid #ddd; background-color: #f5f5f5;">
-                        <strong>Debug Info:</strong> 
-                        <span style="font-family: monospace; word-break: break-all;">
-                            TOOCR Path: /uploads/{{session.get('user_id', 'anonymous')}}/{{selected_folder}}/TOOCR/PNG/{{request.args.get('selected_png')}}
-                        </span>
-                        {% if segments_data %}
-                        <br><strong>Segments Coordinates:</strong>
-                        <div style="font-family: monospace; font-size: 12px; max-height: 150px; overflow-y: auto; margin-top: 5px; padding: 5px; background-color: #f9f9f9; border: 1px solid #ccc;">
-                            {% for segment in segments_data %}
-                            <div style="margin-bottom: 3px;">
-                                <span style="color: #666;">Segment {{ segment.id }}:</span> 
-                                {% if segment.bbox and segment.bbox|length >= 4 %}
-                                <span style="color: #2563eb;">bbox=[{{ segment.bbox[0] }}, {{ segment.bbox[1] }}, {{ segment.bbox[2] }}, {{ segment.bbox[3] }}]</span>
-                                {% if segment.confidence %}
-                                <span style="color: #16a34a;">conf={{ "%.2f"|format(segment.confidence) }}</span>
-                                {% endif %}
-                                {% else %}
-                                <span style="color: #dc2626;">No coordinates</span>
-                                {% endif %}
-                            </div>
-                            {% endfor %}
-                        </div>
-                        {% else %}
-                        <br><strong>Segments Coordinates:</strong> <span style="color: #666; font-style: italic;">No segment data available</span>
-                        {% endif %}
-                    </div>
+              
 
                     <div class="gradio-display-area" style="min-height: 40vh; padding:0; border: none; background: #fff;">
                         <div id="image-container" style="position: relative; display: inline-block;">
