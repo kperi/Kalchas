@@ -4,30 +4,35 @@
 {% block title %}Login - Logios App{% endblock %}
 
 {% block content %}
-<div class="gradio-component-group" style="max-width: 450px; margin: 3rem auto;">
-    <h1 style="font-size: 1.6em; margin-bottom: 1.5rem;">Login to Your Account</h1>
+<div class="gradio-component-group" style="max-width: 480px; margin: var(--space-12) auto;">
+    <h1>🔐 Login to Your Account</h1>
     <form method="POST" action="{{ url_for('auth.login') }}">
         {{ form.hidden_tag() }}
-        <div style="margin-bottom: 1rem;">
+        <div class="mb-6">
             {{ form.username.label }}
-            {{ form.username(class="form-control") }} {# Assuming your form fields can take a class #}
+            {{ form.username(class="form-control") }}
             {% for error in form.username.errors %}
-                <span style="color: red; font-size: 0.8em;">{{ error }}</span>
+                <div class="alert alert-danger" style="margin-top: var(--space-2); padding: var(--space-2) var(--space-3); font-size: var(--text-sm);">{{ error }}</div>
             {% endfor %}
         </div>
-        <div style="margin-bottom: 1.5rem;">
+        <div class="mb-6">
             {{ form.password.label }}
             {{ form.password(class="form-control") }}
             {% for error in form.password.errors %}
-                <span style="color: red; font-size: 0.8em;">{{ error }}</span>
+                <div class="alert alert-danger" style="margin-top: var(--space-2); padding: var(--space-2) var(--space-3); font-size: var(--text-sm);">{{ error }}</div>
             {% endfor %}
         </div>
-        <div style="margin-bottom: 1rem;">
-            {{ form.submit(class="gradio-button gradio-button-primary gradio-button-fullwidth") }}
+        <div class="mb-6">
+            {{ form.submit(class="gradio-button gradio-button-primary gradio-button-fullwidth gradio-button-large") }}
         </div>
     </form>
-    <p style="text-align: center; font-size: 0.9em; margin-top: 1.5rem;">
-        Don't have an account? <a href="{{ url_for('auth.register') }}" style="color: #2563eb; text-decoration: none;">Sign up here</a>
-    </p>
+    <div class="text-center" style="padding-top: var(--space-6); border-top: 1px solid var(--gray-200);">
+        <p style="color: var(--gray-600); margin-bottom: var(--space-3);">
+            Don't have an account?
+        </p>
+        <a href="{{ url_for('auth.register') }}" class="gradio-button gradio-button-outline" style="text-decoration: none;">
+            📝 Create New Account
+        </a>
+    </div>
 </div>
 {% endblock %}

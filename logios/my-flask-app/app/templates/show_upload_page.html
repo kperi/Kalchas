@@ -3,40 +3,49 @@
 {% block title %}Upload Document - Logios App{% endblock %}
 
 {% block content %}
-<div class="gradio-component-group" style="max-width: 700px; margin-left: auto; margin-right: auto;">
-    <h1>Upload New Document</h1>
+<div class="gradio-component-group" style="max-width: 800px; margin-left: auto; margin-right: auto;">
+    <h1>📄 Upload New Document</h1>
     <form id="upload-form" action="{{ url_for('app.show_upload_page') }}" method="post" enctype="multipart/form-data">
-        <div class="form-group" style="margin-bottom: 1rem;">
+        <div class="mb-6">
             <label for="file">Choose an Image or PDF file (Max 100MB):</label>
             <input type="file" name="file" id="file" accept="image/*,.pdf" required>
-            <small class="form-text text-muted">Folder name will be automatically created based on the filename (max 20 characters, spaces replaced with underscores)</small>
+            <div class="text-center mt-4" style="color: var(--gray-500); font-size: var(--text-sm);">
+                📁 Folder name will be automatically created based on the filename<br>
+                <small>(max 20 characters, spaces replaced with underscores)</small>
+            </div>
         </div>
-        <button type="submit" id="upload-btn" class="gradio-button gradio-button-primary gradio-button-fullwidth">Upload Document</button>
+        <button type="submit" id="upload-btn" class="gradio-button gradio-button-primary gradio-button-fullwidth gradio-button-large">
+            📤 Upload Document
+        </button>
     </form>
 
     <!-- Upload Progress Section -->
-    <div id="upload-progress-section" style="display: none; margin-top: 1.5rem;">
+    <div id="upload-progress-section" style="display: none; margin-top: var(--space-8);">
         <div class="gradio-component-group">
-            <h3 id="progress-title">Processing Document...</h3>
-            <div id="progress-status" style="margin-bottom: 1rem; color: #6b7280;">
+            <h3 id="progress-title">⚙️ Processing Document...</h3>
+            <div id="progress-status" class="mb-4" style="color: var(--gray-600);">
                 <span id="current-step">Uploading file...</span>
             </div>
             
             <!-- Upload Progress Bar -->
-            <div class="progress-container" style="margin-bottom: 1rem;">
-                <label for="upload-progress" style="font-size: 0.9em; color: #374151; margin-bottom: 0.5rem; display: block;">File Upload Progress</label>
-                <div class="progress-bar-wrapper">
-                    <div class="progress-bar" id="upload-progress-bar" style="width: 0%;"></div>
-                    <span class="progress-text" id="upload-progress-text">0%</span>
+            <div class="mb-6">
+                <label for="upload-progress" style="font-size: var(--text-sm); color: var(--gray-700); margin-bottom: var(--space-2); display: block; font-weight: 600;">File Upload Progress</label>
+                <div class="progress-bar">
+                    <div class="progress-bar-fill" id="upload-progress-bar" style="width: 0%;"></div>
+                </div>
+                <div class="text-center mt-2" style="font-size: var(--text-sm); color: var(--gray-600);">
+                    <span id="upload-progress-text">0%</span>
                 </div>
             </div>
             
             <!-- PDF Conversion Progress Bar (for PDFs only) -->
-            <div id="conversion-progress-container" style="display: none; margin-bottom: 1rem;">
-                <label for="conversion-progress" style="font-size: 0.9em; color: #374151; margin-bottom: 0.5rem; display: block;">PDF Page Extraction Progress</label>
-                <div class="progress-bar-wrapper">
-                    <div class="progress-bar" id="conversion-progress-bar" style="width: 0%;"></div>
-                    <span class="progress-text" id="conversion-progress-text">0 / 0 pages</span>
+            <div id="conversion-progress-container" style="display: none;" class="mb-6">
+                <label for="conversion-progress" style="font-size: var(--text-sm); color: var(--gray-700); margin-bottom: var(--space-2); display: block; font-weight: 600;">PDF Page Extraction Progress</label>
+                <div class="progress-bar">
+                    <div class="progress-bar-fill" id="conversion-progress-bar" style="width: 0%;"></div>
+                </div>
+                <div class="text-center mt-2" style="font-size: var(--text-sm); color: var(--gray-600);">
+                    <span id="conversion-progress-text">0 / 0 pages</span>
                 </div>
             </div>
             

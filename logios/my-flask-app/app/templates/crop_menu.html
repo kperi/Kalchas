@@ -431,6 +431,15 @@
 {% endblock %}
 
 {% block content %}
+<script>
+    // Modify container for full-width layout
+    document.addEventListener('DOMContentLoaded', function() {
+        const container = document.querySelector('.container');
+        if (container) {
+            container.classList.add('full-width-layout');
+        }
+    });
+</script>
     <div class="page-layout">
         <!-- Sidebar -->
         <div class="sidebar">

@@ -1,34 +1,20 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flask Image and PDF Upload</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
-</head>
-<body>
-    {% extends "layout.html" %}
+{% extends "layout.html" %}
 
-    {% block title %}Welcome - Logios App{% endblock %}
+{% block title %}Welcome - Logios App{% endblock %}
 
-    {% block content %}
-    <div class="gradio-component-group" style="text-align: center;">
-        <h1>Welcome to Logios Document Processing</h1>
-        <p style="font-size: 1.1em; color: #374151; margin-bottom: 1.5rem;">
-           Logios - Polytonic OCR 
-        </p>
-        <div>
-            <a href="{{ url_for('app.show_upload_page') }}" class="gradio-button gradio-button-primary" style="margin-right: 10px;">Upload a Document</a>
-            <a href="{{ url_for('app.image_preview') }}" class="gradio-button gradio-button-secondary">View Documents</a>
-        </div>
-
-        {# The original commented out upload form from index.html is not included here. 
-           If you need a direct upload on the homepage, it should be styled similarly to upload_file.html.
-           For now, this index page acts as a welcome/landing page.
-        #}
+{% block content %}
+<div class="gradio-component-group text-center">
+    <h1>Welcome to Logios Document Processing</h1>
+    <p style="font-size: var(--text-lg); color: var(--gray-600); margin-bottom: var(--space-8);">
+       Transform your documents with advanced polytonic OCR technology
+    </p>
+    <div class="button-group flex justify-center gap-4">
+        <a href="{{ url_for('app.show_upload_page') }}" class="gradio-button gradio-button-primary gradio-button-large">
+            📄 Upload a Document
+        </a>
+        <a href="{{ url_for('app.image_preview') }}" class="gradio-button gradio-button-outline gradio-button-large">
+            🔍 View Documents
+        </a>
     </div>
-
-    {% endblock %}
-</body>
-</html>
+</div>
+{% endblock %}

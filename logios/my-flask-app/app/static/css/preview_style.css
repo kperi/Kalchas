@@ -109,29 +109,35 @@
         background-color: #4b5563;
     }
 
-    /* Sidebar Layout Styles - exact copy from crop_menu.html */
+    /* Modern Page Layout Styles - Updated for new container system */
     .page-layout {
         display: flex;
-        min-height: 100vh;
+        min-height: calc(100vh - 12rem); /* Account for nav, container padding, and margins */
         gap: 0;
+        margin: calc(-1 * var(--space-6)); /* Counteract container padding */
+        border-radius: var(--radius-xl);
+        overflow: hidden;
+        box-shadow: var(--shadow-lg);
+        background: #ffffff;
     }
     
     .sidebar {
-        width: 300px;
-        background-color: #f8fafc;
-        border-right: 1px solid #e2e8f0;
-        padding: 1rem;
+        width: 320px;
+        background: linear-gradient(145deg, #ffffff 0%, var(--gray-50) 100%);
+        border-right: 1px solid var(--gray-200);
+        padding: var(--space-6);
         overflow-y: auto;
-        max-height: 100vh;
+        max-height: calc(100vh - 8rem);
         flex-shrink: 0;
     }
     
     .main-content {
         flex: 1;
-        padding: 1rem;
+        padding: var(--space-6);
         overflow-y: auto;
         display: flex;
-        gap: 1.5rem;
+        gap: var(--space-8);
+        background: linear-gradient(145deg, #ffffff 0%, #fafbfc 100%);
     }
     
     .main-left-column {
@@ -144,45 +150,54 @@
         min-width: 0;
     }
     
+    /* Modern Sidebar Styling */
     .sidebar-section {
-        margin-bottom: 1.5rem;
+        margin-bottom: var(--space-8);
     }
     
     .sidebar-section h3 {
-        font-size: 1rem;
-        font-weight: 600;
-        color: #374151;
-        margin-bottom: 0.75rem;
-        border-bottom: 1px solid #e2e8f0;
-        padding-bottom: 0.5rem;
+        font-size: var(--text-lg);
+        font-weight: 700;
+        color: var(--gray-800);
+        margin-bottom: var(--space-4);
+        border-bottom: 2px solid var(--primary-200);
+        padding-bottom: var(--space-3);
+        background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-700) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
     }
     
     .document-item {
-        padding: 0.75rem;
-        margin-bottom: 0.5rem;
-        border-radius: 6px;
-        border: 1px solid #e2e8f0;
-        background-color: #ffffff;
+        padding: var(--space-4);
+        margin-bottom: var(--space-3);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--gray-200);
+        background: linear-gradient(145deg, #ffffff 0%, var(--gray-50) 100%);
         cursor: pointer;
-        transition: all 0.2s ease;
+        transition: all var(--transition-fast);
+        box-shadow: var(--shadow-sm);
     }
     
     .document-item:hover {
-        background-color: #f1f5f9;
-        border-color: #cbd5e1;
-        transform: translateX(2px);
+        background: linear-gradient(145deg, var(--primary-50) 0%, #ffffff 100%);
+        border-color: var(--primary-300);
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
     }
     
     .document-item.selected {
-        background-color: #e0f2fe;
-        border-color: #0ea5e9;
-        border-left: 4px solid #0ea5e9;
+        background: linear-gradient(135deg, var(--primary-100) 0%, var(--primary-50) 100%);
+        border-color: var(--primary-500);
+        border-left: 4px solid var(--primary-600);
+        box-shadow: var(--shadow-md);
     }
     
     .document-name {
         font-weight: 600;
-        color: #1f2937;
-        margin-bottom: 0.25rem;
+        color: var(--gray-800);
+        margin-bottom: var(--space-2);
+        font-size: var(--text-sm);
     }
     
     .document-meta {

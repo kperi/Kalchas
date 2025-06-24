@@ -1,12 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document Preview & OCR - Logios App</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/preview_style.css') }}">
-    
+{% extends "layout.html" %}
+
+{% block title %}Document Preview & OCR - Logios App{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/preview_style.css') }}">
+
 <style>
     /* Enhanced styling for edited segments */
     .segment-edited {
@@ -54,10 +52,19 @@
         transition: color 0.3s ease;
     }
 </style>
-</head>
-<body>
-    {% include 'layout.html' %}
-    <div class="page-layout">
+{% endblock %}
+
+{% block content %}
+<script>
+    // Modify container for full-width layout
+    document.addEventListener('DOMContentLoaded', function() {
+        const container = document.querySelector('.container');
+        if (container) {
+            container.classList.add('full-width-layout');
+        }
+    });
+</script>
+<div class="page-layout">
    
         <!-- Sidebar -->    
         {% include 'partials/sidebar.html' %}
@@ -250,5 +257,5 @@
 
     <!-- Notification Container -->
     <div id="notification-container" class="notification-container"></div>
-</body>
-</html>
+</div>
+{% endblock %}
