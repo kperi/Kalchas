@@ -192,29 +192,8 @@
                     </form>
                 </div>
                 
-                <!-- OCR Section -->
-                <div class="ocr-section gradio-component-group" style="background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
-                    <h4>Text Recognition (OCR)</h4>
-                    <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
-                        <button id="segment-ocr-btn" class="gradio-button gradio-button-secondary" onclick="performSegmentOCR()" style="flex: 1; min-width: 150px; background-color: #059669; color: white;">
-                            <span id="segment-ocr-text">Segment & OCR</span>
-                            <span id="segment-ocr-loading" style="display: none;">
-                                <span class="loading-spinner"></span>
-                                Processing...
-                            </span>
-                        </button>
-                    </div>
-                    
-                    <!-- Status messages for Segment & OCR -->
-                    <div id="segment-ocr-status" style="margin-bottom: 1rem; padding: 0.75rem; border-radius: 6px; display: none;">
-                        <div id="segment-ocr-status-message"></div>
-                    </div>
-
-                    <textarea id="ocr-result" placeholder="Extracted text will appear here. Segments marked with ★ [FINAL] are manually edited versions." style="height: 200px; width: 100%; font-family: monospace;" readonly></textarea>
-                </div>
-
                 <!-- Line Segments Navigation - Initially hidden -->
-                <div id="line-segments-container" class="gradio-component-group" style="display: none; background-color: #f9fafb; padding: 1rem;">
+                <div id="line-segments-container" class="gradio-component-group" style="display: none; background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
                     <h4>Segment Navigation</h4>
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
                         <button id="prev-segment-btn" class="gradio-button gradio-button-secondary" style="padding: 5px 10px; font-size:0.9em;">&lt; Prev</button>
@@ -245,6 +224,27 @@
                             </textarea>
                         </div>
                     </div>
+                </div>
+
+                <!-- OCR Section -->
+                <div class="ocr-section gradio-component-group" style="background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
+                    <h4>Text Recognition (OCR)</h4>
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                        <button id="segment-ocr-btn" class="gradio-button gradio-button-secondary" onclick="performSegmentOCR()" style="flex: 1; min-width: 150px; background-color: #059669; color: white;">
+                            <span id="segment-ocr-text">Segment & OCR</span>
+                            <span id="segment-ocr-loading" style="display: none;">
+                                <span class="loading-spinner"></span>
+                                Processing...
+                            </span>
+                        </button>
+                    </div>
+                    
+                    <!-- Status messages for Segment & OCR -->
+                    <div id="segment-ocr-status" style="margin-bottom: 1rem; padding: 0.75rem; border-radius: 6px; display: none;">
+                        <div id="segment-ocr-status-message"></div>
+                    </div>
+
+                    <textarea id="ocr-result" placeholder="Extracted text will appear here. Segments marked with ★ [FINAL] are manually edited versions." style="height: 200px; width: 100%; font-family: monospace;" readonly></textarea>
                 </div>
                 
                 <!-- Container for displaying segment JSON -->
