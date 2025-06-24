@@ -414,6 +414,40 @@
                 </form>
             </div>
             
+            <!-- Line Segments Navigation - Initially hidden -->
+            <div id="line-segments-container" class="gradio-component-group" style="display: none; background-color: #f9fafb; padding: 1rem;">
+                <h4>Segment Navigation</h4>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                    <button id="prev-segment-btn" class="gradio-button gradio-button-secondary" style="padding: 5px 10px; font-size:0.9em;">&lt; Prev</button>
+                    <div style="text-align: center; flex-grow: 1; font-size: 0.9em; color: #666;">
+                        <span id="segment-counter">Segment 0 of 0</span>
+                    </div>
+                    <button id="next-segment-btn" class="gradio-button gradio-button-secondary" style="padding: 5px 10px; font-size:0.9em;">Next &gt;</button>
+                </div>
+
+                <!-- Single preview container that will be used for all segment displays -->
+                <div id="sidebar-selected-segment-preview" style="margin-top: 1rem; margin-bottom: 1rem; padding: 1rem; border: 1px solid #e0e0e0; background-color: #fdfdfd; border-radius: 5px;">
+                    <h5 id="sidebar-segment-title" style="margin-top:0; margin-bottom: 0.5rem; font-size: 1em; color: #333;">
+                        Preview of Selected Segment
+                    </h5>
+                    <div style="text-align: center; margin-bottom: 0.5rem;">
+                        <img id="sidebar-segment-image" src="" alt="Selected Segment Image"
+                                style="max-width: 100%; max-height: 200px; border: 1px solid #ccc; object-fit: contain; background-color: #fff;">
+                    </div>
+                    <div id="sidebar-segment-text-container" style="padding: 0.5rem; background-color: #f0f0f0; border-radius: 3px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
+                            <small style="color: #666; font-size: 0.8em;">Edit text below</small>
+                            <small id="save-hint" style="color: #28a745; font-size: 0.75em; font-weight: bold;">Alt+Enter to save</small>
+                        </div>
+                        <textarea id="sidebar-segment-text" 
+                                  style="font-family: monospace; white-space: pre-wrap; font-size: 0.9em; margin:0; color: #333; width: 100%; min-height: 80px; resize: vertical; border: 1px solid #ddd; padding: 0.3rem; border-radius: 3px; background-color: #fff;"
+                                  placeholder="Select a segment to view and edit text">
+                            Select a segment to view text
+                        </textarea>
+                    </div>
+                </div>
+            </div>
+
             <!-- OCR Section -->
             <div class="ocr-section gradio-component-group" style="background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
                 <h4>Text Recognition (OCR)</h4>
@@ -434,10 +468,6 @@
 
                 <textarea id="ocr-result" placeholder="Extracted text will appear here..." style="height: 200px; width: 100%; font-family: monospace;" readonly></textarea>
             </div>
-
-            <!-- Line Segments Navigation - Initially hidden -->
-            <div id="line-segments-container" class="gradio-component-group" style="display: none; background-color: #f9fafb; padding: 1rem;">
-                <h4>Segment Navigation</h4>
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
                     <button id="prev-segment-btn" class="gradio-button gradio-button-secondary" style="padding: 5px 10px; font-size:0.9em;">&lt; Prev</button>
                     <div style="text-align: center; flex-grow: 1; font-size: 0.9em; color: #666;">
