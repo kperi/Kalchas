@@ -51,6 +51,19 @@
     #sidebar-segment-title {
         transition: color 0.3s ease;
     }
+    
+    /* Synchronized scaling for preview image and bounding box overlay */
+    #preview-image:hover {
+        transform: scale(1.02);
+    }
+    
+    #bounding-box-overlay {
+        transition: transform var(--transition-normal, 0.3s ease);
+    }
+    
+    #preview-image:hover + #bounding-box-overlay {
+        transform: scale(1.02);
+    }
 </style>
 {% endblock %}
 
@@ -61,6 +74,20 @@
         const container = document.querySelector('.container');
         if (container) {
             container.classList.add('full-width-layout');
+        }
+        
+        // Synchronized hover scaling for preview image and bounding box overlay
+        const previewImage = document.getElementById('preview-image');
+        const boundingBoxOverlay = document.getElementById('bounding-box-overlay');
+        
+        if (previewImage && boundingBoxOverlay) {
+            previewImage.addEventListener('mouseenter', function() {
+                boundingBoxOverlay.style.transform = 'scale(1.02)';
+            });
+            
+            previewImage.addEventListener('mouseleave', function() {
+                boundingBoxOverlay.style.transform = 'scale(1)';
+            });
         }
     });
 </script>
