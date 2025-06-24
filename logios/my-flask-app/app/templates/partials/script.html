@@ -397,6 +397,23 @@
         
         rightColumn.innerHTML = `
             
+            <div id="segment-selection-container" class="gradio-component-group" style="background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
+                <form id="segment-form" onsubmit="return false;">
+                    <input type="hidden" name="selected_folder" value="${documentName}">
+                    <input type="hidden" name="selected_png" value="${pageName}">
+                    <div style="margin-top: 1rem;">
+                        <label for="segment-select">Select Detected Segment:</label>
+                        <select name="selected_segment" id="segment-select" disabled>
+                            <option value="">-- Select Segment --</option>
+                            <!-- Segments will be populated in JavaScript -->
+                        </select>
+                        <div id="segment-loading" style="font-size: 0.8em; margin-top: 5px; color: #6c757d;">
+                            Run "Segment & OCR" to detect segments
+                        </div>
+                    </div>
+                </form>
+            </div>
+            
             <!-- Line Segments Navigation - Initially hidden -->
             <div id="line-segments-container" class="gradio-component-group" style="display: none; background-color: #f9fafb; padding: 1rem;">
                 <h4>Segment Navigation</h4>
