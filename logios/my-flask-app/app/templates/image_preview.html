@@ -24,6 +24,27 @@
         font-weight: bold;
     }
     
+    /* Styling for final segments */
+    .segment-final {
+        background-color: #fff8e1 !important;
+        border-left: 3px solid #ffa726 !important;
+    }
+    
+    .segment-text-final {
+        background-color: #fff3c4 !important;
+        border: 2px solid #ffa726 !important;
+        box-shadow: 0 0 5px rgba(255, 167, 38, 0.3);
+    }
+    
+    .final-text-highlight {
+        background-color: #fff3c4 !important;
+        border-left: 4px solid #ffa726 !important;
+        padding: 4px 8px !important;
+        margin: 2px 0 !important;
+        font-weight: 500 !important;
+        display: block !important;
+    }
+    
     /* Smooth transitions for visual feedback */
     #sidebar-segment-text {
         transition: all 0.3s ease;
@@ -155,7 +176,7 @@
                         <div id="segment-ocr-status-message"></div>
                     </div>
 
-                    <textarea id="ocr-result" placeholder="Extracted text will appear here..." style="height: 200px; width: 100%; font-family: monospace;" readonly></textarea>
+                    <textarea id="ocr-result" placeholder="Extracted text will appear here. Segments marked with ★ [FINAL] are manually edited versions." style="height: 200px; width: 100%; font-family: monospace;" readonly></textarea>
                 </div>
 
                 <!-- Line Segments Navigation - Initially hidden -->

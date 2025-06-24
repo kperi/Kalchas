@@ -1216,9 +1216,14 @@
                     this.alt = 'Error loading image';
                 };
 
-                // Update text - check for final text first
+                // Update text - use final text if available, otherwise original text
                 let displayText = '(No text available)';
-                if (segment.text) {
+                let isSegmentFinal = false;
+                
+                if (segment.is_final && segment.final_text) {
+                    displayText = segment.final_text;
+                    isSegmentFinal = true;
+                } else if (segment.text) {
                     if (typeof segment.text === 'string') {
                         displayText = segment.text;
                     } else if (Array.isArray(segment.text) && segment.text.length > 0) {
@@ -1231,8 +1236,32 @@
                     }
                 }
                 
-                // Load final text if it exists
-                loadFinalSegmentText(segmentId, displayText, textEl, titleEl);
+                // Update textarea with the text
+                textEl.value = displayText;
+                
+                // Update title and styling based on whether segment is final
+                if (isSegmentFinal) {
+                    titleEl.textContent = `Preview of Segment ${index + 1} ✏️ (Edited)`;
+                    titleEl.style.color = '#28a745';
+                    titleEl.style.fontWeight = 'bold';
+                    
+                    // Add visual indicator to the textarea
+                    textEl.style.backgroundColor = '#f8fff8';
+                    textEl.style.borderLeftColor = '#28a745';
+                    textEl.style.borderLeftWidth = '3px';
+                } else {
+                    titleEl.textContent = `Preview of Segment ${index + 1}`;
+                    titleEl.style.color = '';
+                    titleEl.style.fontWeight = '';
+                    textEl.style.backgroundColor = '';
+                    textEl.style.borderLeftColor = '';
+                    textEl.style.borderLeftWidth = '';
+                }
+                
+                // Set original text for change tracking (use final text as baseline if available)
+                if (typeof window.setOriginalSegmentText === 'function') {
+                    window.setOriginalSegmentText(displayText);
+                }
 
                 // Show the preview container
                 previewContainer.style.display = 'block';
@@ -1327,7 +1356,10 @@
                             if (segment.text) {
                                 let segmentText = '';
                                 
-                                if (typeof segment.text === 'string') {
+                                // Use final text if available, otherwise use original text
+                                if (segment.is_final && segment.final_text) {
+                                    segmentText = segment.final_text;
+                                } else if (typeof segment.text === 'string') {
                                     segmentText = segment.text;
                                 } else if (Array.isArray(segment.text) && segment.text.length > 0) {
                                     segmentText = String(segment.text[0]);
@@ -1364,6 +1396,13 @@
                             if (segment.text) {
                                 const textPreview = Array.isArray(segment.text) ? segment.text[0] : segment.text;
                                 displayText += `: ${String(textPreview).substring(0, 30)}...`;
+                            }
+                            
+                            // Add edit indicator if segment has a final file
+                            if (segment.is_final) {
+                                displayText = `✏️ ${displayText}`;
+                                option.style.color = '#28a745';
+                                option.style.fontWeight = 'bold';
                             }
                             
                             option.textContent = displayText;
@@ -2354,6 +2393,7 @@
                     const segmentNumber = currentSegmentDisplayIndex + 1;
                     titleEl.textContent = `Preview of Segment ${segmentNumber} ✏️ (Edited)`;
                     titleEl.style.color = '#28a745';
+                    titleEl.style.fontWeight = 'bold';
                     
                     // Update textarea styling to show it's been edited
                     segmentTextArea.style.backgroundColor = '#f8fff8';
@@ -2365,16 +2405,33 @@
                 const segmentSelect = document.getElementById('segment-select');
                 if (segmentSelect && segmentSelect.options[currentSegmentDisplayIndex + 1]) {
                     const option = segmentSelect.options[currentSegmentDisplayIndex + 1];
-                    if (!option.textContent.startsWith('✏️')) {
-                        option.textContent = `✏️ ${option.textContent}`;
+                    if (!option.textContent.includes('✏️')) {
+                        // Remove any existing [FINAL] or other indicators first
+                        let cleanText = option.textContent.replace(/\s*\[FINAL\]\s*|\s*✏️\s*/g, '');
+                        option.textContent = `✏️ ${cleanText}`;
                         option.style.color = '#28a745';
                         option.style.fontWeight = 'bold';
                     }
                 }
                 
+                // Reload segments to pick up the .final file and update OCR results
                 setTimeout(() => {
-                    segmentTextArea.style.backgroundColor = '#f8fff8'; // Keep edited background
-                    segmentTextArea.style.borderColor = '#ddd';
+                    if (currentSegmentFolderGlobal && currentSegmentPageIdGlobal) {
+                        console.log('Reloading segments after save to pick up .final file');
+                        loadLineSegments(currentSegmentFolderGlobal, currentSegmentPageIdGlobal)
+                            .then(() => {
+                                // After reload, re-select the same segment to show the updated state
+                                if (currentSegmentDisplayIndex >= 0 && currentSegmentDisplayIndex < currentSegmentsList.length) {
+                                    displaySegmentByIndex(currentSegmentDisplayIndex, false);
+                                }
+                            })
+                            .catch(err => console.error('Error reloading segments:', err));
+                    }
+                }, 500);
+                
+                setTimeout(() => {
+                    segmentTextArea.style.backgroundColor = '#fff3c4'; // Keep final segment background
+                    segmentTextArea.style.borderColor = '#ffa726';
                 }, 1000);
             } else {
                 console.error('Failed to save final segment text:', data.message);

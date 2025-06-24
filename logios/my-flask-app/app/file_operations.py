@@ -971,6 +971,24 @@ def fetch_page_segments_data(
                     else:
                         text_content = str(segment_data["text"])
 
+                # Check for final text file and use it if it exists
+                is_final = False
+                final_text = None
+                final_file_path = os.path.join(segments_dir, f"{segment_id}.final")
+                if os.path.exists(final_file_path):
+                    try:
+                        with open(final_file_path, "r", encoding="utf-8") as final_f:
+                            final_text = final_f.read().strip()
+                        is_final = True
+                        logger.info(f"Using final text from {final_file_path}")
+                        # Use final text as the main text content
+                        text_content = final_text
+                    except Exception as final_e:
+                        logger.warning(
+                            f"Error reading final file {final_file_path}: {str(final_e)}"
+                        )
+                        # Fall back to original text from JSON
+
                 # Extract coordinates (handle both 'coords' and 'bbox' formats)
                 coordinates = segment_data.get("coords", segment_data.get("bbox", []))
 
@@ -978,9 +996,14 @@ def fetch_page_segments_data(
                 client_segment_data = {
                     "id": segment_id,
                     "text": text_content,
+                    "final_text": final_text,  # Add final_text field for frontend
                     "confidence": segment_data.get("confidence", 0.0),
                     "bbox": coordinates,
                     "file_path": segment_path,
+                    "filename": (
+                        f"{segment_id}.final" if is_final else f"{segment_id}.json"
+                    ),
+                    "is_final": is_final,
                 }
                 segments_data_list.append(client_segment_data)
 
