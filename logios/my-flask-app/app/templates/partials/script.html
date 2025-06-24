@@ -1,4 +1,19 @@
 <script>
+    // CSS for contenteditable placeholder
+    const style = document.createElement('style');
+    style.textContent = `
+        #ocr-result:empty:before {
+            content: attr(data-placeholder);
+            color: #999;
+            pointer-events: none;
+        }
+        
+        #ocr-result:focus:empty:before {
+            content: "";
+        }
+    `;
+    document.head.appendChild(style);
+
     // Document selection and navigation variables
     const pngSelect = document.getElementById('png-select');
     const selectedDocumentInfo = document.getElementById('selected-document-info');
@@ -466,7 +481,7 @@
                     <div id="segment-ocr-status-message"></div>
                 </div>
 
-                <textarea id="ocr-result" placeholder="Extracted text will appear here..." style="height: 200px; width: 100%; font-family: monospace;" readonly></textarea>
+                <div id="ocr-result" contenteditable="true" data-placeholder="Extracted text will appear here..." style="height: 200px; width: 100%; font-family: monospace; border: 1px solid #ccc; padding: 8px; overflow-y: auto; background-color: white; border-radius: 4px;" role="textbox" aria-multiline="true"></div>
             </div>
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
                     <button id="prev-segment-btn" class="gradio-button gradio-button-secondary" style="padding: 5px 10px; font-size:0.9em;">&lt; Prev</button>
@@ -669,10 +684,10 @@
 
     // Helper function to clear segment data when switching pages
     function clearSegmentData() {
-        // Clear OCR result textarea
+        // Clear OCR result div
         const ocrResult = document.getElementById('ocr-result');
         if (ocrResult) {
-            ocrResult.value = '';
+            ocrResult.innerHTML = '';
         }
         
         // Clear segment dropdown
@@ -1377,18 +1392,20 @@
                 if (data && data.success === true && data.segments && Array.isArray(data.segments) && data.segments.length > 0) {
                     currentSegmentsList = data.segments;
                     
-                    // Update OCR result textarea with all segment text
+                    // Update OCR result div with all segment text (with highlighting for final segments)
                     const ocrResult = document.getElementById('ocr-result');
                     if (ocrResult) {
-                        const textLines = [];
+                        const htmlLines = [];
                         
                         data.segments.forEach((segment, index) => {
                             if (segment.text) {
                                 let segmentText = '';
+                                let isFinal = false;
                                 
                                 // Use final text if available, otherwise use original text
                                 if (segment.is_final && segment.final_text) {
                                     segmentText = segment.final_text;
+                                    isFinal = true;
                                 } else if (typeof segment.text === 'string') {
                                     segmentText = segment.text;
                                 } else if (Array.isArray(segment.text) && segment.text.length > 0) {
@@ -1399,12 +1416,19 @@
                                 
                                 segmentText = segmentText.trim();
                                 if (segmentText) {
-                                    textLines.push(segmentText);
+                                    // Escape HTML to prevent XSS
+                                    const escapedText = segmentText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                    
+                                    if (isFinal) {
+                                        htmlLines.push(`<span class="ocr-final-line">★ ${escapedText} [FINAL]</span>`);
+                                    } else {
+                                        htmlLines.push(escapedText);
+                                    }
                                 }
                             }
                         });
                         
-                        ocrResult.value = textLines.join('\n');
+                        ocrResult.innerHTML = htmlLines.join('<br>');
                     }
                     
                     // Populate the dropdown
@@ -1635,20 +1659,23 @@
                     showSegmentOCRStatus('success', 'OCR processing completed successfully!');
                     showAlert('success', 'OCR processing completed successfully!');
                     
-                    // Collect all text lines from segments and concatenate with line feeds
+                    // Collect all text lines from segments and concatenate with highlighting for final segments
                     const ocrResult = document.getElementById('ocr-result');
                     if (ocrResult) {
-                        let allText = '';
+                        let htmlContent = '';
                         
                         // First try to get text from data.segments if available
                         if (data.segments && Array.isArray(data.segments) && data.segments.length > 0) {
-                            const textLines = [];
+                            const htmlLines = [];
                             
                             data.segments.forEach((segment, index) => {
                                 if (segment.text) {
                                     let segmentText = '';
+                                    let isFinal = segment.is_final && segment.final_text;
                                     
-                                    if (typeof segment.text === 'string') {
+                                    if (isFinal) {
+                                        segmentText = segment.final_text;
+                                    } else if (typeof segment.text === 'string') {
                                         segmentText = segment.text;
                                     } else if (Array.isArray(segment.text) && segment.text.length > 0) {
                                         // If text is an array [text, confidence], take the first element
@@ -1661,22 +1688,30 @@
                                     // Clean and add the text if not empty
                                     segmentText = segmentText.trim();
                                     if (segmentText) {
-                                        textLines.push(segmentText);
+                                        // Escape HTML to prevent XSS
+                                        const escapedText = segmentText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                        
+                                        if (isFinal) {
+                                            htmlLines.push(`<span class="ocr-final-line">★ ${escapedText} [FINAL]</span>`);
+                                        } else {
+                                            htmlLines.push(escapedText);
+                                        }
                                     }
                                 }
                             });
                             
-                            // Join all text lines with line feeds
-                            allText = textLines.join('\n');
+                            // Join all text lines with line breaks
+                            htmlContent = htmlLines.join('<br>');
                         }
                         
                         // Fallback to data.text if no segments text was found
-                        if (!allText && data.text) {
-                            allText = data.text;
+                        if (!htmlContent && data.text) {
+                            // Escape HTML for fallback text as well
+                            htmlContent = data.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
                         }
                         
-                        // Set the concatenated text in the textarea
-                        ocrResult.value = allText;
+                        // Set the HTML content in the div
+                        ocrResult.innerHTML = htmlContent;
                     }
                     
                     // Populate the segment dropdown with the new segments

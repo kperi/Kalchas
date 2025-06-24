@@ -2776,3 +2776,122 @@ def get_final_segment_text():
     except Exception as e:
         current_app.logger.error(f"Error getting final segment text: {str(e)}")
         return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
+
+
+@app.route(
+    "/api/get_complete_ocr_text/<user_id>/<document_folder_name>/<page_image_filename_base>"
+)
+@login_required
+def get_complete_ocr_text(user_id, document_folder_name, page_image_filename_base):
+    """
+    Collect all OCR'd text for a page in order, prioritizing final text over original JSON text.
+    For each segment: if a .final file exists, use that text; otherwise use the text from the JSON file.
+
+    Args:
+        user_id: The ID of the user
+        document_folder_name: Name of the document folder
+        page_image_filename_base: Base filename of the page (e.g., "page_001" or "page_001_crop_002")
+
+    Returns:
+        JSON response with complete OCR text and segment details
+    """
+    try:
+        # Fetch all segments data for the page
+        segments_data = file_operations.fetch_page_segments_data(
+            current_app.config,
+            user_id,
+            document_folder_name,
+            page_image_filename_base,
+            is_document_completed=True,
+        )
+
+        if segments_data is None:
+            return jsonify(
+                {
+                    "success": False,
+                    "error": "No segments data found for this page",
+                    "complete_text": "",
+                    "segments_used": [],
+                }
+            )
+
+        if not segments_data:
+            return jsonify(
+                {
+                    "success": True,
+                    "complete_text": "",
+                    "segments_used": [],
+                    "message": "No segments found for this page",
+                }
+            )
+
+        # Collect text from all segments in order
+        text_lines = []
+        segments_used = []
+
+        for segment in segments_data:
+            segment_text = ""
+            text_source = "none"
+
+            # Prioritize final text if available
+            if segment.get("is_final") and segment.get("final_text"):
+                segment_text = segment["final_text"].strip()
+                text_source = "final"
+            elif segment.get("text"):
+                # Use original JSON text
+                if isinstance(segment["text"], str):
+                    segment_text = segment["text"].strip()
+                elif isinstance(segment["text"], list) and len(segment["text"]) > 0:
+                    # Handle [text, confidence] format
+                    segment_text = str(segment["text"][0]).strip()
+                else:
+                    segment_text = str(segment["text"]).strip()
+                text_source = "json"
+
+            # Add segment info to tracking
+            segment_info = {
+                "segment_id": segment.get("id", "unknown"),
+                "text_source": text_source,
+                "text_length": len(segment_text),
+                "has_final": segment.get("is_final", False),
+            }
+            segments_used.append(segment_info)
+
+            # Add text to collection if not empty
+            if segment_text:
+                text_lines.append(segment_text)
+
+        # Join all text with line breaks
+        complete_text = "\n".join(text_lines)
+
+        current_app.logger.info(
+            f"Collected complete OCR text for {page_image_filename_base}: "
+            f"{len(segments_used)} segments, {len(complete_text)} characters"
+        )
+
+        return jsonify(
+            {
+                "success": True,
+                "complete_text": complete_text,
+                "segments_used": segments_used,
+                "total_segments": len(segments_data),
+                "final_segments_count": sum(1 for s in segments_used if s["has_final"]),
+                "message": f"Collected text from {len(segments_used)} segments",
+            }
+        )
+
+    except Exception as e:
+        current_app.logger.error(
+            f"Error collecting complete OCR text for {page_image_filename_base}: {str(e)}"
+        )
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "error": f"Error collecting OCR text: {str(e)}",
+                    "complete_text": "",
+                    "segments_used": [],
+                }
+            ),
+            500,
+        )

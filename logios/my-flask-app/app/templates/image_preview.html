@@ -43,6 +43,30 @@
         display: block !important;
     }
     
+    /* OCR Result highlighting for final lines */
+    .ocr-final-line {
+        background-color: #fff3c4;
+        border-left: 4px solid #ffa726;
+        padding: 2px 4px;
+        margin: 1px 0;
+        display: inline-block;
+        width: 100%;
+        box-sizing: border-box;
+        font-weight: 500;
+    }
+    
+    /* Placeholder styling for contenteditable div */
+    #ocr-result:empty:before {
+        content: attr(data-placeholder);
+        color: #999;
+        pointer-events: none;
+        font-style: italic;
+    }
+    
+    #ocr-result:focus:empty:before {
+        content: "";
+    }
+    
     /* Smooth transitions for visual feedback */
     #sidebar-segment-text {
         transition: all 0.3s ease;
@@ -244,7 +268,12 @@
                         <div id="segment-ocr-status-message"></div>
                     </div>
 
-                    <textarea id="ocr-result" placeholder="Extracted text will appear here. Segments marked with ★ [FINAL] are manually edited versions." style="height: 200px; width: 100%; font-family: monospace;" readonly></textarea>
+                    <div id="ocr-result" 
+                         contenteditable="true" 
+                         data-placeholder="Extracted text will appear here. Segments marked with ★ [FINAL] are manually edited versions." 
+                         style="height: 200px; width: 100%; font-family: monospace; border: 1px solid #ccc; padding: 8px; overflow-y: auto; background-color: white; border-radius: 4px; white-space: pre-wrap;" 
+                         role="textbox" 
+                         aria-multiline="true"></div>
                 </div>
                 
                 <!-- Container for displaying segment JSON -->
