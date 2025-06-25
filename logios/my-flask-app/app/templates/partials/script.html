@@ -487,14 +487,7 @@
 
                 <div id="ocr-result" contenteditable="false" data-placeholder="Extracted text will appear here..." style="height: 200px; width: 100%; font-family: monospace; border: 1px solid #ccc; padding: 8px; overflow-y: auto; background-color: white; border-radius: 4px;" role="textbox" aria-multiline="true"></div>
             </div>
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                    <button id="prev-segment-btn" class="gradio-button gradio-button-secondary" style="padding: 5px 10px; font-size:0.9em;">&lt; Prev</button>
-                    <div style="text-align: center; flex-grow: 1; font-size: 0.9em; color: #666;">
-                        <span id="segment-counter">Segment 0 of 0</span>
-                    </div>
-                    <button id="next-segment-btn" class="gradio-button gradio-button-secondary" style="padding: 5px 10px; font-size:0.9em;">Next &gt;</button>
-                </div>
-
+                
                 <!-- Single preview container that will be used for all segment displays -->
                 
             </div>
@@ -1359,12 +1352,6 @@
         if (segmentCounter) segmentCounter.textContent = 'Loading segments...';
         
         lineSegmentsContainer.style.display = 'block';
-        
-        // Show segment preview
-        const segmentPreview = document.getElementById('sidebar-selected-segment-preview');
-        if (segmentPreview) {
-            segmentPreview.style.display = 'block';
-        }
         currentSegmentsList = [];
         currentSegmentDisplayIndex = -1;
         currentSegmentFolderGlobal = folder;
