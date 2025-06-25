@@ -280,7 +280,7 @@
             console.error('File input not found!');
         }
 
-        // Simplified upload form handling
+        // Full upload form handling with progress tracking
         if (uploadForm) {
             uploadForm.addEventListener('submit', function(e) {
                 console.log('Form submit intercepted');
@@ -295,9 +295,190 @@
                 }
 
                 console.log('Starting upload for file:', file.name);
-                // For now, just show an alert - you can implement the full upload logic later
-                alert('Upload functionality preserved - file: ' + file.name);
+                startUpload(formData, file);
             });
+        }
+
+        // Upload function with progress tracking
+        function startUpload(formData, file) {
+            // Show progress section
+            progressSection.style.display = 'block';
+            uploadForm.classList.add('uploading');
+            uploadBtn.disabled = true;
+            
+            // Reset progress
+            updateUploadProgress(0);
+            updateProgressMessage('📤 Starting upload...');
+            currentStep.textContent = 'Uploading file...';
+            
+            // Generate unique upload ID
+            currentUploadId = 'upload_' + Date.now();
+            
+            // Create XMLHttpRequest for progress tracking
+            const xhr = new XMLHttpRequest();
+            
+            xhr.upload.addEventListener('progress', function(e) {
+                if (e.lengthComputable) {
+                    const percentComplete = Math.round((e.loaded / e.total) * 100);
+                    updateUploadProgress(percentComplete);
+                    updateProgressMessage(`📤 Uploading... ${percentComplete}%`);
+                }
+            });
+            
+            xhr.addEventListener('load', function() {
+                if (xhr.status === 200) {
+                    // Check if response is HTML (redirect response) or JSON
+                    const contentType = xhr.getResponseHeader('Content-Type');
+                    
+                    if (contentType && contentType.includes('text/html')) {
+                        // Handle HTML redirect response
+                        console.log('Received HTML response, checking for redirect...');
+                        
+                        // Parse the HTML to check for redirect or success
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(xhr.responseText, 'text/html');
+                        
+                        // Check if there's a redirect meta tag or if we got the crop_image page
+                        const title = doc.querySelector('title')?.textContent || '';
+                        
+                        if (title.includes('Crop') || xhr.responseURL.includes('crop_image')) {
+                            // Successfully uploaded and redirected to crop page
+                            handleUploadSuccess({ 
+                                redirect_url: xhr.responseURL || '/crop_image',
+                                message: 'Upload successful'
+                            });
+                        } else {
+                            // Check for flash messages in the HTML
+                            const flashMessages = doc.querySelectorAll('.alert, .flash-message');
+                            let errorMessage = 'Upload completed but status unclear';
+                            
+                            flashMessages.forEach(msg => {
+                                if (msg.classList.contains('alert-danger') || msg.textContent.toLowerCase().includes('error')) {
+                                    errorMessage = msg.textContent.trim();
+                                }
+                            });
+                            
+                            if (errorMessage.includes('error') || errorMessage.includes('Error')) {
+                                handleUploadError(errorMessage);
+                            } else {
+                                handleUploadSuccess({ 
+                                    redirect_url: '/crop_image',
+                                    message: 'Upload successful'
+                                });
+                            }
+                        }
+                    } else {
+                        // Try to parse as JSON
+                        try {
+                            const response = JSON.parse(xhr.responseText);
+                            handleUploadSuccess(response);
+                        } catch (e) {
+                            console.error('Error parsing JSON response:', e);
+                            console.log('Response text:', xhr.responseText);
+                            
+                            // If JSON parsing fails but status is 200, assume success
+                            handleUploadSuccess({ 
+                                redirect_url: '/crop_image',
+                                message: 'Upload completed successfully'
+                            });
+                        }
+                    }
+                } else {
+                    handleUploadError(`Upload failed with status: ${xhr.status}`);
+                }
+            });
+            
+            xhr.addEventListener('error', function() {
+                handleUploadError('Network error during upload');
+            });
+            
+            xhr.open('POST', uploadForm.action);
+            xhr.send(formData);
+            
+            // Start polling for processing progress if it's a PDF
+            if (file.type === 'application/pdf') {
+                setTimeout(() => pollProcessingProgress(), 1000);
+            }
+        }
+        
+        function updateUploadProgress(percent) {
+            uploadProgressBar.style.width = percent + '%';
+            uploadProgressText.textContent = percent + '%';
+        }
+        
+        function updateProgressMessage(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'progress-message';
+            messageDiv.textContent = message;
+            progressMessages.appendChild(messageDiv);
+            progressMessages.scrollTop = progressMessages.scrollHeight;
+        }
+        
+        function pollProcessingProgress() {
+            if (!currentUploadId) return;
+            
+            fetch(`/progress/${currentUploadId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'processing') {
+                        currentStep.textContent = data.step || 'Processing...';
+                        
+                        if (data.conversion_progress) {
+                            conversionProgressContainer.style.display = 'block';
+                            const percent = Math.round((data.conversion_progress.current / data.conversion_progress.total) * 100);
+                            conversionProgressBar.style.width = percent + '%';
+                            conversionProgressText.textContent = `${data.conversion_progress.current} / ${data.conversion_progress.total} pages`;
+                        }
+                        
+                        updateProgressMessage(data.message || 'Processing...');
+                        setTimeout(() => pollProcessingProgress(), 1000);
+                    } else if (data.status === 'completed') {
+                        handleProcessingComplete(data);
+                    } else if (data.status === 'error') {
+                        handleUploadError(data.message || 'Processing failed');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error polling progress:', error);
+                });
+        }
+        
+        function handleUploadSuccess(response) {
+            updateUploadProgress(100);
+            updateProgressMessage('✅ Upload completed successfully!');
+            
+            // Determine redirect URL
+            let redirectUrl = '/crop_image'; // Default fallback
+            
+            if (response.redirect_url) {
+                redirectUrl = response.redirect_url;
+            } else if (typeof response === 'string' && response.includes('crop_image')) {
+                redirectUrl = '/crop_image';
+            }
+            
+            updateProgressMessage('🔄 Redirecting to document processing...');
+            setTimeout(() => {
+                window.location.href = redirectUrl;
+            }, 1500);
+        }
+        
+        function handleProcessingComplete(data) {
+            currentStep.textContent = 'Processing completed!';
+            updateProgressMessage('✅ Document processing completed!');
+            
+            if (data.redirect_url) {
+                updateProgressMessage('🔄 Redirecting to document view...');
+                setTimeout(() => {
+                    window.location.href = data.redirect_url;
+                }, 1500);
+            }
+        }
+        
+        function handleUploadError(message) {
+            updateProgressMessage('❌ Error: ' + message);
+            uploadForm.classList.remove('uploading');
+            uploadBtn.disabled = false;
+            currentStep.textContent = 'Upload failed';
         }
 
         console.log('Script initialization complete');
