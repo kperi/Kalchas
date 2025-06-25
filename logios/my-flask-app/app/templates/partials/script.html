@@ -228,9 +228,11 @@
         
         // Make AJAX call to get document images
         const userId = '{{ session.get("user_id", "anonymous") }}';
-        const apiUrl = `{{ url_for('app.api_get_document_images', user_id='__USER_ID__', document_folder_name='__DOCUMENT_NAME__') }}`
-            .replace('__USER_ID__', encodeURIComponent(userId))
-            .replace('__DOCUMENT_NAME__', encodeURIComponent(documentName));
+        // Construct the API URL properly
+        const baseUrl = '{{ url_for("app.api_get_document_images", user_id="PLACEHOLDER_USER", document_folder_name="PLACEHOLDER_DOC") }}';
+        const apiUrl = baseUrl
+            .replace('PLACEHOLDER_USER', encodeURIComponent(userId))
+            .replace('PLACEHOLDER_DOC', encodeURIComponent(documentName));
         
         fetch(apiUrl)
             .then(response => {
@@ -318,13 +320,12 @@
                 console.log('[loadPage] Container found, proceeding with page load');
                 
                 const userId = '{{ session.get("user_id", "anonymous") }}';
-                const imageUrl = `{{ url_for('app.serve_completed_document_png_file', 
-                    user_id='__USER_ID__', 
-                    document_folder_name='__FOLDER__', 
-                    image_filename='__FILENAME__') }}`
-                    .replace('__USER_ID__', encodeURIComponent(userId))
-                    .replace('__FOLDER__', encodeURIComponent(documentName))
-                    .replace('__FILENAME__', encodeURIComponent(pageName));
+                // Construct the image URL properly
+                const baseImageUrl = '{{ url_for("app.serve_completed_document_png_file", user_id="PLACEHOLDER_USER", document_folder_name="PLACEHOLDER_FOLDER", image_filename="PLACEHOLDER_FILENAME") }}';
+                const imageUrl = baseImageUrl
+                    .replace('PLACEHOLDER_USER', encodeURIComponent(userId))
+                    .replace('PLACEHOLDER_FOLDER', encodeURIComponent(documentName))
+                    .replace('PLACEHOLDER_FILENAME', encodeURIComponent(pageName));
                 
                 // Update image preview area to show the selected page
                 documentDisplayContainer.innerHTML = `
@@ -441,26 +442,7 @@
                 </div>
 
                 <!-- Single preview container that will be used for all segment displays -->
-                <div id="sidebar-selected-segment-preview" style="margin-top: 1rem; margin-bottom: 1rem; padding: 1rem; border: 1px solid #e0e0e0; background-color: #fdfdfd; border-radius: 5px;">
-                    <h5 id="sidebar-segment-title" style="margin-top:0; margin-bottom: 0.5rem; font-size: 1em; color: #333;">
-                        Preview of Selected Segment
-                    </h5>
-                    <div style="text-align: center; margin-bottom: 0.5rem;">
-                        <img id="sidebar-segment-image" src="" alt="Selected Segment Image"
-                                style="max-width: 100%; max-height: 200px; border: 1px solid #ccc; object-fit: contain; background-color: #fff;">
-                    </div>
-                    <div id="sidebar-segment-text-container" style="padding: 0.5rem; background-color: #f0f0f0; border-radius: 3px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
-                            <small style="color: #666; font-size: 0.8em;">Edit text below</small>
-                            <small id="save-hint" style="color: #28a745; font-size: 0.75em; font-weight: bold;">Alt+Enter to save</small>
-                        </div>
-                        <textarea id="sidebar-segment-text" 
-                                  style="font-family: monospace; white-space: pre-wrap; font-size: 0.9em; margin:0; color: #333; width: 100%; min-height: 80px; resize: vertical; border: 1px solid #ddd; padding: 0.3rem; border-radius: 3px; background-color: #fff;"
-                                  placeholder="Select a segment to view and edit text">
-                            Select a segment to view text
-                        </textarea>
-                    </div>
-                </div>
+                
             </div>
 
             <!-- OCR Section -->
@@ -853,8 +835,9 @@
         }
         
         const userId = '{{ session.get("user_id", "anonymous") }}';
-        const apiUrl = `{{ url_for('app.api_get_user_documents', user_id='__USER_ID__') }}`
-            .replace('__USER_ID__', encodeURIComponent(userId));
+        // Construct the API URL properly
+        const baseUrl = '{{ url_for("app.api_get_user_documents", user_id="PLACEHOLDER_USER") }}';
+        const apiUrl = baseUrl.replace('PLACEHOLDER_USER', encodeURIComponent(userId));
         
         fetch(apiUrl)
             .then(response => {
@@ -1142,11 +1125,11 @@
         }
         
         // Construct URL with proper encoding using url_for pattern
-        const jsonUrl = `{{ url_for('app.get_segment_json', user_id='__USER_ID__', document_folder_name='__FOLDER__', page_image_filename_base='__PAGE_ID__', segment_id_str='__SEGMENT_ID__') }}`
-            .replace('__USER_ID__', encodeURIComponent(userId))
-            .replace('__FOLDER__', encodeURIComponent(folder))
-            .replace('__PAGE_ID__', encodeURIComponent(pageId))
-            .replace('__SEGMENT_ID__', encodeURIComponent(segmentId));
+        const jsonUrl = '{{ url_for("app.get_segment_json", user_id="PLACEHOLDER_USER", document_folder_name="PLACEHOLDER_FOLDER", page_image_filename_base="PLACEHOLDER_PAGE", segment_id_str="PLACEHOLDER_SEGMENT") }}'
+            .replace('PLACEHOLDER_USER', encodeURIComponent(userId))
+            .replace('PLACEHOLDER_FOLDER', encodeURIComponent(folder))
+            .replace('PLACEHOLDER_PAGE', encodeURIComponent(pageId))
+            .replace('PLACEHOLDER_SEGMENT', encodeURIComponent(segmentId));
         
         console.log('[fetchSegmentJson] Fetching JSON from:', jsonUrl);
         
@@ -1246,11 +1229,11 @@
                 const segmentId = segment.id !== undefined ? String(segment.id) : 
                                 index.toString().padStart(3, '0');
         
-                const imageUrl = `{{ url_for('app.get_segment_image', user_id='__USER_ID__', document_folder_name='__FOLDER__', page_image_filename_base='__PAGE_ID__', segment_id_str='__SEGMENT_ID__') }}`
-                    .replace('__USER_ID__', encodeURIComponent("{{ session.get('user_id', 'anonymous') }}"))
-                    .replace('__FOLDER__', encodeURIComponent(currentSegmentFolderGlobal))
-                    .replace('__PAGE_ID__', encodeURIComponent(currentSegmentPageIdGlobal))
-                    .replace('__SEGMENT_ID__', encodeURIComponent(segmentId));
+                const imageUrl = '{{ url_for("app.get_segment_image", user_id="PLACEHOLDER_USER", document_folder_name="PLACEHOLDER_FOLDER", page_image_filename_base="PLACEHOLDER_PAGE", segment_id_str="PLACEHOLDER_SEGMENT") }}'
+                    .replace('PLACEHOLDER_USER', encodeURIComponent("{{ session.get('user_id', 'anonymous') }}"))
+                    .replace('PLACEHOLDER_FOLDER', encodeURIComponent(currentSegmentFolderGlobal))
+                    .replace('PLACEHOLDER_PAGE', encodeURIComponent(currentSegmentPageIdGlobal))
+                    .replace('PLACEHOLDER_SEGMENT', encodeURIComponent(segmentId));
 
                 // Update image
                 imageEl.src = imageUrl;
@@ -1373,10 +1356,10 @@
         currentSegmentPageIdGlobal = pageId;
         updateNavigationButtons();
 
-        const segmentsUrl = `{{ url_for('app.get_segments', user_id='USERID', document_folder_name='FOLDER', page_image_filename_base='PAGEID') }}`
-            .replace('USERID', '{{ session.get("user_id", "anonymous") }}')
-            .replace('FOLDER', encodeURIComponent(folder))
-            .replace('PAGEID', encodeURIComponent(pageId));
+        const segmentsUrl = '{{ url_for("app.get_segments", user_id="PLACEHOLDER_USER", document_folder_name="PLACEHOLDER_FOLDER", page_image_filename_base="PLACEHOLDER_PAGE") }}'
+            .replace('PLACEHOLDER_USER', '{{ session.get("user_id", "anonymous") }}')
+            .replace('PLACEHOLDER_FOLDER', encodeURIComponent(folder))
+            .replace('PLACEHOLDER_PAGE', encodeURIComponent(pageId));
         
         // Return the fetch promise chain
         return fetch(segmentsUrl)
@@ -1563,11 +1546,11 @@
 
         if (segment.has_image === true && (segment.id !== null && segment.id !== undefined)) {
             const segmentIdStr = String(segment.id); 
-            const imageUrl = `{{ url_for('app.get_segment_image', user_id='__USER_ID__', document_folder_name='__FOLDER__', page_image_filename_base='__PAGE_ID__', segment_id_str='__SEGMENT_ID__') }}`
-                .replace('__USER_ID__', encodeURIComponent("{{ session.get('user_id', 'anonymous') }}"))
-                .replace('__FOLDER__', encodeURIComponent(folder))
-                .replace('__PAGE_ID__', encodeURIComponent(pageId))
-                .replace('__SEGMENT_ID__', encodeURIComponent(segmentIdStr));
+            const imageUrl = '{{ url_for("app.get_segment_image", user_id="PLACEHOLDER_USER", document_folder_name="PLACEHOLDER_FOLDER", page_image_filename_base="PLACEHOLDER_PAGE", segment_id_str="PLACEHOLDER_SEGMENT") }}'
+                .replace('PLACEHOLDER_USER', encodeURIComponent("{{ session.get('user_id', 'anonymous') }}"))
+                .replace('PLACEHOLDER_FOLDER', encodeURIComponent(folder))
+                .replace('PLACEHOLDER_PAGE', encodeURIComponent(pageId))
+                .replace('PLACEHOLDER_SEGMENT', encodeURIComponent(segmentIdStr));
                 
             console.log('[showSelectedSegment] Image URL:', imageUrl);
             
@@ -1625,13 +1608,10 @@
         hideSegmentOCRStatus();
 
         // Get the image URL for the current page
-        const imageUrl = `{{ url_for('app.serve_completed_document_png_file', 
-            user_id='__USER_ID__', 
-            document_folder_name='__FOLDER__', 
-            image_filename='__FILENAME__') }}`
-            .replace('__USER_ID__', encodeURIComponent("{{ session.get('user_id', 'anonymous') }}"))
-            .replace('__FOLDER__', encodeURIComponent(currentFolder))
-            .replace('__FILENAME__', encodeURIComponent(currentPage));
+        const imageUrl = '{{ url_for("app.serve_completed_document_png_file", user_id="PLACEHOLDER_USER", document_folder_name="PLACEHOLDER_FOLDER", image_filename="PLACEHOLDER_FILENAME") }}'
+            .replace('PLACEHOLDER_USER', encodeURIComponent("{{ session.get('user_id', 'anonymous') }}"))
+            .replace('PLACEHOLDER_FOLDER', encodeURIComponent(currentFolder))
+            .replace('PLACEHOLDER_FILENAME', encodeURIComponent(currentPage));
 
         // Call the Flask OCR processing endpoint
         const ocrData = {
@@ -2208,10 +2188,10 @@
         const userId = '{{ session.get("user_id", "anonymous") }}';
         
         // Make API call to get segments data
-        const segmentsUrl = `{{ url_for('app.get_segments', user_id='__USER_ID__', document_folder_name='__DOCUMENT_NAME__', page_image_filename_base='__PAGE_BASE__') }}`
-            .replace('__USER_ID__', encodeURIComponent(userId))
-            .replace('__DOCUMENT_NAME__', encodeURIComponent(documentName))
-            .replace('__PAGE_BASE__', encodeURIComponent(pageImageFilenameBase));
+        const segmentsUrl = '{{ url_for("app.get_segments", user_id="PLACEHOLDER_USER", document_folder_name="PLACEHOLDER_FOLDER", page_image_filename_base="PLACEHOLDER_PAGE") }}'
+            .replace('PLACEHOLDER_USER', encodeURIComponent(userId))
+            .replace('PLACEHOLDER_FOLDER', encodeURIComponent(documentName))
+            .replace('PLACEHOLDER_PAGE', encodeURIComponent(pageImageFilenameBase));
         
         fetch(segmentsUrl)
             .then(response => response.json())
