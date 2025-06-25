@@ -444,6 +444,28 @@
                 <!-- Single preview container that will be used for all segment displays -->
                 
             </div>
+            
+            <!-- Segment Preview Section -->
+            <div id="sidebar-selected-segment-preview" style="margin-bottom: 1.5rem; padding: 1rem; border: 1px solid #e0e0e0; background-color: #fdfdfd; border-radius: 5px; display: none;">
+                <h5 id="sidebar-segment-title" style="margin-top:0; margin-bottom: 0.5rem; font-size: 1em; color: #333;">
+                    Preview of Selected Segment
+                </h5>
+                <div style="text-align: center; margin-bottom: 0.5rem;">
+                    <img id="sidebar-segment-image" src="" alt="Selected Segment Image"
+                            style="max-width: 100%; max-height: 200px; border: 1px solid #ccc; object-fit: contain; background-color: #fff;">
+                </div>
+                <div id="sidebar-segment-text-container" style="padding: 0.5rem; background-color: #f0f0f0; border-radius: 3px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
+                        <small style="color: #666; font-size: 0.8em;">Edit text below</small>
+                        <small id="save-hint" style="color: #28a745; font-size: 0.75em; font-weight: bold;">Alt+Enter to save</small>
+                    </div>
+                    <textarea id="sidebar-segment-text" 
+                              style="font-family: monospace; white-space: pre-wrap; font-size: 0.9em; margin:0; color: #333; width: 100%; min-height: 80px; resize: vertical; border: 1px solid #ddd; padding: 0.3rem; border-radius: 3px; background-color: #fff;"
+                              placeholder="Select a segment to view and edit text">
+                        Select a segment to view text
+                    </textarea>
+                </div>
+            </div>
 
             <!-- OCR Section -->
             <div class="ocr-section gradio-component-group" style="background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
@@ -474,26 +496,7 @@
                 </div>
 
                 <!-- Single preview container that will be used for all segment displays -->
-                <div id="sidebar-selected-segment-preview" style="margin-top: 1rem; margin-bottom: 1rem; padding: 1rem; border: 1px solid #e0e0e0; background-color: #fdfdfd; border-radius: 5px;">
-                    <h5 id="sidebar-segment-title" style="margin-top:0; margin-bottom: 0.5rem; font-size: 1em; color: #333;">
-                        Preview of Selected Segment
-                    </h5>
-                    <div style="text-align: center; margin-bottom: 0.5rem;">
-                        <img id="sidebar-segment-image" src="" alt="Selected Segment Image"
-                                style="max-width: 100%; max-height: 200px; border: 1px solid #ccc; object-fit: contain; background-color: #fff;">
-                    </div>
-                    <div id="sidebar-segment-text-container" style="padding: 0.5rem; background-color: #f0f0f0; border-radius: 3px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
-                            <small style="color: #666; font-size: 0.8em;">Edit text below</small>
-                            <small id="save-hint" style="color: #28a745; font-size: 0.75em; font-weight: bold;">Alt+Enter to save</small>
-                        </div>
-                        <textarea id="sidebar-segment-text" 
-                                  style="font-family: monospace; white-space: pre-wrap; font-size: 0.9em; margin:0; color: #333; width: 100%; min-height: 80px; resize: vertical; border: 1px solid #ddd; padding: 0.3rem; border-radius: 3px; background-color: #fff;"
-                                  placeholder="Select a segment to view and edit text">
-                            Select a segment to view text
-                        </textarea>
-                    </div>
-                </div>
+                
             </div>
             
             <!-- Container for displaying segment JSON -->
@@ -690,6 +693,12 @@
         const lineSegmentsContainer = document.getElementById('line-segments-container');
         if (lineSegmentsContainer) {
             lineSegmentsContainer.style.display = 'none';
+        }
+        
+        // Hide segment preview
+        const segmentPreview = document.getElementById('sidebar-selected-segment-preview');
+        if (segmentPreview) {
+            segmentPreview.style.display = 'none';
         }
         
         // Clear bounding boxes
@@ -1350,6 +1359,12 @@
         if (segmentCounter) segmentCounter.textContent = 'Loading segments...';
         
         lineSegmentsContainer.style.display = 'block';
+        
+        // Show segment preview
+        const segmentPreview = document.getElementById('sidebar-selected-segment-preview');
+        if (segmentPreview) {
+            segmentPreview.style.display = 'block';
+        }
         currentSegmentsList = [];
         currentSegmentDisplayIndex = -1;
         currentSegmentFolderGlobal = folder;
