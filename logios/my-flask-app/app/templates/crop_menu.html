@@ -848,6 +848,9 @@
                 
                 // Initialize sidebar selection
                 setupSidebarDocumentSelection();
+                
+                // Initialize OCR section (always visible)
+                updateOCRSection();
 
                 // Image selection handler
                 if (fileSelect) {
@@ -1475,16 +1478,14 @@
                         if (data.success) {
                             showCropStatus('success', data.message);
                             
-                            // Remove deleted page from the dropdown
-                            const pageOption = document.querySelector(`#file-select option[value="${pageName}"]`);
-                            if (pageOption) {
-                                pageOption.remove();
+                            // Reload the document images to refresh the dropdown
+                            if (currentFolder) {
+                                loadDocumentImages(currentFolder);
                             }
                             
                             // If deleted page was selected, clear selection
                             if (currentImage === pageName) {
                                 currentImage = '';
-                                fileSelect.value = '';
                                 hideImageDisplay();
                                 hideCrops();
                                 hideDeletePageButton();
@@ -1548,10 +1549,33 @@
                 function updateOCRSection() {
                     const ocrSection = document.getElementById('move-to-ocr-section');
                     if (ocrSection) {
+                        // Always keep OCR section visible
+                        ocrSection.style.display = 'block';
+                        
+                        // Enable/disable the button based on whether a document is selected
+                        const moveToOcrBtn = document.getElementById('move-to-ocr-btn');
+                        const ocrDescription = ocrSection.querySelector('p');
+                        
                         if (currentFolder) {
-                            ocrSection.style.display = 'block';
+                            // Document selected - enable button and show specific description
+                            if (moveToOcrBtn) {
+                                moveToOcrBtn.disabled = false;
+                                moveToOcrBtn.style.opacity = '1';
+                                moveToOcrBtn.style.cursor = 'pointer';
+                            }
+                            if (ocrDescription) {
+                                ocrDescription.textContent = `Copy all cropped images from "${currentFolder}" to the OCR processing folder.`;
+                            }
                         } else {
-                            ocrSection.style.display = 'none';
+                            // No document selected - disable button and show generic description
+                            if (moveToOcrBtn) {
+                                moveToOcrBtn.disabled = true;
+                                moveToOcrBtn.style.opacity = '0.6';
+                                moveToOcrBtn.style.cursor = 'not-allowed';
+                            }
+                            if (ocrDescription) {
+                                ocrDescription.textContent = 'Select a document above to prepare its cropped images for OCR processing.';
+                            }
                         }
                     }
                 }
@@ -1572,6 +1596,14 @@
                 
                 // Move to OCR function
                 window.moveToOCR = function() {
+                    const moveToOcrBtn = document.getElementById('move-to-ocr-btn');
+                    
+                    // Check if button is disabled
+                    if (moveToOcrBtn && moveToOcrBtn.disabled) {
+                        showMoveToOCRStatus('error', 'Please select a document first');
+                        return;
+                    }
+                    
                     if (!currentFolder) {
                         showMoveToOCRStatus('error', 'No document selected');
                         return;
@@ -1693,7 +1725,7 @@
             </div>
         </div>
 
-        <div id="move-to-ocr-section" style="margin-top: 2rem; text-align: center; display: none;">
+        <div id="move-to-ocr-section" style="margin-top: 2rem; text-align: center;">
             <div class="gradio-component-group">
                 <h3>Prepare Images for OCR</h3>
                 <p style="margin-bottom: 15px;">Copy all cropped images from this document to the OCR processing folder.</p>
