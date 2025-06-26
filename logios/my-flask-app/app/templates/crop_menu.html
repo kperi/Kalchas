@@ -506,6 +506,7 @@
                 <h1>Image Cropping Tool</h1>
 
             <!-- Debug info for documents -->
+            <!--
             <div id="debug-documents-info" style="margin-bottom: 10px; padding: 5px; border: 1px solid #ddd; background-color: #f0f0f0; font-size: 0.8em;">
                 <strong>Debug:</strong> 
                 Documents count: {{ documents|length if documents else 0 }}
@@ -514,6 +515,7 @@
                     | Document names: {% for doc in documents %}{{ doc.name }}{% if not loop.last %}, {% endif %}{% endfor %}
                 {% endif %}
             </div>
+            -->
             
             {% if documents %}
             <div class="gradio-component-group" style="background-color: #f9fafb; padding: 1rem; margin-bottom: 1.5rem;">
