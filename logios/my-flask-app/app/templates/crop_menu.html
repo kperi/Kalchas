@@ -61,6 +61,8 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            padding: 20px;             /* Add padding around the image */
+            box-sizing: border-box;    /* Include padding in the total height */
         }
         
         /* Cropper container fills the entire preview area */
@@ -103,10 +105,10 @@
             position: relative !important;
         }
         
-        /* Ensure crop box stays within reasonable bounds */
+        /* Allow crop box to use full image dimensions */
         .cropper-crop-box {
-            max-width: 90% !important;
-            max-height: 90% !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
         }
         
         /* Prevent layout shifts during cropper initialization */
@@ -1114,11 +1116,11 @@
                         autoCropArea: 0.7,  // Initial crop area
                         responsive: false,  // Disable responsive behavior to prevent resize on scroll
                         restore: false,     // Disable restore on window resize
-                        background: true,   // Show background to see full image
-                        modal: true,        // Show modal to darken areas outside crop box
-                        guides: true,
-                        center: true,
-                        highlight: true,    // Highlight the crop box area
+                        background: false,  // Hide background overlay
+                        modal: false,       // Disable modal overlay that darkens areas outside crop box
+                        guides: false,      // Remove guide lines
+                        center: false,      // Remove center indicator
+                        highlight: false,   // Remove highlight overlay on crop box area
                         cropBoxMovable: true,
                         cropBoxResizable: true,
                         checkCrossOrigin: false,
