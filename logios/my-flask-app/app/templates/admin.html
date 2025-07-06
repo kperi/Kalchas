@@ -812,6 +812,92 @@
         }
     }
     
+    .confirmation-modal {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        visibility: hidden;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+    
+    .confirmation-modal.show {
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+    
+    .modal-content {
+        background-color: #ffffff;
+        padding: 2rem;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        max-width: 400px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        position: relative;
+        animation: modalFadeIn 0.3s ease-out;
+    }
+    
+    @keyframes modalFadeIn {
+        from {
+            opacity: 0;
+            transform: scale(0.9);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+    
+    .modal-content h3 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+        color: #111827;
+        font-weight: 600;
+        font-size: 1.25rem;
+    }
+    
+    .modal-content p {
+        margin-bottom: 1.5rem;
+        color: #374151;
+        line-height: 1.5;
+    }
+    
+    .modal-buttons {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1.5rem;
+        justify-content: flex-end;
+    }
+    
+    .modal-buttons .gradio-button {
+        min-width: 80px;
+        padding: 0.75rem 1.5rem;
+        font-weight: 500;
+    }
+    
+    .gradio-button-danger {
+        background-color: #dc2626;
+        color: white;
+        border: 1px solid #dc2626;
+    }
+    
+    .gradio-button-danger:hover {
+        background-color: #b91c1c;
+        border-color: #b91c1c;
+    }
+    
     /* Loading states */
     .loading-overlay {
         position: fixed;
@@ -1308,6 +1394,32 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize modal - ensure it's hidden on page load
+    const modal = document.getElementById('confirmation-modal');
+    if (modal) {
+        modal.classList.remove('show');
+        console.log('Modal initialized and hidden');
+    }
+
+    // Close modal when clicking outside
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this && this.classList.contains('show')) {
+                closeConfirmationModal();
+            }
+        });
+    }
+
+    // Close modal with Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            const modalElement = document.getElementById('confirmation-modal');
+            if (modalElement && modalElement.classList.contains('show')) {
+                closeConfirmationModal();
+            }
+        }
+    });
+
     // State management and error recovery
     let tabState = {
         current: 'system-overview',
@@ -1827,6 +1939,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Global functions for deletion
     window.confirmDeleteUser = function(userId) {
+        console.log('confirmDeleteUser called for userId:', userId);
         showConfirmationModal(
             'Delete User',
             `Are you sure you want to delete user "${userId}" and ALL their documents? This action cannot be undone.`,
@@ -1894,30 +2007,54 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function showConfirmationModal(title, message, confirmCallback) {
-        document.getElementById('modal-title').textContent = title;
-        document.getElementById('modal-message').textContent = message;
-        document.getElementById('confirmation-modal').style.display = 'block';
+        console.log('showConfirmationModal called with:', { title, message });
+        const modal = document.getElementById('confirmation-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const confirmButton = document.getElementById('confirm-button');
+        
+        if (!modal || !modalTitle || !modalMessage || !confirmButton) {
+            console.error('Modal elements not found');
+            // Fallback to native confirm
+            if (confirm(`${title}\n\n${message}`)) {
+                confirmCallback();
+            }
+            return;
+        }
+        
+        modalTitle.textContent = title;
+        modalMessage.textContent = message;
+        
+        // Show modal with class-based approach
+        modal.classList.add('show');
+        console.log('Modal shown, classes:', modal.className);
+        
+        // Prevent body scrolling when modal is open
+        document.body.style.overflow = 'hidden';
         
         // Set up confirm button
-        const confirmButton = document.getElementById('confirm-button');
         confirmButton.onclick = function() {
             closeConfirmationModal();
             confirmCallback();
         };
+        
+        // Focus the modal for accessibility
+        setTimeout(() => {
+            confirmButton.focus();
+        }, 100);
     }
     
     window.closeConfirmationModal = function() {
-        document.getElementById('confirmation-modal').style.display = 'none';
-    };
-    
-    // Close modal when clicking outside
-    document.getElementById('confirmation-modal').addEventListener('click', function(e) {
-        if (e.target === this) {
-            closeConfirmationModal();
+        console.log('closeConfirmationModal called');
+        const modal = document.getElementById('confirmation-modal');
+        if (modal) {
+            modal.classList.remove('show');
+            console.log('Modal hidden, classes:', modal.className);
+            // Restore body scrolling
+            document.body.style.overflow = '';
         }
-    });
-    
-    // Edit user functionality
+    };
+     // Edit user functionality
     window.editUser = function(userId) {
         if (!userId) {
             console.error('No user ID provided');
@@ -2458,3 +2595,15 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
+
+<!-- Confirmation Modal -->
+<div id="confirmation-modal" class="confirmation-modal">
+    <div class="modal-content">
+        <h3 id="modal-title">Confirm Action</h3>
+        <p id="modal-message">Are you sure you want to proceed?</p>
+        <div class="modal-buttons">
+            <button class="gradio-button gradio-button-secondary" onclick="closeConfirmationModal()">Cancel</button>
+            <button class="gradio-button gradio-button-danger" id="confirm-button">Confirm</button>
+        </div>
+    </div>
+</div>
