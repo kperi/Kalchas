@@ -313,9 +313,17 @@
     
     .tab-navigation {
         display: flex;
-        border-bottom: 1px solid #e5e7eb;
+        justify-content: center;
+        gap: 0.5rem;
         margin-bottom: 1.5rem;
-        gap: 0;
+        flex-wrap: wrap;
+    }
+    
+    .tab-navigation .gradio-button {
+        flex: 1;
+        min-width: 140px;
+        max-width: 200px;
+        white-space: nowrap;
     }
     
     .tab-btn {
@@ -878,19 +886,19 @@
     <div class="gradio-component-group">
                 <!-- Tab Navigation -->
                 <div class="tab-navigation" role="tablist" aria-label="Admin dashboard navigation">
-                    <button class="tab-btn active" data-tab="system-overview" role="tab" aria-selected="true" aria-controls="system-overview" id="tab-system-overview">
+                    <button class="gradio-button gradio-button-secondary tab-btn active" data-tab="system-overview" role="tab" aria-selected="true" aria-controls="system-overview" id="tab-system-overview">
                         📊 System Overview
                     </button>
-                    <button class="tab-btn" data-tab="user-management" role="tab" aria-selected="false" aria-controls="user-management" id="tab-user-management">
+                    <button class="gradio-button gradio-button-secondary tab-btn" data-tab="user-management" role="tab" aria-selected="false" aria-controls="user-management" id="tab-user-management">
                         👥 User Management
                     </button>
-                    <button class="tab-btn" data-tab="document-management" role="tab" aria-selected="false" aria-controls="document-management" id="tab-document-management">
+                    <button class="gradio-button gradio-button-secondary tab-btn" data-tab="document-management" role="tab" aria-selected="false" aria-controls="document-management" id="tab-document-management">
                         📄 Document Management
                     </button>
-                    <button class="tab-btn" data-tab="user-creation" role="tab" aria-selected="false" aria-controls="user-creation" id="tab-user-creation">
+                    <button class="gradio-button gradio-button-secondary tab-btn" data-tab="user-creation" role="tab" aria-selected="false" aria-controls="user-creation" id="tab-user-creation">
                         ➕ Create User
                     </button>
-                    <button class="tab-btn" data-tab="user-editing" role="tab" aria-selected="false" aria-controls="user-editing" id="tab-user-editing">
+                    <button class="gradio-button gradio-button-secondary tab-btn" data-tab="user-editing" role="tab" aria-selected="false" aria-controls="user-editing" id="tab-user-editing">
                         ✏️ Edit User
                     </button>
                 </div>
