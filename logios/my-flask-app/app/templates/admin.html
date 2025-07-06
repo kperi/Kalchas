@@ -202,6 +202,8 @@
         padding: 0.75rem;
         border-radius: 6px;
         margin-bottom: 1rem;
+        position: relative;
+        animation: slideIn 0.3s ease-out;
     }
     
     .alert-success {
@@ -214,6 +216,38 @@
         background-color: #fef2f2;
         color: #dc2626;
         border: 1px solid #fecaca;
+    }
+    
+    .alert-info {
+        background-color: #dbeafe;
+        color: #1e40af;
+        border: 1px solid #bfdbfe;
+    }
+    
+    .alert-warning {
+        background-color: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fcd34d;
+    }
+    
+    .alert-close {
+        opacity: 0.7;
+        transition: opacity 0.2s ease;
+    }
+    
+    .alert-close:hover {
+        opacity: 1;
+    }
+    
+    @keyframes slideIn {
+        from { 
+            opacity: 0; 
+            transform: translateY(-10px); 
+        }
+        to { 
+            opacity: 1; 
+            transform: translateY(0); 
+        }
     }
     
     .confirmation-modal {
@@ -295,6 +329,7 @@
         border-bottom: 2px solid transparent;
         transition: all 0.2s ease;
         position: relative;
+        outline: none;
     }
     
     .tab-btn:hover {
@@ -302,18 +337,58 @@
         background-color: #f9fafb;
     }
     
+    .tab-btn:focus {
+        color: #2563eb;
+        background-color: #f9fafb;
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+        border-radius: 4px;
+    }
+    
     .tab-btn.active {
         color: #2563eb;
         border-bottom-color: #2563eb;
         background-color: #ffffff;
+        font-weight: 600;
+    }
+    
+    .tab-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
     }
     
     .tab-content {
-        display: none;
+        display: none !important;
+        animation: fadeIn 0.2s ease-in-out;
+        opacity: 0;
+        transform: translateY(10px);
+        transition: opacity 0.2s ease, transform 0.2s ease;
     }
     
     .tab-content.active {
-        display: block;
+        display: block !important;
+        opacity: 1;
+        transform: translateY(0);
+    }
+    
+    /* Ensure all non-active tabs are hidden */
+    .tab-content:not(.active) {
+        display: none !important;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* Additional fallback to ensure tabs work correctly */
+    .admin-container .tab-content:not(.active) {
+        display: none !important;
+        visibility: hidden;
+    }
+    
+    .admin-container .tab-content.active {
+        display: block !important;
+        visibility: visible;
     }
     
     .form-group {
@@ -454,16 +529,23 @@
     }
     
     .activity-list {
-        max-height: 300px;
+        max-height: 500px;
         overflow-y: auto;
+        border-radius: 8px;
+        border: 1px solid #f3f4f6;
     }
     
     .activity-item {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 0.75rem 0;
+        padding: 1rem;
         border-bottom: 1px solid #f3f4f6;
+        transition: background-color 0.2s ease;
+    }
+    
+    .activity-item:hover {
+        background-color: #f9fafb;
     }
     
     .activity-item:last-child {
@@ -471,45 +553,211 @@
     }
     
     .activity-user {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
         flex: 1;
     }
     
+    .activity-avatar {
+        flex-shrink: 0;
+    }
+    
+    .avatar-circle {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+    }
+    
+    .activity-user-info {
+        flex: 1;
+        min-width: 0;
+    }
+    
     .activity-user-name {
-        font-weight: 500;
+        font-weight: 600;
         color: #111827;
-        margin-bottom: 0.25rem;
+        margin-bottom: 0.125rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     
     .activity-user-handle {
-        font-size: 0.8em;
+        font-size: 0.8rem;
         color: #6b7280;
+        margin-bottom: 0.25rem;
+    }
+    
+    .activity-admin-badge {
+        background-color: #fef3c7;
+        color: #92400e;
+        padding: 0.125rem 0.375rem;
+        border-radius: 12px;
+        font-size: 0.625rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    .activity-details {
+        text-align: right;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: flex-end;
     }
     
     .activity-time {
-        text-align: right;
-        font-size: 0.8em;
-    }
-    
-    .activity-time-label {
-        color: #6b7280;
-        margin-bottom: 0.25rem;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
     }
     
     .activity-time-value {
         font-weight: 500;
         color: #374151;
+        font-size: 0.875rem;
+    }
+    
+    .activity-time-relative {
+        color: #6b7280;
+        font-size: 0.75rem;
+        margin-top: 0.125rem;
+    }
+    
+    .activity-stats {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+    
+    .activity-stat {
+        background-color: #f3f4f6;
+        color: #374151;
+        padding: 0.125rem 0.375rem;
+        border-radius: 12px;
+        font-size: 0.625rem;
+        font-weight: 500;
+    }
+    
+    .activity-stat.no-data {
+        background-color: #fee2e2;
+        color: #dc2626;
+    }
+    
+    .activity-summary {
+        background-color: #f9fafb;
+        border-radius: 8px;
+        padding: 1rem;
+        border: 1px solid #f3f4f6;
+    }
+    
+    .activity-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+    }
+    
+    .activity-summary-item {
+        text-align: center;
+    }
+    
+    .activity-summary-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #111827;
+        margin-bottom: 0.25rem;
+    }
+    
+    .activity-summary-label {
+        font-size: 0.75rem;
+        color: #6b7280;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    .activity-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .activity-filter-select {
+        padding: 0.375rem 0.75rem;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        background-color: white;
+        color: #374151;
+        cursor: pointer;
+        transition: border-color 0.2s ease;
+    }
+    
+    .activity-filter-select:focus {
+        outline: none;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.1);
+    }
+    
+    .activity-more {
+        padding: 1rem;
+        text-align: center;
+        border-top: 1px solid #f3f4f6;
+        background-color: #fafafa;
+    }
+    
+    .show-more-btn {
+        background: none;
+        border: 1px solid #d1d5db;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        color: #374151;
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: all 0.2s ease;
+    }
+    
+    .show-more-btn:hover {
+        background-color: #f3f4f6;
+        border-color: #9ca3af;
     }
     
     .empty-state {
         text-align: center;
         padding: 3rem 1rem;
         color: #6b7280;
+        background-color: #fafafa;
+        border-radius: 8px;
+        border: 2px dashed #e5e7eb;
     }
     
     .empty-state-icon {
         font-size: 3rem;
         margin-bottom: 1rem;
         opacity: 0.5;
+    }
+    
+    .empty-state h4 {
+        color: #374151;
+        margin: 0 0 0.5rem 0;
+        font-weight: 600;
+    }
+    
+    .empty-state p {
+        margin: 0;
+        font-size: 0.9rem;
+        line-height: 1.5;
     }
     
     /* Enhanced responsive improvements */
@@ -525,11 +773,55 @@
         .activity-item {
             flex-direction: column;
             align-items: flex-start;
-            gap: 0.5rem;
+            gap: 0.75rem;
+            padding: 1rem 0.75rem;
+        }
+        
+        .activity-details {
+            align-items: flex-start;
+            text-align: left;
+            width: 100%;
         }
         
         .activity-time {
-            text-align: left;
+            align-items: flex-start;
+        }
+        
+        .activity-summary-grid {
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
+        }
+        
+        .activity-controls {
+            margin-top: 0.5rem;
+        }
+        
+        /* Improved mobile tab navigation */
+        .tab-navigation {
+            overflow-x: auto;
+            overflow-y: hidden;
+            white-space: nowrap;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+        }
+        
+        .tab-navigation::-webkit-scrollbar {
+            height: 3px;
+        }
+        
+        .tab-navigation::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        
+        .tab-navigation::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 3px;
+        }
+        
+        .tab-btn {
+            white-space: nowrap;
+            min-width: auto;
+            flex-shrink: 0;
         }
     }
     
@@ -537,6 +829,39 @@
         .stats-grid {
             grid-template-columns: 1fr;
         }
+        
+        .admin-container {
+            padding: 0 0.5rem;
+            margin: 1rem auto;
+        }
+        
+        .tab-btn {
+            padding: 0.5rem 1rem;
+            font-size: 0.8em;
+        }
+    }
+    
+    /* Loading states */
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    }
+    
+    .loading-overlay .loading-spinner {
+        width: 32px;
+        height: 32px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #3b82f6;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
     }
 </style>
 {% endblock %}
@@ -552,20 +877,20 @@
     <!-- Main Content -->
     <div class="gradio-component-group">
                 <!-- Tab Navigation -->
-                <div class="tab-navigation">
-                    <button class="tab-btn active" data-tab="system-overview">
+                <div class="tab-navigation" role="tablist" aria-label="Admin dashboard navigation">
+                    <button class="tab-btn active" data-tab="system-overview" role="tab" aria-selected="true" aria-controls="system-overview" id="tab-system-overview">
                         📊 System Overview
                     </button>
-                    <button class="tab-btn" data-tab="user-management">
-                        � User Management
+                    <button class="tab-btn" data-tab="user-management" role="tab" aria-selected="false" aria-controls="user-management" id="tab-user-management">
+                        👥 User Management
                     </button>
-                    <button class="tab-btn" data-tab="document-management">
-                        � Document Management
+                    <button class="tab-btn" data-tab="document-management" role="tab" aria-selected="false" aria-controls="document-management" id="tab-document-management">
+                        📄 Document Management
                     </button>
-                    <button class="tab-btn" data-tab="user-creation">
+                    <button class="tab-btn" data-tab="user-creation" role="tab" aria-selected="false" aria-controls="user-creation" id="tab-user-creation">
                         ➕ Create User
                     </button>
-                    <button class="tab-btn" data-tab="user-editing">
+                    <button class="tab-btn" data-tab="user-editing" role="tab" aria-selected="false" aria-controls="user-editing" id="tab-user-editing">
                         ✏️ Edit User
                     </button>
                 </div>
@@ -574,7 +899,7 @@
                 <div id="alert-area"></div>
                 
                 <!-- System Overview Tab -->
-                <div id="system-overview" class="tab-content active">
+                <div id="system-overview" class="tab-content active" role="tabpanel" aria-labelledby="tab-system-overview">
                     <h3 style="margin-top: 0;">System Overview</h3>
                     <p style="color: #6b7280; margin-bottom: 2rem;">Monitor system statistics, performance metrics, and overall health of the Logios OCR Platform.</p>
                     
@@ -685,32 +1010,91 @@
                     
                     <!-- Recent Activity -->
                     <div class="overview-card">
-                        <h4>🕒 Recent Activity</h4>
-                        <div class="activity-list">
-                            {% set sorted_users = users_data|selectattr('last_login')|sort(attribute='last_login', reverse=true)|list %}
-                            {% for user in sorted_users[:10] %}
-                            <div class="activity-item">
-                                <div class="activity-user">
-                                    <div class="activity-user-name">{{ user.display_name }}</div>
-                                    <div class="activity-user-handle">@{{ user.username }}</div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h4 style="margin: 0;">🕒 Recent Activity</h4>
+                            <div class="activity-controls">
+                                <select id="activity-filter" class="activity-filter-select" onchange="filterActivity(this.value)">
+                                    <option value="all">All Users</option>
+                                    <option value="recent">Last 7 days</option>
+                                    <option value="month">Last 30 days</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        {% set sorted_users = users_data|selectattr('last_login')|sort(attribute='last_login', reverse=true)|list %}
+                        
+                        <div class="activity-summary" style="margin-bottom: 1rem;">
+                            <div class="activity-summary-grid">
+                                <div class="activity-summary-item">
+                                    <div class="activity-summary-value" id="recent-count">0</div>
+                                    <div class="activity-summary-label">Last 7 days</div>
                                 </div>
-                                <div class="activity-time">
-                                    <div class="activity-time-label">Last login</div>
-                                    <div class="activity-time-value">{{ user.last_login.strftime('%b %d, %Y') }}</div>
+                                <div class="activity-summary-item">
+                                    <div class="activity-summary-value">{{ sorted_users|length }}</div>
+                                    <div class="activity-summary-label">Total with logins</div>
+                                </div>
+                                <div class="activity-summary-item">
+                                    <div class="activity-summary-value">{{ users_data|rejectattr('last_login')|list|length }}</div>
+                                    <div class="activity-summary-label">Never logged in</div>
                                 </div>
                             </div>
+                        </div>
+                        
+                        <div class="activity-list">
+                            {% if sorted_users %}
+                                {% for user in sorted_users[:15] %}
+                                <div class="activity-item" data-login-date="{{ user.last_login.strftime('%Y-%m-%d') }}">
+                                    <div class="activity-user">
+                                        <div class="activity-avatar">
+                                            <div class="avatar-circle">
+                                                {{ user.display_name[0]|upper if user.display_name else user.username[0]|upper }}
+                                            </div>
+                                        </div>
+                                        <div class="activity-user-info">
+                                            <div class="activity-user-name">{{ user.display_name or user.username }}</div>
+                                            <div class="activity-user-handle">@{{ user.username }}</div>
+                                            {% if user.is_admin %}
+                                                <span class="activity-admin-badge">Admin</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="activity-details">
+                                        <div class="activity-time">
+                                            <div class="activity-time-value">{{ user.last_login.strftime('%b %d, %Y') }}</div>
+                                            <div class="activity-time-relative">{{ get_relative_time(user.last_login) if get_relative_time is defined else user.last_login.strftime('%H:%M') }}</div>
+                                        </div>
+                                        <div class="activity-stats">
+                                            {% if user.has_folder %}
+                                                <span class="activity-stat">{{ user.total_documents }} docs</span>
+                                                <span class="activity-stat">{{ user.storage_size_mb }}MB</span>
+                                            {% else %}
+                                                <span class="activity-stat no-data">No uploads</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                                
+                                {% if sorted_users|length > 15 %}
+                                <div class="activity-more">
+                                    <button class="show-more-btn" onclick="showMoreActivity()">
+                                        Show {{ sorted_users|length - 15 }} more users
+                                    </button>
+                                </div>
+                                {% endif %}
                             {% else %}
                             <div class="empty-state">
-                                <div class="empty-state-icon">📊</div>
-                                <p>No recent activity to display</p>
+                                <div class="empty-state-icon">�</div>
+                                <h4>No User Activity</h4>
+                                <p>No users have logged in yet. Activity will appear here once users start using the system.</p>
                             </div>
-                            {% endfor %}
+                            {% endif %}
                         </div>
                     </div>
                 </div>
                 
                 <!-- User Management Tab -->
-                <div id="user-management" class="tab-content">
+                <div id="user-management" class="tab-content" role="tabpanel" aria-labelledby="tab-user-management">
                     <h3 style="margin-top: 0;">User Management</h3>
                     <p style="color: #6b7280; margin-bottom: 1.5rem;">Manage system users, view their information, and delete users and their documents.</p>
                     
@@ -772,7 +1156,7 @@
                 </div>
                 
                 <!-- Document Management Tab -->
-                <div id="document-management" class="tab-content">
+                <div id="document-management" class="tab-content" role="tabpanel" aria-labelledby="tab-document-management">
                     <!-- Welcome State -->
                     <div id="welcome-state">
                         <div style="text-align: center; padding: 3rem 1rem; color: #6b7280;">
@@ -801,7 +1185,7 @@
                 </div>
             
                 <!-- User Creation Tab -->
-                <div id="user-creation" class="tab-content">
+                <div id="user-creation" class="tab-content" role="tabpanel" aria-labelledby="tab-user-creation">
                     <h3 style="margin-top: 0;">Create New User</h3>
                     
                     <form id="create-user-form">
@@ -869,7 +1253,7 @@
                 </div>
                 
                 <!-- User Editing Tab -->
-                <div id="user-editing" class="tab-content">
+                <div id="user-editing" class="tab-content" role="tabpanel" aria-labelledby="tab-user-editing">
                     <div id="edit-welcome-state">
                         <div style="text-align: center; padding: 3rem 1rem; color: #6b7280;">
                             <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;">✏️</div>
@@ -965,6 +1349,13 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // State management and error recovery
+    let tabState = {
+        current: 'system-overview',
+        previous: null,
+        history: ['system-overview']
+    };
+    
     // Variables
     let currentUserId = null;
     const userDocumentsSection = document.getElementById('user-documents-section');
@@ -1002,22 +1393,128 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Tab functionality
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const targetTab = this.getAttribute('data-tab');
+    // Tab functionality - Enhanced with error handling and state management
+    
+    function switchToTab(tabId) {
+        try {
+            // Validate tab exists
+            const targetTabContent = document.getElementById(tabId);
+            const targetTabButton = document.querySelector(`[data-tab="${tabId}"]`);
+            
+            if (!targetTabContent || !targetTabButton) {
+                console.error(`Tab "${tabId}" not found`);
+                showAlert('error', `Tab "${tabId}" not found`);
+                return false;
+            }
+            
+            // Store previous state
+            tabState.previous = tabState.current;
             
             // Update active tab button
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+                btn.setAttribute('aria-selected', 'false');
+            });
+            targetTabButton.classList.add('active');
+            targetTabButton.setAttribute('aria-selected', 'true');
             
-            // Update active tab content
+            // Update active tab content - ensure proper display management
             document.querySelectorAll('.tab-content').forEach(content => {
                 content.classList.remove('active');
+                content.setAttribute('aria-hidden', 'true');
+                content.style.display = 'none'; // Explicitly set display to none
             });
-            document.getElementById(targetTab).classList.add('active');
+            targetTabContent.classList.add('active');
+            targetTabContent.setAttribute('aria-hidden', 'false');
+            targetTabContent.style.display = 'block'; // Explicitly set display to block
+            
+            // Update state tracking
+            tabState.current = tabId;
+            if (tabState.history[tabState.history.length - 1] !== tabId) {
+                tabState.history.push(tabId);
+                // Keep history reasonable size
+                if (tabState.history.length > 10) {
+                    tabState.history = tabState.history.slice(-5);
+                }
+            }
+            
+            // Clear any alerts when switching tabs (except for certain cases)
+            if (alertArea && !['error'].includes(getCurrentAlertType())) {
+                alertArea.innerHTML = '';
+            }
+            
+            // Focus management for accessibility
+            targetTabButton.focus();
+            
+            console.log(`Switched to tab: ${tabId} - Content should now be visible`);
+            return true;
+        } catch (error) {
+            console.error('Error switching tabs:', error);
+            showAlert('error', 'Failed to switch tabs: ' + error.message);
+            return false;
+        }
+    }
+    
+    // Helper function to get current alert type
+    function getCurrentAlertType() {
+        if (!alertArea || !alertArea.innerHTML.trim()) return null;
+        const alertElement = alertArea.querySelector('.alert');
+        if (!alertElement) return null;
+        
+        const classList = Array.from(alertElement.classList);
+        const alertClass = classList.find(cls => cls.startsWith('alert-'));
+        return alertClass ? alertClass.replace('alert-', '') : null;
+    }
+    
+    // Initialize tab functionality
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const targetTab = this.getAttribute('data-tab');
+            if (targetTab) {
+                switchToTab(targetTab);
+            }
+        });
+        
+        // Add keyboard navigation
+        btn.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                const targetTab = this.getAttribute('data-tab');
+                if (targetTab) {
+                    switchToTab(targetTab);
+                }
+            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                e.preventDefault();
+                navigateTabsWithKeyboard(e.key === 'ArrowRight');
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                // Go back to system overview on escape
+                switchToTab('system-overview');
+            }
         });
     });
+    
+    // Keyboard navigation between tabs
+    function navigateTabsWithKeyboard(forward = true) {
+        const tabs = Array.from(document.querySelectorAll('.tab-btn'));
+        const currentIndex = tabs.findIndex(tab => tab.classList.contains('active'));
+        
+        if (currentIndex === -1) return;
+        
+        let nextIndex;
+        if (forward) {
+            nextIndex = (currentIndex + 1) % tabs.length;
+        } else {
+            nextIndex = currentIndex === 0 ? tabs.length - 1 : currentIndex - 1;
+        }
+        
+        const nextTab = tabs[nextIndex];
+        const targetTab = nextTab.getAttribute('data-tab');
+        if (targetTab) {
+            switchToTab(targetTab);
+        }
+    }
     
     // User creation form
     createUserForm.addEventListener('submit', function(e) {
@@ -1027,35 +1524,60 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Function to view user documents (called from user management tab)
     window.viewUserDocuments = function(userId) {
-        // Switch to document management tab
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-        document.querySelector('[data-tab="document-management"]').classList.add('active');
+        if (!userId) {
+            console.error('No user ID provided');
+            showAlert('error', 'Invalid user ID');
+            return;
+        }
         
-        document.querySelectorAll('.tab-content').forEach(content => {
-            content.classList.remove('active');
-        });
-        document.getElementById('document-management').classList.add('active');
+        // Switch to document management tab using robust function
+        if (!switchToTab('document-management')) {
+            console.error('Failed to switch to document management tab');
+            return;
+        }
         
         // Set up document view
         currentUserId = userId;
-        selectedUserTitle.textContent = `Documents for ${userId}`;
+        if (selectedUserTitle) {
+            selectedUserTitle.textContent = `Documents for ${userId}`;
+        }
         
         // Show user documents section
-        welcomeState.style.display = 'none';
-        userDocumentsSection.style.display = 'block';
+        if (welcomeState) {
+            welcomeState.style.display = 'none';
+        }
+        if (userDocumentsSection) {
+            userDocumentsSection.style.display = 'block';
+        }
         
         // Load user documents
         loadUserDocuments(userId);
     };
     
     function loadUserDocuments(userId) {
-        userLoading.style.display = 'block';
-        userDocumentsList.innerHTML = '';
+        if (!userId) {
+            console.error('No user ID provided to loadUserDocuments');
+            return;
+        }
+        
+        if (userLoading) {
+            userLoading.style.display = 'block';
+        }
+        if (userDocumentsList) {
+            userDocumentsList.innerHTML = '';
+        }
         
         fetch(`/api/admin/user_documents/${userId}`)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
-                userLoading.style.display = 'none';
+                if (userLoading) {
+                    userLoading.style.display = 'none';
+                }
                 
                 if (data.success) {
                     displayUserDocuments(data);
@@ -1065,13 +1587,20 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 console.error('Error loading user documents:', error);
-                userLoading.style.display = 'none';
-                showAlert('error', 'Network error occurred while loading user documents');
+                if (userLoading) {
+                    userLoading.style.display = 'none';
+                }
+                showAlert('error', 'Network error occurred while loading user documents: ' + error.message);
             });
     }
     
     function displayUserDocuments(userData) {
-        if (userData.documents.length === 0) {
+        if (!userDocumentsList) {
+            console.error('User documents list element not found');
+            return;
+        }
+        
+        if (!userData || !userData.documents || userData.documents.length === 0) {
             userDocumentsList.innerHTML = `
                 <div class="empty-state">
                     <div class="empty-state-icon">📄</div>
@@ -1082,65 +1611,114 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Create stats summary
+        // Create stats summary with safety checks
+        const totalDocs = userData.total_documents || 0;
+        const completedDocs = userData.completed_documents || 0;
+        const inProgressDocs = userData.in_progress_documents || 0;
+        const storageMb = userData.storage_size_mb || 0;
+        
         const statsHtml = `
             <div class="stats-grid" style="margin-bottom: 1.5rem;">
                 <div class="stat-card">
-                    <div class="stat-value">${userData.total_documents}</div>
+                    <div class="stat-value">${totalDocs}</div>
                     <div class="stat-label">Total Documents</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value">${userData.completed_documents}</div>
+                    <div class="stat-value">${completedDocs}</div>
                     <div class="stat-label">Completed</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value">${userData.in_progress_documents}</div>
+                    <div class="stat-value">${inProgressDocs}</div>
                     <div class="stat-label">In Progress</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value">${userData.storage_size_mb}</div>
+                    <div class="stat-value">${storageMb}</div>
                     <div class="stat-label">Storage (MB)</div>
                 </div>
             </div>
         `;
         
-        // Create documents list
-        const documentsHtml = userData.documents.map(doc => `
-            <div class="document-item">
-                <div class="document-header">
-                    <div class="document-name">${doc.name}</div>
-                    <button class="delete-btn" onclick="confirmDeleteDocument('${userData.user_id}', '${doc.name}')">
-                        🗑️ Delete
-                    </button>
+        // Create documents list with safety checks
+        const documentsHtml = userData.documents.map(doc => {
+            const docName = doc.name || 'Unknown';
+            const isCompleted = doc.is_completed || false;
+            const totalPngCount = doc.total_png_count || 0;
+            const cropCount = doc.crop_count || 0;
+            const pdfFiles = doc.pdf_files || [];
+            const creationDate = doc.creation_date || '';
+            
+            return `
+                <div class="document-item">
+                    <div class="document-header">
+                        <div class="document-name">${escapeHtml(docName)}</div>
+                        <button class="delete-btn" onclick="confirmDeleteDocument('${escapeHtml(userData.user_id)}', '${escapeHtml(docName)}')">
+                            🗑️ Delete
+                        </button>
+                    </div>
+                    <div class="document-meta">
+                        <span class="status-badge ${isCompleted ? 'status-completed' : 'status-progress'}">
+                            ${isCompleted ? 'Completed' : 'In Progress'}
+                        </span>
+                        <span>${totalPngCount} images</span>
+                        <span>${cropCount} crops</span>
+                        ${pdfFiles.length > 0 ? `<span>PDF: ${pdfFiles.map(f => escapeHtml(f)).join(', ')}</span>` : ''}
+                        ${creationDate ? `<span>Created: ${escapeHtml(creationDate)}</span>` : ''}
+                    </div>
                 </div>
-                <div class="document-meta">
-                    <span class="status-badge ${doc.is_completed ? 'status-completed' : 'status-progress'}">
-                        ${doc.is_completed ? 'Completed' : 'In Progress'}
-                    </span>
-                    <span>${doc.total_png_count} images</span>
-                    <span>${doc.crop_count} crops</span>
-                    ${doc.pdf_files ? `<span>PDF: ${doc.pdf_files.join(', ')}</span>` : ''}
-                    ${doc.creation_date ? `<span>Created: ${doc.creation_date}</span>` : ''}
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
         
         userDocumentsList.innerHTML = statsHtml + '<h3>Documents</h3>' + documentsHtml;
     }
     
+    // Helper function to escape HTML to prevent XSS
+    function escapeHtml(text) {
+        if (typeof text !== 'string') return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+    
     function showAlert(type, message) {
+        if (!alertArea) {
+            console.error('Alert area not found');
+            return;
+        }
+        
+        // Validate alert type
+        const validTypes = ['success', 'error', 'info', 'warning'];
+        if (!validTypes.includes(type)) {
+            console.warn(`Invalid alert type: ${type}. Using 'info' instead.`);
+            type = 'info';
+        }
+        
+        // Clear existing alerts
+        alertArea.innerHTML = '';
+        
+        // Create new alert
         alertArea.innerHTML = `
             <div class="alert alert-${type}">
-                ${message}
+                <button type="button" class="alert-close" onclick="this.parentElement.remove()" style="float: right; background: none; border: none; font-size: 1.2em; cursor: pointer; padding: 0; margin-left: 1rem;">&times;</button>
+                ${escapeHtml(message)}
             </div>
         `;
         
-        // Auto-hide success alerts
-        if (type === 'success') {
+        // Auto-hide success and info alerts
+        if (type === 'success' || type === 'info') {
             setTimeout(() => {
-                alertArea.innerHTML = '';
+                if (alertArea) {
+                    alertArea.innerHTML = '';
+                }
             }, 5000);
         }
+        
+        // Scroll to alert
+        alertArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
     
     // User creation functions
@@ -1382,56 +1960,115 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Edit user functionality
     window.editUser = function(userId) {
+        if (!userId) {
+            console.error('No user ID provided');
+            showAlert('error', 'Invalid user ID');
+            return;
+        }
+        
         console.log('Loading user for editing:', userId);
         
-        // Switch to edit user tab
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-        document.querySelector('[data-tab="user-editing"]').classList.add('active');
+        // Switch to edit user tab using robust function
+        if (!switchToTab('user-editing')) {
+            console.error('Failed to switch to edit user tab');
+            return;
+        }
         
-        document.querySelectorAll('.tab-content').forEach(content => {
-            content.classList.remove('active');
-        });
-        document.getElementById('user-editing').classList.add('active');
+        // Show loading state
+        showAlert('info', 'Loading user data...');
         
         // Load user data
         fetch(`/api/admin/get_user/${userId}`)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
-                if (data.success) {
+                if (data.success && data.user) {
                     populateEditForm(data.user);
                     showEditForm();
+                    showAlert('success', 'User data loaded successfully');
                 } else {
                     showAlert('error', data.message || 'Failed to load user data');
                 }
             })
             .catch(error => {
                 console.error('Error loading user:', error);
-                showAlert('error', 'Network error occurred while loading user data');
+                showAlert('error', 'Network error occurred while loading user data: ' + error.message);
             });
     };
     
     function populateEditForm(user) {
-        document.getElementById('edit-user-id').value = user.id;
-        document.getElementById('edit-username').value = user.username;
-        document.getElementById('edit-email').value = user.email;
-        document.getElementById('edit-first-name').value = user.first_name;
-        document.getElementById('edit-last-name').value = user.last_name;
-        document.getElementById('edit-password').value = ''; // Always start with empty password
-        document.getElementById('edit-is-admin').checked = user.is_admin;
-        document.getElementById('edit-is-active').checked = user.is_active;
+        if (!user) {
+            console.error('No user data provided to populateEditForm');
+            return;
+        }
         
-        // Clear any previous errors
-        clearEditFormErrors();
+        try {
+            // Safely populate form fields with null checks
+            const fields = {
+                'edit-user-id': user.id || '',
+                'edit-username': user.username || '',
+                'edit-email': user.email || '',
+                'edit-first-name': user.first_name || '',
+                'edit-last-name': user.last_name || '',
+                'edit-password': '' // Always start with empty password
+            };
+            
+            // Populate text fields
+            Object.entries(fields).forEach(([fieldId, value]) => {
+                const field = document.getElementById(fieldId);
+                if (field) {
+                    field.value = value;
+                } else {
+                    console.warn(`Field ${fieldId} not found`);
+                }
+            });
+            
+            // Populate checkboxes
+            const adminCheckbox = document.getElementById('edit-is-admin');
+            const activeCheckbox = document.getElementById('edit-is-active');
+            
+            if (adminCheckbox) {
+                adminCheckbox.checked = !!user.is_admin;
+            }
+            if (activeCheckbox) {
+                activeCheckbox.checked = !!user.is_active;
+            }
+            
+            // Clear any previous errors
+            clearEditFormErrors();
+            
+        } catch (error) {
+            console.error('Error populating edit form:', error);
+            showAlert('error', 'Failed to populate form fields');
+        }
     }
     
     function showEditForm() {
-        document.getElementById('edit-welcome-state').style.display = 'none';
-        document.getElementById('edit-user-form-section').style.display = 'block';
+        const welcomeState = document.getElementById('edit-welcome-state');
+        const formSection = document.getElementById('edit-user-form-section');
+        
+        if (welcomeState) {
+            welcomeState.style.display = 'none';
+        }
+        if (formSection) {
+            formSection.style.display = 'block';
+        }
     }
     
     function hideEditForm() {
-        document.getElementById('edit-welcome-state').style.display = 'block';
-        document.getElementById('edit-user-form-section').style.display = 'none';
+        const welcomeState = document.getElementById('edit-welcome-state');
+        const formSection = document.getElementById('edit-user-form-section');
+        
+        if (welcomeState) {
+            welcomeState.style.display = 'block';
+        }
+        if (formSection) {
+            formSection.style.display = 'none';
+        }
     }
     
     window.cancelEditUser = function() {
@@ -1549,6 +2186,316 @@ document.addEventListener('DOMContentLoaded', function() {
             showAlert('error', 'Network error occurred while updating user: ' + error.message);
         });
     }
+    
+    // Activity filtering functionality
+    window.filterActivity = function(filterValue) {
+        const activityItems = document.querySelectorAll('.activity-item[data-login-date]');
+        const now = new Date();
+        let cutoffDate;
+        
+        switch(filterValue) {
+            case 'recent':
+                cutoffDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
+                break;
+            case 'month':
+                cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
+                break;
+            case 'all':
+            default:
+                cutoffDate = null;
+                break;
+        }
+        
+        let visibleCount = 0;
+        activityItems.forEach(item => {
+            if (!cutoffDate) {
+                item.style.display = 'flex';
+                visibleCount++;
+            } else {
+                const loginDate = new Date(item.dataset.loginDate);
+                if (loginDate >= cutoffDate) {
+                    item.style.display = 'flex';
+                    visibleCount++;
+                } else {
+                    item.style.display = 'none';
+                }
+            }
+        });
+        
+        // Update "show more" button if it exists
+        const showMoreBtn = document.querySelector('.show-more-btn');
+        if (showMoreBtn) {
+            if (visibleCount === 0 && filterValue !== 'all') {
+                showMoreBtn.style.display = 'none';
+            } else {
+                showMoreBtn.style.display = 'block';
+            }
+        }
+        
+        // Update recent users count if we're showing the activity tab
+        updateRecentUsersCount();
+        
+        console.log(`Activity filter applied: ${filterValue}, showing ${visibleCount} items`);
+    };
+    
+    window.showMoreActivity = function() {
+        // This would typically load more data from the server
+        // For now, we'll just show a message
+        showAlert('info', 'Loading more activity data would be implemented here with server pagination.');
+    };
+    
+    // Calculate and update recent users count
+    function updateRecentUsersCount() {
+        try {
+            const activityItems = document.querySelectorAll('.activity-item[data-login-date]');
+            const now = new Date();
+            const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            
+            let recentCount = 0;
+            activityItems.forEach(item => {
+                const loginDate = new Date(item.dataset.loginDate);
+                if (loginDate >= sevenDaysAgo) {
+                    recentCount++;
+                }
+            });
+            
+            const recentCountElement = document.getElementById('recent-count');
+            if (recentCountElement) {
+                recentCountElement.textContent = recentCount;
+            }
+        } catch (error) {
+            console.error('Error updating recent users count:', error);
+        }
+    }
+    
+    // Initialize the admin dashboard
+    function initializeAdminDashboard() {
+        try {
+            // First, ensure only the correct tab is visible
+            initializeTabVisibility();
+            
+            // Verify all required elements exist
+            const requiredElements = [
+                'alert-area',
+                'system-overview',
+                'user-management', 
+                'document-management',
+                'user-creation',
+                'user-editing'
+            ];
+            
+            const missingElements = requiredElements.filter(id => !document.getElementById(id));
+            if (missingElements.length > 0) {
+                console.error('Missing required elements:', missingElements);
+                showAlert('error', 'Dashboard initialization failed. Missing elements: ' + missingElements.join(', '));
+                return false;
+            }
+            
+            // Initialize tab buttons with proper attributes
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                const tabId = btn.getAttribute('data-tab');
+                if (!tabId) {
+                    console.warn('Tab button missing data-tab attribute:', btn);
+                    return;
+                }
+                
+                // Add ARIA attributes if missing
+                if (!btn.id) btn.id = `tab-${tabId}`;
+                if (!btn.getAttribute('role')) btn.setAttribute('role', 'tab');
+                if (!btn.getAttribute('aria-controls')) btn.setAttribute('aria-controls', tabId);
+                
+                // Set initial state
+                if (btn.classList.contains('active')) {
+                    btn.setAttribute('aria-selected', 'true');
+                    tabState.current = tabId;
+                } else {
+                    btn.setAttribute('aria-selected', 'false');
+                }
+            });
+            
+            // Initialize tab content with proper attributes
+            document.querySelectorAll('.tab-content').forEach(content => {
+                if (!content.getAttribute('role')) content.setAttribute('role', 'tabpanel');
+                if (content.classList.contains('active')) {
+                    content.setAttribute('aria-hidden', 'false');
+                    content.style.display = 'block';
+                } else {
+                    content.setAttribute('aria-hidden', 'true');
+                    content.style.display = 'none';
+                }
+            });
+            
+            // Calculate recent users count for activity summary
+            updateRecentUsersCount();
+            
+            console.log('Admin dashboard initialized successfully');
+            return true;
+        } catch (error) {
+            console.error('Error initializing admin dashboard:', error);
+            if (alertArea) {
+                showAlert('error', 'Dashboard initialization failed: ' + error.message);
+            }
+            return false;
+        }
+    }
+    
+    // Ensure proper tab visibility on initialization
+    function initializeTabVisibility() {
+        try {
+            // Hide all tab content first
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+                content.style.display = 'none';
+                content.setAttribute('aria-hidden', 'true');
+            });
+            
+            // Reset all tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+                btn.setAttribute('aria-selected', 'false');
+            });
+            
+            // Show only the system overview tab (default)
+            const systemOverviewTab = document.getElementById('system-overview');
+            const systemOverviewBtn = document.querySelector('[data-tab="system-overview"]');
+            
+            if (systemOverviewTab && systemOverviewBtn) {
+                systemOverviewTab.classList.add('active');
+                systemOverviewTab.style.display = 'block';
+                systemOverviewTab.setAttribute('aria-hidden', 'false');
+                
+                systemOverviewBtn.classList.add('active');
+                systemOverviewBtn.setAttribute('aria-selected', 'true');
+                
+                tabState.current = 'system-overview';
+                tabState.history = ['system-overview'];
+            }
+            
+            console.log('Tab visibility initialized - only system-overview should be visible');
+        } catch (error) {
+            console.error('Error initializing tab visibility:', error);
+        }
+    }
+    
+    // Go back to previous tab
+    function goToPreviousTab() {
+        if (tabState.previous && tabState.previous !== tabState.current) {
+            switchToTab(tabState.previous);
+        } else if (tabState.history.length > 1) {
+            // Go to second-to-last tab in history
+            const previousTab = tabState.history[tabState.history.length - 2];
+            switchToTab(previousTab);
+        }
+    }
+    
+    // Emergency reset function
+    window.resetAdminDashboard = function() {
+        try {
+            // Reset tab visibility first
+            initializeTabVisibility();
+            
+            // Clear any error states
+            if (alertArea) {
+                alertArea.innerHTML = '';
+            }
+            
+            // Reset forms
+            const forms = document.querySelectorAll('form');
+            forms.forEach(form => {
+                if (form.reset) form.reset();
+            });
+            
+            // Clear error messages
+            document.querySelectorAll('.form-error').forEach(error => {
+                error.textContent = '';
+            });
+            document.querySelectorAll('.form-input.error').forEach(input => {
+                input.classList.remove('error');
+            });
+            
+            // Reset document management state
+            currentUserId = null;
+            if (welcomeState) {
+                welcomeState.style.display = 'block';
+            }
+            if (userDocumentsSection) {
+                userDocumentsSection.style.display = 'none';
+            }
+            
+            showAlert('success', 'Dashboard has been reset to default state');
+            
+        } catch (error) {
+            console.error('Error resetting dashboard:', error);
+        }
+    };
+    
+    // Enhanced initialization when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeAdminDashboard);
+    } else {
+        initializeAdminDashboard();
+    }
+    
+    // Add debug information for troubleshooting
+    window.getAdminDashboardState = function() {
+        return {
+            tabState: tabState,
+            currentUserId: currentUserId,
+            availableTabs: Array.from(document.querySelectorAll('.tab-btn')).map(btn => ({
+                id: btn.getAttribute('data-tab'),
+                active: btn.classList.contains('active'),
+                text: btn.textContent.trim()
+            })),
+            visibleContent: Array.from(document.querySelectorAll('.tab-content')).map(content => ({
+                id: content.id,
+                visible: content.classList.contains('active'),
+                display: window.getComputedStyle(content).display
+            }))
+        };
+    };
+    
+    // Global error handler for unhandled errors
+    window.addEventListener('error', function(event) {
+        console.error('Global error in admin dashboard:', event.error);
+        
+        // Only show user-facing error for critical issues
+        if (event.error && event.error.message && 
+            (event.error.message.includes('Cannot read property') || 
+             event.error.message.includes('is not a function'))) {
+            showAlert('warning', 'A minor error occurred. If issues persist, try refreshing the page.');
+        }
+    });
+    
+    // Unhandled promise rejection handler
+    window.addEventListener('unhandledrejection', function(event) {
+        console.error('Unhandled promise rejection in admin dashboard:', event.reason);
+        
+        // Handle common network errors gracefully
+        if (event.reason && event.reason.message && 
+            (event.reason.message.includes('fetch') || 
+             event.reason.message.includes('network') ||
+             event.reason.message.includes('Failed to fetch'))) {
+            showAlert('error', 'Network error occurred. Please check your connection and try again.');
+        }
+    });
+    
+    // Add emergency keyboard shortcut
+    document.addEventListener('keydown', function(e) {
+        // Ctrl+Shift+R = Reset dashboard
+        if (e.ctrlKey && e.shiftKey && e.key === 'R') {
+            e.preventDefault();
+            console.log('Emergency reset triggered');
+            resetAdminDashboard();
+        }
+        // Ctrl+Shift+D = Debug info
+        else if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+            e.preventDefault();
+            console.log('Admin Dashboard Debug Info:', getAdminDashboardState());
+        }
+    });
+    
+    // Initialize the dashboard
+    initializeAdminDashboard();
 });
 </script>
 {% endblock %}
