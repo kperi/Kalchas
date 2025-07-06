@@ -89,11 +89,27 @@ def init_db():
     db.create_all()
 
 
-def create_admin_user(
-    username="admin", email="admin@logios.phil.uoa.gr", password="admin1231"
-):
+import secrets
+
+
+def create_admin_user(username=None, email=None, password=None):
     """Create a default admin user if it doesn't exist"""
     from werkzeug.security import generate_password_hash
+
+    # Use environment variables or secure defaults
+    username = username or os.environ.get("ADMIN_USERNAME", "admin")
+    email = email or os.environ.get("ADMIN_EMAIL", "admin@logios.phil.uoa.gr")
+    password = password or os.environ.get("ADMIN_PASSWORD")
+
+    # If no password is set in environment, generate a secure one and warn
+    if not password:
+        password = secrets.token_urlsafe(16)
+        print(
+            f"WARNING: No ADMIN_PASSWORD environment variable set. Generated secure password: {password}"
+        )
+        print(
+            f"Please save this password and set ADMIN_PASSWORD environment variable for future deployments."
+        )
 
     existing_user = User.query.filter_by(username=username).first()
     if not existing_user:

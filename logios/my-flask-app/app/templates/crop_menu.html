@@ -4,6 +4,7 @@
 
 {% block head %}
     {{ super() }}
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
     <style>
@@ -1188,9 +1189,15 @@
                     formData.append('original_filename', currentImage);
                     formData.append('cropped_image_data', canvas.toDataURL('image/png'));
                     
+                    // Get CSRF token
+                    const csrfToken = document.querySelector('meta[name=csrf-token]').getAttribute('content');
+                    
                     // Send AJAX request
                     fetch('/api/process_crop', {
                         method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrfToken
+                        },
                         body: formData
                     })
                     .then(response => response.json())
@@ -1410,8 +1417,14 @@
                     formData.append('user_id', userId);
                     formData.append('document_name', documentName);
                     
+                    // Get CSRF token
+                    const csrfToken = document.querySelector('meta[name=csrf-token]').getAttribute('content');
+                    
                     fetch('/api/admin/delete_document', {
                         method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrfToken
+                        },
                         body: formData
                     })
                     .then(response => response.json())
@@ -1473,8 +1486,14 @@
                     formData.append('document_name', documentName);
                     formData.append('page_name', pageName);
                     
+                    // Get CSRF token
+                    const csrfToken = document.querySelector('meta[name=csrf-token]').getAttribute('content');
+                    
                     fetch('/api/delete_page', {
                         method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrfToken
+                        },
                         body: formData
                     })
                     .then(response => response.json())
@@ -1619,8 +1638,14 @@
                     const formData = new FormData();
                     formData.append('folder', currentFolder);
                     
+                    // Get CSRF token
+                    const csrfToken = document.querySelector('meta[name=csrf-token]').getAttribute('content');
+                    
                     fetch('/api/move_to_ocr', {
                         method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrfToken
+                        },
                         body: formData
                     })
                     .then(response => response.json())

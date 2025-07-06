@@ -3,6 +3,7 @@
 {% block title %}Document Preview & OCR - Logios App{% endblock %}
 
 {% block head %}
+<meta name="csrf-token" content="{{ csrf_token() }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/preview_style.css') }}">
 
 <style>

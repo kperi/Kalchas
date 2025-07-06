@@ -6,6 +6,7 @@
 <div class="gradio-component-group" style="max-width: 800px; margin-left: auto; margin-right: auto;">
     <h1>📄 Upload New Document</h1>
     <form id="upload-form" action="{{ url_for('app.show_upload_page') }}" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <div class="mb-6">
             <label for="file">Choose an Image or PDF file (Max 100MB):</label>
             <input type="file" name="file" id="file" accept="image/*,.pdf" required>

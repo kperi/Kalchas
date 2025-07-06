@@ -1246,6 +1246,8 @@
                     <h3 style="margin-top: 0;">Create New User</h3>
                     
                     <form id="create-user-form">
+                        {{ csrf_token() }}
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <div class="form-group">
                         <label for="new-username" class="form-label">Username *</label>
                         <input type="text" id="new-username" name="username" class="form-input" required
@@ -1275,8 +1277,9 @@
                     <div class="form-group">
                         <label for="new-password" class="form-label">Password *</label>
                         <input type="password" id="new-password" name="password" class="form-input" required
-                               placeholder="Minimum 6 characters">
+                               placeholder="Minimum 8 characters, include uppercase, lowercase, digit and special character">
                         <div class="form-error" id="password-error"></div>
+                        <small style="color: #6b7280; font-size: 0.8em;">Password must contain: 8+ characters, uppercase letter, lowercase letter, digit, and special character</small>
                     </div>
                     
                     <div class="form-group">
@@ -1323,6 +1326,8 @@
                         <h3 style="margin-top: 0;">Edit User Details</h3>
                         
                         <form id="edit-user-form">
+                            {{ csrf_token() }}
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                             <input type="hidden" id="edit-user-id" name="user_id">
                             
                             <div class="form-group">
@@ -1818,7 +1823,7 @@ document.addEventListener('DOMContentLoaded', function() {
             confirm_password: confirmPassword ? '***' : 'empty'
         });
         
-        // Client-side validation
+        // Client-side validation with stronger password requirements
         let hasErrors = false;
         
         if (password !== confirmPassword) {
@@ -1826,8 +1831,31 @@ document.addEventListener('DOMContentLoaded', function() {
             hasErrors = true;
         }
         
-        if (password.length < 6) {
-            showFieldError('password-error', 'Password must be at least 6 characters');
+        // Strong password validation
+        if (password.length < 8) {
+            showFieldError('password-error', 'Password must be at least 8 characters');
+            hasErrors = true;
+        } else if (!/[A-Z]/.test(password)) {
+            showFieldError('password-error', 'Password must contain at least one uppercase letter');
+            hasErrors = true;
+        } else if (!/[a-z]/.test(password)) {
+            showFieldError('password-error', 'Password must contain at least one lowercase letter');
+            hasErrors = true;
+        } else if (!/\d/.test(password)) {
+            showFieldError('password-error', 'Password must contain at least one digit');
+            hasErrors = true;
+        } else if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\?]/.test(password)) {
+            showFieldError('password-error', 'Password must contain at least one special character');
+            hasErrors = true;
+        } else if (/\s/.test(password)) {
+            showFieldError('password-error', 'Password cannot contain spaces');
+            hasErrors = true;
+        }
+        
+        // Username validation
+        const username = formData.get('username');
+        if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+            showFieldError('username-error', 'Username can only contain letters, numbers, and underscores');
             hasErrors = true;
         }
         
@@ -1844,8 +1872,14 @@ document.addEventListener('DOMContentLoaded', function() {
         
         console.log('Sending request to /api/admin/create_user');
         
+        // Get CSRF token
+        const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+        
         fetch('/api/admin/create_user', {
             method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken
+            },
             body: formData
         })
         .then(response => {

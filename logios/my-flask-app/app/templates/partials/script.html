@@ -1651,6 +1651,7 @@
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name=csrf-token]').getAttribute('content')
             },
             body: JSON.stringify(ocrData)
         })
@@ -2107,8 +2108,14 @@
         formData.append('user_id', userId);
         formData.append('document_name', documentName);
         
+        // Get CSRF token
+        const csrfToken = document.querySelector('meta[name=csrf-token]').getAttribute('content');
+        
         fetch('/api/admin/delete_document', {
             method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken
+            },
             body: formData
         })
         .then(response => response.json())
@@ -2442,6 +2449,7 @@
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name=csrf-token]').getAttribute('content')
             },
             body: JSON.stringify(requestData)
         })

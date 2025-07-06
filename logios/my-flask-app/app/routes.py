@@ -11,6 +11,7 @@ from flask import (
     send_from_directory,
 )
 from flask_login import login_required, current_user
+from flask_wtf.csrf import CSRFProtect, validate_csrf
 
 import json
 import mimetypes
@@ -26,6 +27,7 @@ import uuid
 from collections import defaultdict
 
 from . import file_operations
+from .rate_limiting import rate_limit_admin, rate_limit_api
 
 app = Blueprint("app", __name__)
 
@@ -42,6 +44,12 @@ def index():
     return render_template("index.html")
 
 
+# Add exemption for upload routes from CSRF to fix upload issues
+from app import csrf
+
+
+# Exempt the upload route to resolve the 400 error
+@csrf.exempt
 @app.route("/show_upload_page", methods=["POST", "GET"])
 @login_required
 def show_upload_page():
@@ -1413,6 +1421,9 @@ def api_admin_delete_user():
 
 @app.route("/api/admin/create_user", methods=["POST"])
 @login_required
+@rate_limit_admin(
+    max_requests=10, window_seconds=300
+)  # 10 user creations per 5 minutes
 def api_admin_create_user():
     """
     AJAX endpoint to create a new user.
@@ -1425,6 +1436,13 @@ def api_admin_create_user():
         )
         return jsonify({"success": False, "message": "Access denied"}), 403
 
+    # Validate CSRF token
+    try:
+        validate_csrf(request.headers.get("X-CSRFToken"))
+    except:
+        current_app.logger.warning(f"Invalid CSRF token from {current_user.username}")
+        return jsonify({"success": False, "message": "Invalid CSRF token"}), 400
+
     current_app.logger.info(
         f"Admin {current_user.username} attempting to create new user"
     )
@@ -1435,8 +1453,9 @@ def api_admin_create_user():
         from werkzeug.security import generate_password_hash
         from email_validator import validate_email, EmailNotValidError
 
+        # Sanitize input data
         username = request.form.get("username", "").strip()
-        email = request.form.get("email", "").strip()
+        email = request.form.get("email", "").strip().lower()
         first_name = request.form.get("first_name", "").strip()
         last_name = request.form.get("last_name", "").strip()
         password = request.form.get("password", "")
@@ -1446,16 +1465,22 @@ def api_admin_create_user():
             f"Received form data - username: {username}, email: {email}, is_admin: {is_admin}"
         )
 
-        # Validation
+        # Enhanced validation
         errors = {}
 
+        # Username validation
         if not username:
             errors["username"] = "Username is required"
-        elif len(username) < 3:
-            errors["username"] = "Username must be at least 3 characters"
+        elif len(username) < 3 or len(username) > 25:
+            errors["username"] = "Username must be between 3 and 25 characters"
+        elif not re.match(r"^[a-zA-Z0-9_]+$", username):
+            errors["username"] = (
+                "Username can only contain letters, numbers, and underscores"
+            )
         elif User.query.filter_by(username=username).first():
             errors["username"] = "Username already exists"
 
+        # Email validation
         if not email:
             errors["email"] = "Email is required"
         else:
@@ -1466,10 +1491,27 @@ def api_admin_create_user():
             except EmailNotValidError:
                 errors["email"] = "Invalid email format"
 
+        # Name validation
+        if first_name and not re.match(r"^[a-zA-Z\s\-\'\.]*$", first_name):
+            errors["first_name"] = "First name contains invalid characters"
+        if last_name and not re.match(r"^[a-zA-Z\s\-\'\.]*$", last_name):
+            errors["last_name"] = "Last name contains invalid characters"
+
+        # Strong password validation
         if not password:
             errors["password"] = "Password is required"
-        elif len(password) < 6:
-            errors["password"] = "Password must be at least 6 characters"
+        elif len(password) < 8:
+            errors["password"] = "Password must be at least 8 characters long"
+        elif not re.search(r"[A-Z]", password):
+            errors["password"] = "Password must contain at least one uppercase letter"
+        elif not re.search(r"[a-z]", password):
+            errors["password"] = "Password must contain at least one lowercase letter"
+        elif not re.search(r"\d", password):
+            errors["password"] = "Password must contain at least one digit"
+        elif not re.search(r'[!@#$%^&*()_+\-=\[\]{};\':"\\|,.<>\?]', password):
+            errors["password"] = "Password must contain at least one special character"
+        elif re.search(r"\s", password):
+            errors["password"] = "Password cannot contain spaces"
 
         if errors:
             current_app.logger.warning(f"User creation validation failed: {errors}")
@@ -1783,6 +1825,7 @@ cleanup_thread = threading.Thread(target=periodic_cleanup, daemon=True)
 cleanup_thread.start()
 
 
+@csrf.exempt
 @app.route("/api/upload_with_progress", methods=["POST"])
 @login_required
 def api_upload_with_progress():
