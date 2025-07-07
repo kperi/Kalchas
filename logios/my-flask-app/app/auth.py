@@ -55,39 +55,12 @@ def login():
 
 @auth.route("/register", methods=["GET", "POST"])
 def register():
-    # Redirect if user is already logged in
-    if current_user.is_authenticated:
-        return redirect(url_for("app.index"))
-
-    form = RegistrationForm()
-    if form.validate_on_submit():
-        try:
-            # Create new user
-            hashed_password = generate_password_hash(form.password.data)
-            new_user = User(
-                username=form.username.data,
-                email=form.email.data,
-                first_name=form.first_name.data if form.first_name.data else None,
-                last_name=form.last_name.data if form.last_name.data else None,
-                password_hash=hashed_password,
-                is_active=True,
-                is_admin=False,
-            )
-
-            db.session.add(new_user)
-            db.session.commit()
-
-            flash(
-                f"Registration successful! Welcome to Logios, {new_user.display_name}!",
-                "success",
-            )
-            return redirect(url_for("auth.login"))
-
-        except Exception as e:
-            db.session.rollback()
-            flash("An error occurred during registration. Please try again.", "danger")
-
-    return render_template("register.html", form=form)
+    # Registration is disabled
+    flash(
+        "Registration is currently disabled. Please contact an administrator for account creation.",
+        "warning",
+    )
+    return redirect(url_for("auth.login"))
 
 
 @auth.route("/logout")
