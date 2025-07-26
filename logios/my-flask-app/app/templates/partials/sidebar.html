@@ -12,6 +12,20 @@
                 <!-- Alert area for sidebar notifications -->
                 <div id="sidebar-alert-area"></div>
                 
+                <!-- Search box (show only when more than 3 documents) -->
+                {% if folders and folders|length > 3 %}
+                <div class="search-section" style="padding: 1rem 0; background: transparent; border: none; position: static;">
+                {% else %}
+                <div class="search-section" style="padding: 1rem 0; background: transparent; border: none; position: static; display: none;">
+                {% endif %}
+                    <div class="search-box">
+                        <input type="text" id="document-search" placeholder="Search documents..." 
+                               oninput="filterDocuments()">
+                        <i class="fas fa-search"></i>
+                    </div>
+                    <div id="search-results-count" style="font-size: 0.75rem; color: #6b7280; margin-top: 0.5rem; text-align: center;"></div>
+                </div>
+                
                 <div id="sidebar-documents-container">
                     <div id="sidebar-loading" class="sidebar-loading" style="display: none;">
                         <span class="loading-spinner"></span>

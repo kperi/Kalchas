@@ -119,6 +119,65 @@
         });
     }
     
+    // Document search filter function
+    function filterDocuments() {
+        const searchInput = document.getElementById('document-search');
+        const resultsCount = document.getElementById('search-results-count');
+        const documentItems = document.querySelectorAll('#sidebar-documents-list .document-item');
+        
+        if (!searchInput) return;
+        
+        const searchTerm = searchInput.value.toLowerCase().trim();
+        let visibleCount = 0;
+        
+        documentItems.forEach(item => {
+            const documentName = item.getAttribute('data-document-name');
+            const documentNameElement = item.querySelector('.document-name');
+            
+            if (documentName && documentNameElement) {
+                const nameText = documentNameElement.textContent.toLowerCase();
+                const isMatch = nameText.includes(searchTerm);
+                
+                if (isMatch || searchTerm === '') {
+                    item.style.display = 'block';
+                    visibleCount++;
+                } else {
+                    item.style.display = 'none';
+                }
+            }
+        });
+        
+        // Update results count
+        if (resultsCount) {
+            if (searchTerm === '') {
+                resultsCount.textContent = '';
+            } else {
+                const totalCount = documentItems.length;
+                resultsCount.textContent = `Showing ${visibleCount} of ${totalCount} documents`;
+            }
+        }
+    }
+    
+    // Make filterDocuments globally accessible
+    window.filterDocuments = filterDocuments;
+    
+    // Function to show/hide search box based on document count
+    function toggleSearchBox(documentCount) {
+        const searchSection = document.querySelector('.search-section');
+        if (searchSection) {
+            if (documentCount > 3) {
+                searchSection.style.display = 'block';
+            } else {
+                searchSection.style.display = 'none';
+                // Clear search when hiding
+                const searchInput = document.getElementById('document-search');
+                const resultsCount = document.getElementById('search-results-count');
+                if (searchInput) searchInput.value = '';
+                if (resultsCount) resultsCount.textContent = '';
+            }
+        }
+    }
+    
     // Function to select a document
     function selectDocument(documentName) {
         console.log('[selectDocument] Selecting document:', documentName);
@@ -828,6 +887,11 @@
             loadUserDocuments();
         } else {
             console.log('[DOMContentLoaded] Documents already loaded from server');
+            // Set search box visibility based on existing documents
+            const existingDocuments = Array.from(documentsContainer).filter(child => 
+                child.classList && child.classList.contains('document-item')
+            );
+            toggleSearchBox(existingDocuments.length);
         }
         
         // Set initial browser history state
@@ -891,20 +955,27 @@
                         documentsList.innerHTML = '';
                     }
                     
-                    if (data.documents.length > 0) {
+                    // Filter completed documents only
+                    const completedDocuments = data.documents.filter(doc => doc.is_completed);
+                    
+                    if (completedDocuments.length > 0) {
                         // Populate with documents
-                        data.documents.forEach(doc => {
-                            if (doc.is_completed) { // Only show OCR-ready documents
-                                const documentItem = createDocumentItem(doc);
-                                if (documentsList) {
-                                    documentsList.appendChild(documentItem);
-                                }
+                        completedDocuments.forEach(doc => {
+                            const documentItem = createDocumentItem(doc);
+                            if (documentsList) {
+                                documentsList.appendChild(documentItem);
                             }
                         });
+                        
+                        // Show/hide search box based on document count
+                        toggleSearchBox(completedDocuments.length);
                         
                         // Re-setup event listeners
                         setupSidebarDocumentSelection();
                     } else {
+                        // Hide search box when no documents
+                        toggleSearchBox(0);
+                        
                         // Show no documents message
                         if (documentsList) {
                             documentsList.innerHTML = `
@@ -927,6 +998,9 @@
                 if (sidebarLoading) {
                     sidebarLoading.style.display = 'none';
                 }
+                
+                // Hide search box on error
+                toggleSearchBox(0);
                 
                 // Show error message
                 if (documentsList) {
@@ -2143,6 +2217,10 @@
                     setTimeout(() => {
                         documentElement.remove();
                         
+                        // Update search box visibility based on remaining documents
+                        const remainingDocs = document.querySelectorAll('.document-item').length;
+                        toggleSearchBox(remainingDocs);
+                        
                         // Check if this was the selected document
                         if (currentFolder === documentName) {
                             // Clear current selection and reset main content
@@ -2158,7 +2236,6 @@
                         }
                         
                         // Check if no documents left
-                        const remainingDocs = document.querySelectorAll('.document-item').length;
                         if (remainingDocs === 0) {
                             const documentsList = document.getElementById('sidebar-documents-list');
                             documentsList.innerHTML = `
