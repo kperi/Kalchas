@@ -1431,7 +1431,7 @@
                                     const escapedText = segmentText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                                     
                                     if (isFinal) {
-                                        htmlLines.push(`<span class="ocr-final-line">★ ${escapedText} [FINAL]</span>`);
+                                        htmlLines.push(`<span class="ocr-final-line">★ ${escapedText} </span>`);
                                     } else {
                                         htmlLines.push(escapedText);
                                     }
@@ -1701,7 +1701,7 @@
                                         const escapedText = segmentText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                                         
                                         if (isFinal) {
-                                            htmlLines.push(`<span class="ocr-final-line">★ ${escapedText} [FINAL]</span>`);
+                                            htmlLines.push(`<span class="ocr-final-line">★ ${escapedText}  </span>`);
                                         } else {
                                             htmlLines.push(escapedText);
                                         }
@@ -2487,7 +2487,7 @@
                 if (segmentSelect && segmentSelect.options[currentSegmentDisplayIndex + 1]) {
                     const option = segmentSelect.options[currentSegmentDisplayIndex + 1];
                     if (!option.textContent.includes('✏️')) {
-                        // Remove any existing [FINAL] or other indicators first
+                        // Remove any existing   or other indicators first
                         let cleanText = option.textContent.replace(/\s*\[FINAL\]\s*|\s*✏️\s*/g, '');
                         option.textContent = `✏️ ${cleanText}`;
                         option.style.color = '#28a745';

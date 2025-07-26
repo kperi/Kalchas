@@ -58,7 +58,7 @@ class RateLimiter:
 rate_limiter = RateLimiter()
 
 
-def rate_limit(max_requests=5, window_seconds=300, per_user=True):
+def rate_limit(max_requests=10, window_seconds=100, per_user=True):
     """
     Decorator to add rate limiting to Flask routes
 
