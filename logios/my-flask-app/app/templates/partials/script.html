@@ -848,6 +848,9 @@
                 pageSelectionContainer.classList.add('show');
             }
         }
+        
+        // Initialize download button state
+        // (No longer needed as download is per-document now)
     });
 
     // Function to load user documents via AJAX
@@ -951,11 +954,18 @@
                         <span>OCR Ready</span>
                     </div>
                 </div>
-                <button class="document-delete-btn" 
-                        onclick="confirmDeleteDocumentFromOCR('${doc.name}')" 
-                        title="Delete ${doc.name}">
-                    🗑️
-                </button>
+                <div class="document-actions">
+                    <button class="document-download-btn" 
+                            onclick="downloadDocumentOCR('${doc.name}')" 
+                            title="Download OCR text for ${doc.name}">
+                        📄
+                    </button>
+                    <button class="document-delete-btn" 
+                            onclick="confirmDeleteDocumentFromOCR('${doc.name}')" 
+                            title="Delete ${doc.name}">
+                        🗑️
+                    </button>
+                </div>
             </div>
         `;
         
@@ -2528,5 +2538,503 @@
         .finally(() => {
             segmentTextArea.disabled = false;
         });
+    }
+
+    // Download OCR Text functionality for documents
+    function downloadDocumentOCR(documentName) {
+        if (!documentName) {
+            showAlert('warning', 'No document specified for download');
+            return;
+        }
+
+        // Show loading state in button
+        const downloadBtn = document.querySelector(`[onclick="downloadDocumentOCR('${documentName}')"]`);
+        if (downloadBtn) {
+            downloadBtn.disabled = true;
+            downloadBtn.innerHTML = '⏳';
+            downloadBtn.title = 'Downloading all pages...';
+        }
+
+        const userId = '{{ session.get("user_id", "anonymous") }}';
+        
+        // Always try to download ALL pages for the document first
+        // This ensures we get the complete document, not just the current page
+        let downloadPromise;
+        
+        // Try multiple approaches to discover and download all pages
+        // 1. First try API to get pages list
+        // 2. If that fails, try comprehensive page discovery
+        // 3. If no pages found, create empty document
+        
+        const pagesApiUrl = '{{ url_for("app.api_get_user_documents", user_id="PLACEHOLDER_USER") }}'
+            .replace('PLACEHOLDER_USER', encodeURIComponent(userId));
+        
+        downloadPromise = fetch(pagesApiUrl)
+            .then(response => {
+                console.log(`API request for documents made to: ${pagesApiUrl}`);
+                if (!response.ok) {
+                    console.log('API request failed, proceeding with page discovery...');
+                    return { success: false };
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success && data.documents) {
+                    // Find the selected document
+                    const document = data.documents.find(doc => doc.name === documentName);
+                    if (document && document.pages && document.pages.length > 0) {
+                        console.log(`Found ${document.pages.length} pages for document "${documentName}" via API:`, document.pages);
+                        return downloadMultiplePages(documentName, document.pages);
+                    } else {
+                        console.log(`Document "${documentName}" found in API but no pages:`, document);
+                    }
+                }
+                
+                // If API didn't provide pages or document not found, try comprehensive page discovery
+                console.log('API did not provide pages, trying comprehensive page discovery...');
+                return downloadWithComprehensivePageDiscovery(documentName);
+            })
+            .catch(apiError => {
+                // If API fails completely, try page discovery as fallback
+                console.log('API failed completely, trying page discovery as fallback...', apiError);
+                return downloadWithComprehensivePageDiscovery(documentName);
+            });
+        
+        downloadPromise
+            .catch(error => {
+                console.error('Download document OCR error:', error);
+                showAlert('error', `Download failed: ${error.message}`);
+            })
+            .finally(() => {
+                // Restore button state
+                if (downloadBtn) {
+                    downloadBtn.disabled = false;
+                    downloadBtn.innerHTML = '📄';
+                    downloadBtn.title = 'Download all OCR text for this document';
+                }
+            });
+    }
+
+    // Helper function to download OCR text for current page only
+    function downloadCurrentPageOCR(documentName, pageFilename) {
+        const userId = '{{ session.get("user_id", "anonymous") }}';
+        const pageId = pageFilename.split('.')[0]; // Remove file extension
+        
+        const apiUrl = '{{ url_for("app.get_complete_ocr_text", user_id="PLACEHOLDER_USER", document_folder_name="PLACEHOLDER_FOLDER", page_image_filename_base="PLACEHOLDER_PAGE") }}'
+            .replace('PLACEHOLDER_USER', encodeURIComponent(userId))
+            .replace('PLACEHOLDER_FOLDER', encodeURIComponent(documentName))
+            .replace('PLACEHOLDER_PAGE', encodeURIComponent(pageId));
+
+        return fetch(apiUrl)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Create filename with document, page, and timestamp
+                    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+                    const filename = `${documentName}_${pageId}_OCR_${timestamp}.txt`;
+                    
+                    // Prepare download content with metadata
+                    let downloadContent = '';
+                    downloadContent += `OCR Text Export\n`;
+                    downloadContent += `================\n`;
+                    downloadContent += `Document: ${documentName}\n`;
+                    downloadContent += `Page: ${pageId}\n`;
+                    downloadContent += `Export Date: ${new Date().toLocaleString()}\n`;
+                    downloadContent += `Total Segments: ${data.total_segments || 0}\n`;
+                    downloadContent += `Final/Edited Segments: ${data.final_segments_count || 0}\n`;
+                    downloadContent += `\n`;
+                    downloadContent += `Text Content:\n`;
+                    downloadContent += `=============\n`;
+                    downloadContent += `${data.complete_text || '(No text content available)'}\n`;
+                    
+                    // Add segment details if available
+                    if (data.segments_used && data.segments_used.length > 0) {
+                        downloadContent += `\n`;
+                        downloadContent += `Segment Details:\n`;
+                        downloadContent += `================\n`;
+                        data.segments_used.forEach((segment, index) => {
+                            downloadContent += `Segment ${index + 1}: `;
+                            downloadContent += `ID=${segment.segment_id}, `;
+                            downloadContent += `Source=${segment.text_source}, `;
+                            downloadContent += `Length=${segment.text_length}, `;
+                            downloadContent += `Final=${segment.has_final ? 'Yes' : 'No'}\n`;
+                        });
+                    }
+                    
+                    // Create and trigger download
+                    const blob = new Blob([downloadContent], { type: 'text/plain;charset=utf-8' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    
+                    // Show success message
+                    const finalCount = data.final_segments_count || 0;
+                    const totalCount = data.total_segments || 0;
+                    let successMessage = `Downloaded OCR text for ${pageId} (${totalCount} segments)`;
+                    if (finalCount > 0) {
+                        successMessage += ` - ${finalCount} edited segments prioritized`;
+                    }
+                    showAlert('success', successMessage);
+                } else {
+                    throw new Error(data.error || 'Failed to prepare OCR text for download');
+                }
+            });
+    }
+
+    // Helper function to download OCR text for multiple pages
+    function downloadMultiplePages(documentName, pages) {
+        const userId = '{{ session.get("user_id", "anonymous") }}';
+        
+        console.log(`downloadMultiplePages called for "${documentName}" with ${pages.length} pages:`, pages);
+        
+        // Collect OCR text from all pages - handle cases where pages exist but have no OCR
+        return Promise.all(pages.map(page => {
+            const pageId = page.replace('.png', ''); // Remove extension
+            const pageApiUrl = '{{ url_for("app.get_complete_ocr_text", user_id="PLACEHOLDER_USER", document_folder_name="PLACEHOLDER_FOLDER", page_image_filename_base="PLACEHOLDER_PAGE") }}'
+                .replace('PLACEHOLDER_USER', encodeURIComponent(userId))
+                .replace('PLACEHOLDER_FOLDER', encodeURIComponent(documentName))
+                .replace('PLACEHOLDER_PAGE', encodeURIComponent(pageId));
+            
+            console.log(`Fetching OCR for page "${page}" (pageId: "${pageId}") from:`, pageApiUrl);
+            
+            return fetch(pageApiUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        console.log(`No OCR data available for page ${page} (HTTP ${response.status})`);
+                        return {
+                            page: page,
+                            pageId: pageId,
+                            success: false,
+                            text: '',
+                            segments: [],
+                            totalSegments: 0,
+                            finalSegments: 0,
+                            error: `HTTP ${response.status}`
+                        };
+                    }
+                    return response.json();
+                })
+                .then(pageData => {
+                    console.log(`OCR response for page ${page}:`, pageData);
+                    return {
+                        page: page,
+                        pageId: pageId,
+                        success: pageData.success,
+                        text: pageData.complete_text || '',
+                        segments: pageData.segments_used || [],
+                        totalSegments: pageData.total_segments || 0,
+                        finalSegments: pageData.final_segments_count || 0
+                    };
+                })
+                .catch(error => {
+                    console.log(`Error fetching OCR for page ${page}:`, error);
+                    return {
+                        page: page,
+                        pageId: pageId,
+                        success: false,
+                        text: '',
+                        segments: [],
+                        totalSegments: 0,
+                        finalSegments: 0,
+                        error: error.message
+                    };
+                });
+        }))
+        .then(allPagesData => {
+            // Create comprehensive download content
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+            const filename = `${documentName}_Complete_OCR_${timestamp}.txt`;
+            
+            let downloadContent = '';
+            downloadContent += `Complete OCR Text Export\n`;
+            downloadContent += `========================\n`;
+            downloadContent += `Document: ${documentName}\n`;
+            downloadContent += `Export Date: ${new Date().toLocaleString()}\n`;
+            downloadContent += `Total Pages: ${allPagesData.length}\n`;
+            
+            let totalSegments = 0;
+            let totalFinalSegments = 0;
+            
+            allPagesData.forEach(pageData => {
+                totalSegments += pageData.totalSegments;
+                totalFinalSegments += pageData.finalSegments;
+            });
+            
+            downloadContent += `Total Segments: ${totalSegments}\n`;
+            downloadContent += `Edited Segments: ${totalFinalSegments}\n`;
+            downloadContent += `\n`;
+            
+            // Add content for each page
+            allPagesData.forEach((pageData, index) => {
+                downloadContent += `Page ${index + 1} (${pageData.page})\n`;
+                downloadContent += `${'='.repeat(30)}\n`;
+                
+                if (pageData.success && pageData.text) {
+                    downloadContent += `${pageData.text}\n`;
+                } else {
+                    downloadContent += `(No OCR text available for this page)\n`;
+                }
+                
+                downloadContent += `\n`;
+            });
+            
+            // Add summary
+            downloadContent += `Summary\n`;
+            downloadContent += `=======\n`;
+            allPagesData.forEach((pageData, index) => {
+                downloadContent += `Page ${index + 1}: ${pageData.totalSegments} segments`;
+                if (pageData.finalSegments > 0) {
+                    downloadContent += ` (${pageData.finalSegments} edited)`;
+                }
+                downloadContent += `\n`;
+            });
+            
+            // Create and trigger download
+            const blob = new Blob([downloadContent], { type: 'text/plain;charset=utf-8' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            // Show success message with detailed feedback
+            const pagesWithOCR = allPagesData.filter(p => p.success && p.totalSegments > 0).length;
+            const pagesWithoutOCR = allPagesData.length - pagesWithOCR;
+            
+            let successMessage = `Downloaded document "${documentName}" (${allPagesData.length} pages total)`;
+            
+            if (pagesWithOCR > 0) {
+                successMessage += ` - ${pagesWithOCR} pages with OCR content (${totalSegments} segments)`;
+                if (totalFinalSegments > 0) {
+                    successMessage += `, ${totalFinalSegments} edited segments prioritized`;
+                }
+            }
+            
+            if (pagesWithoutOCR > 0) {
+                if (pagesWithOCR > 0) {
+                    successMessage += `, ${pagesWithoutOCR} pages need OCR processing`;
+                } else {
+                    successMessage += ` - All pages need OCR processing`;
+                }
+            }
+            
+            const alertType = (pagesWithOCR > 0) ? 'success' : 'info';
+            showAlert(alertType, successMessage);
+        });
+    }
+
+    // Enhanced page discovery function that handles empty documents gracefully
+    function downloadWithComprehensivePageDiscovery(documentName) {
+        const userId = '{{ session.get("user_id", "anonymous") }}';
+        
+        // Try to discover pages by attempting to fetch OCR for comprehensive page patterns
+        const pagesToTry = [];
+        
+        // Try page_001.png, page_002.png, etc. up to page_100 for very large documents
+        for (let i = 1; i <= 100; i++) {
+            const pageId = `page_${i.toString().padStart(3, '0')}`;
+            pagesToTry.push(pageId);
+            
+            // Also try crop patterns for each page: page_001_crop_001, page_001_crop_002, etc.
+            for (let j = 1; j <= 20; j++) {
+                const cropId = `page_${i.toString().padStart(3, '0')}_crop_${j.toString().padStart(3, '0')}`;
+                pagesToTry.push(cropId);
+            }
+        }
+        
+        // Also try other common patterns like page1, page2, etc.
+        for (let i = 1; i <= 50; i++) {
+            pagesToTry.push(`page${i}`);
+            pagesToTry.push(`page_${i}`);
+            pagesToTry.push(`p${i}`);
+            
+            // Add crop patterns for these too
+            for (let j = 1; j <= 10; j++) {
+                pagesToTry.push(`page${i}_crop${j}`);
+                pagesToTry.push(`page_${i}_crop_${j}`);
+                pagesToTry.push(`page${i}_crop_${j.toString().padStart(3, '0')}`);
+                pagesToTry.push(`page_${i}_crop_${j.toString().padStart(3, '0')}`);
+            }
+        }
+        
+        console.log(`Attempting comprehensive page discovery for "${documentName}" using ${pagesToTry.length} patterns...`);
+        
+        // Test which pages actually exist by making API calls with timeout
+        const pageTests = pagesToTry.map(pageId => {
+            const pageApiUrl = '{{ url_for("app.get_complete_ocr_text", user_id="PLACEHOLDER_USER", document_folder_name="PLACEHOLDER_FOLDER", page_image_filename_base="PLACEHOLDER_PAGE") }}'
+                .replace('PLACEHOLDER_USER', encodeURIComponent(userId))
+                .replace('PLACEHOLDER_FOLDER', encodeURIComponent(documentName))
+                .replace('PLACEHOLDER_PAGE', encodeURIComponent(pageId));
+            
+            // Add timeout to prevent hanging
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout per page
+            
+            return fetch(pageApiUrl, { signal: controller.signal })
+                .then(response => {
+                    clearTimeout(timeoutId);
+                    if (response.ok) {
+                        return response.json().then(data => {
+                            if (data.success) {
+                                console.log(`Found valid page with OCR: ${pageId}`);
+                                return {
+                                    pageId: pageId,
+                                    page: pageId + '.png',
+                                    success: true,
+                                    text: data.complete_text || '',
+                                    segments: data.segments_used || [],
+                                    totalSegments: data.total_segments || 0,
+                                    finalSegments: data.final_segments_count || 0
+                                };
+                            }
+                        });
+                    }
+                    return null; // Page doesn't exist or no OCR
+                })
+                .catch(error => {
+                    clearTimeout(timeoutId);
+                    if (error.name !== 'AbortError') {
+                        console.log(`Page ${pageId} failed or timeout:`, error.message);
+                    }
+                    return null; // Page doesn't exist or error
+                });
+        });
+        
+        return Promise.all(pageTests)
+            .then(results => {
+                // Filter out null results (pages that don't exist)
+                const validPages = results.filter(result => result !== null && result !== undefined);
+                
+                console.log(`Page discovery complete: found ${validPages.length} pages with OCR content for "${documentName}"`);
+                
+                if (validPages.length === 0) {
+                    // No OCR content found - create empty document
+                    console.log(`No OCR content found for "${documentName}", creating empty document download...`);
+                    return downloadEmptyDocument(documentName);
+                }
+                
+                // Sort pages by pageId to maintain order
+                validPages.sort((a, b) => a.pageId.localeCompare(b.pageId));
+                
+                // Create comprehensive download content
+                const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+                const filename = `${documentName}_OCR_${timestamp}.txt`;
+                
+                let downloadContent = '';
+                downloadContent += `OCR Text Export\n`;
+                downloadContent += `================\n`;
+                downloadContent += `Document: ${documentName}\n`;
+                downloadContent += `Export Date: ${new Date().toLocaleString()}\n`;
+                downloadContent += `Total Pages: ${validPages.length}\n`;
+                
+                let totalSegments = 0;
+                let totalFinalSegments = 0;
+                
+                validPages.forEach(pageData => {
+                    totalSegments += pageData.totalSegments;
+                    totalFinalSegments += pageData.finalSegments;
+                });
+                
+                downloadContent += `Total Segments: ${totalSegments}\n`;
+                downloadContent += `Edited Segments: ${totalFinalSegments}\n`;
+                downloadContent += `\n`;
+                
+                // Add content for each page
+                validPages.forEach((pageData, index) => {
+                    downloadContent += `Page ${index + 1} (${pageData.pageId})\n`;
+                    downloadContent += `${'='.repeat(30)}\n`;
+                    
+                    if (pageData.text) {
+                        downloadContent += `${pageData.text}\n`;
+                    } else {
+                        downloadContent += `(No OCR text available for this page)\n`;
+                    }
+                    
+                    downloadContent += `\n`;
+                });
+                
+                // Add summary
+                downloadContent += `Summary\n`;
+                downloadContent += `=======\n`;
+                validPages.forEach((pageData, index) => {
+                    downloadContent += `Page ${index + 1}: ${pageData.totalSegments} segments`;
+                    if (pageData.finalSegments > 0) {
+                        downloadContent += ` (${pageData.finalSegments} edited)`;
+                    }
+                    downloadContent += `\n`;
+                });
+                
+                // Create and trigger download
+                const blob = new Blob([downloadContent], { type: 'text/plain;charset=utf-8' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                
+                // Show success message
+                let successMessage = `Downloaded OCR text for ${documentName} (${validPages.length} pages found, ${totalSegments} segments)`;
+                if (totalFinalSegments > 0) {
+                    successMessage += ` - ${totalFinalSegments} edited segments prioritized`;
+                }
+                showAlert('success', successMessage);
+            });
+    }
+
+    // Helper function to create and download an empty document when no OCR content exists
+    function downloadEmptyDocument(documentName) {
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+        const filename = `${documentName}_Empty_OCR_${timestamp}.txt`;
+        
+        let downloadContent = '';
+        downloadContent += `OCR Text Export (Empty Document)\n`;
+        downloadContent += `================================\n`;
+        downloadContent += `Document: ${documentName}\n`;
+        downloadContent += `Export Date: ${new Date().toLocaleString()}\n`;
+        downloadContent += `Status: No OCR content found\n`;
+        downloadContent += `Total Pages: 0\n`;
+        downloadContent += `Total Segments: 0\n`;
+        downloadContent += `Edited Segments: 0\n`;
+        downloadContent += `\n`;
+        downloadContent += `Content:\n`;
+        downloadContent += `========\n`;
+        downloadContent += `This document has not been processed with OCR yet, or no recognizable text was found.\n`;
+        downloadContent += `To add OCR content:\n`;
+        downloadContent += `1. Select a page from this document\n`;
+        downloadContent += `2. Click "Segment & OCR" to process the page\n`;
+        downloadContent += `3. Repeat for all pages in the document\n`;
+        downloadContent += `4. Download again to get the complete OCR text\n`;
+        
+        // Create and trigger download
+        const blob = new Blob([downloadContent], { type: 'text/plain;charset=utf-8' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        // Show informative message
+        showAlert('info', `Downloaded empty document template for "${documentName}". No OCR content found - please process pages with OCR first.`);
+        
+        return Promise.resolve(); // Return resolved promise to maintain chain
     }
 </script>

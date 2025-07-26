@@ -1063,6 +1063,28 @@ def api_get_user_documents(user_id):
                 current_app.config, user_id, doc_name
             )
             if doc_info:
+                # Get pages for the document
+                pages = []
+                if doc_info.get("is_completed"):
+                    try:
+                        completed_path = os.path.join(
+                            current_app.config["UPLOAD_FOLDER"],
+                            user_id,
+                            "completed",
+                            doc_name,
+                        )
+                        if os.path.exists(completed_path):
+                            png_files = [
+                                f
+                                for f in os.listdir(completed_path)
+                                if f.lower().endswith(".png")
+                            ]
+                            pages = sorted(png_files)
+                    except Exception as e:
+                        current_app.logger.warning(
+                            f"Error getting pages for {doc_name}: {str(e)}"
+                        )
+
                 detailed_documents.append(
                     {
                         "name": doc_info.get("name"),
@@ -1070,6 +1092,7 @@ def api_get_user_documents(user_id):
                         "total_png_count": doc_info.get("total_png_count", 0),
                         "crop_count": doc_info.get("crop_count", 0),
                         "pdf_files": doc_info.get("pdf_files", []),
+                        "pages": pages,  # Add pages list
                         "status": (
                             "Completed"
                             if doc_info.get("is_completed")

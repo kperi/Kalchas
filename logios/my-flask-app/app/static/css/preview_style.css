@@ -231,7 +231,55 @@
         color: #6b7280;
     }
     
-    /* Document delete button styles - exact copy from crop_menu.html */
+    .document-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+    }
+    
+    .document-name-section {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .document-actions {
+        display: flex;
+        gap: 0.25rem;
+        align-items: center;
+    }
+    
+    /* Document download button styles */
+    .document-download-btn {
+        background-color: #1f2937;
+        color: white;
+        border: none;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.625rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        opacity: 0;
+        visibility: hidden;
+    }
+    
+    .document-download-btn:hover {
+        background-color: #374151;
+        transform: scale(1.05);
+    }
+    
+    .document-item:hover .document-download-btn {
+        opacity: 1;
+        visibility: visible;
+    }
+    
+    .document-download-btn:disabled {
+        background-color: #9ca3af;
+        cursor: not-allowed;
+        transform: none;
+    }
+    
+    /* Update existing document delete button to work with new actions container */
     .document-delete-btn {
         background-color: #dc2626;
         color: white;
@@ -243,7 +291,6 @@
         transition: all 0.2s ease;
         opacity: 0;
         visibility: hidden;
-        margin-left: 0.5rem;
     }
     
     .document-delete-btn:hover {
@@ -260,18 +307,6 @@
         background-color: #9ca3af;
         cursor: not-allowed;
         transform: none;
-    }
-    
-    .document-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        width: 100%;
-    }
-    
-    .document-name-section {
-        flex: 1;
-        min-width: 0;
     }
     
     /* Sidebar alert styles */

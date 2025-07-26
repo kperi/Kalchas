@@ -29,11 +29,18 @@
                                                 <span>OCR Ready</span>
                                             </div>
                                         </div>
-                                        <button class="document-delete-btn" 
-                                                onclick="confirmDeleteDocumentFromOCR('{{ folder }}')" 
-                                                title="Delete {{ folder }}">
-                                            🗑️
-                                        </button>
+                                        <div class="document-actions">
+                                            <button class="document-download-btn" 
+                                                    onclick="downloadDocumentOCR('{{ folder }}')" 
+                                                    title="Download all OCR text for {{ folder }} (all pages with edited text prioritized)">
+                                                📄
+                                            </button>
+                                            <button class="document-delete-btn" 
+                                                    onclick="confirmDeleteDocumentFromOCR('{{ folder }}')" 
+                                                    title="Delete {{ folder }}">
+                                                🗑️
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             {% endfor %}
