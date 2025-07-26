@@ -12,8 +12,8 @@
                 <!-- Alert area for sidebar notifications -->
                 <div id="sidebar-alert-area"></div>
                 
-                <!-- Search box (show only when more than 3 documents) -->
-                {% if folders and folders|length > 3 %}
+                <!-- Search box (show only when more than 10 documents) -->
+                {% if folders and folders|length > 10 %}
                 <div class="search-section" style="padding: 1rem 0; background: transparent; border: none; position: static;">
                 {% else %}
                 <div class="search-section" style="padding: 1rem 0; background: transparent; border: none; position: static; display: none;">
