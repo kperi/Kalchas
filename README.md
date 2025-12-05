@@ -51,8 +51,10 @@ text = model.ocr([image]) #  output: ['ἡμέραν ἐς τὸ συγκείμ�
 A more detailed full page OCR example using Kalhas and Kraken can be found [here](demo.ipynb)
 
 
+
+
 ### Citing
 
 
-TODO: Citing
+Konstantinos, P., & Dionisis, G. (2025). Logios: An open source Greek Polytonic Optical Character Recognition system. arXiv preprint arXiv:2506.21474.
 
