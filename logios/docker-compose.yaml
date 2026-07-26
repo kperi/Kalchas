@@ -17,6 +17,7 @@ services:
 
   ocr:
     build: ./ocr
+    restart: unless-stopped
     volumes:
       - .:/app
       - ./ocr:/app
