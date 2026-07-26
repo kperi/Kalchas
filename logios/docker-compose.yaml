@@ -2,7 +2,7 @@ services:
  
   doclayout:
     build: ./dlayout
-    restart: on-failure
+    restart: unless-stopped
     ports:
       - "8602:8602"
     volumes:
