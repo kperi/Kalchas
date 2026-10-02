@@ -48,7 +48,11 @@ class UploadApiTestCase(unittest.TestCase):
             patch.object(
                 routes.file_operations,
                 "handle_pdf_upload_with_auto_folder_no_sanitize",
-                return_value=("/uploads/alice/document", "/uploads/alice/document/page.png", "document"),
+                return_value=(
+                    "/uploads/alice/document",
+                    "/uploads/alice/document/page.png",
+                    "document",
+                ),
             ) as save_upload,
             patch.object(routes.threading, "Thread") as thread_class,
         ):

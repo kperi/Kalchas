@@ -1774,7 +1774,10 @@ def api_upload_with_progress():
             progress["error_message"] = (
                 "Error saving uploaded file or creating document folder"
             )
-            return jsonify({"success": False, "message": progress["error_message"]}), 500
+            return (
+                jsonify({"success": False, "message": progress["error_message"]}),
+                500,
+            )
 
         progress = upload_progress_store[upload_id]
         progress["document_folder"] = doc_folder_name
