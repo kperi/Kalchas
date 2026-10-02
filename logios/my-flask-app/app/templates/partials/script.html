@@ -42,6 +42,11 @@
     const currentDocumentName = document.getElementById('current-document-name');
     const pageSelectionContainer = document.getElementById('page-selection-container');
     const documentDisplayContainer = document.getElementById('document-display-container');
+    const initialPageState = {
+        folder: {{ selected_folder | tojson }},
+    page: { { selected_png | tojson } },
+    segmentIndex: { { selected_segment | tojson } }
+    };
 
     // Current state
     let currentFolder = '{{ selected_folder or "" }}';
@@ -1108,28 +1113,12 @@
     document.addEventListener('DOMContentLoaded', function () {
         console.log('OCR page ready');
 
-        const selectedPng = "{{ request.args.get('selected_png') }}";
-        const selectedFolder = "{{ selected_folder }}";
+        const selectedPng = initialPageState.page;
+        const selectedFolder = initialPageState.folder;
 
         if (selectedPng && selectedFolder) {
-            const pageId = selectedPng.split('.')[0];
-
-            // Check if the required elements exist before calling checkForExistingSegments
-            const lineSegmentsContainer = document.getElementById('line-segments-container');
-            const selectedLineImageEl = document.getElementById('sidebar-segment-image');
-            const selectedLineTextEl = document.getElementById('sidebar-segment-text');
-
-            if (lineSegmentsContainer && selectedLineImageEl && selectedLineTextEl) {
-                console.log('[DOMContentLoaded] Required elements found, checking for existing segments');
-                checkForExistingSegments(selectedFolder, pageId);
-            } else {
-                console.warn('[DOMContentLoaded] Required segment elements not rendered (server-side conditional rendering)');
-                console.log('[DOMContentLoaded] Elements present:', {
-                    lineSegmentsContainer: !!lineSegmentsContainer,
-                    selectedLineImageEl: !!selectedLineImageEl,
-                    selectedLineTextEl: !!selectedLineTextEl
-                });
-            }
+            showOCRControls(selectedFolder, selectedPng);
+            checkForExistingSegments(selectedFolder, selectedPng);
         }
 
         // Event listeners for new Prev/Next buttons
