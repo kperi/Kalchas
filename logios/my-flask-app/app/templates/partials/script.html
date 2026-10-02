@@ -11,6 +11,28 @@
         #ocr-result:focus:empty:before {
             content: "";
         }
+
+        #ocr-result:not(:empty):after {
+            content: "";
+            display: block;
+            height: calc(100% - 2rem);
+            pointer-events: none;
+        }
+
+        .ocr-result-line {
+            display: block;
+            box-sizing: border-box;
+            width: 100%;
+            padding: 2px 4px;
+            border-left: 4px solid transparent;
+        }
+
+        .ocr-result-line.ocr-active-line {
+            background-color: #fee2e2;
+            border-left-color: #dc2626;
+            box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.25);
+            font-weight: 600;
+        }
     `;
     document.head.appendChild(style);
 
@@ -20,12 +42,12 @@
     const currentDocumentName = document.getElementById('current-document-name');
     const pageSelectionContainer = document.getElementById('page-selection-container');
     const documentDisplayContainer = document.getElementById('document-display-container');
-    
+
     // Current state
     let currentFolder = '{{ selected_folder or "" }}';
     let currentPage = '{{ request.args.get("selected_png") or "" }}';
     const userId = '{{ session.get("user_id", "anonymous") }}';
-    
+
     // URL state management without page reloads
     function updateBrowserURL(folder, page) {
         const url = new URL(window.location);
@@ -39,19 +61,19 @@
         } else {
             url.searchParams.delete('selected_png');
         }
-        
+
         // Update URL without page reload
         window.history.pushState({
             folder: folder,
             page: page
         }, '', url.toString());
     }
-    
+
     // Handle browser back/forward navigation
-    window.addEventListener('popstate', function(event) {
+    window.addEventListener('popstate', function (event) {
         if (event.state) {
             const { folder, page } = event.state;
-            
+
             if (folder !== currentFolder) {
                 // Navigate to different folder
                 if (folder) {
@@ -80,7 +102,7 @@
                     });
                 }
             }
-            
+
             if (page !== currentPage && folder) {
                 // Navigate to different page
                 if (page) {
@@ -110,7 +132,7 @@
     function setupSidebarDocumentSelection() {
         const documentItems = document.querySelectorAll('.document-item');
         documentItems.forEach(item => {
-            item.addEventListener('click', function(e) {
+            item.addEventListener('click', function (e) {
                 const documentName = this.getAttribute('data-document-name');
                 if (documentName && documentName !== currentFolder) {
                     selectDocument(documentName);
@@ -118,26 +140,26 @@
             });
         });
     }
-    
+
     // Document search filter function
     function filterDocuments() {
         const searchInput = document.getElementById('document-search');
         const resultsCount = document.getElementById('search-results-count');
         const documentItems = document.querySelectorAll('#sidebar-documents-list .document-item');
-        
+
         if (!searchInput) return;
-        
+
         const searchTerm = searchInput.value.toLowerCase().trim();
         let visibleCount = 0;
-        
+
         documentItems.forEach(item => {
             const documentName = item.getAttribute('data-document-name');
             const documentNameElement = item.querySelector('.document-name');
-            
+
             if (documentName && documentNameElement) {
                 const nameText = documentNameElement.textContent.toLowerCase();
                 const isMatch = nameText.includes(searchTerm);
-                
+
                 if (isMatch || searchTerm === '') {
                     item.style.display = 'block';
                     visibleCount++;
@@ -146,7 +168,7 @@
                 }
             }
         });
-        
+
         // Update results count
         if (resultsCount) {
             if (searchTerm === '') {
@@ -157,10 +179,10 @@
             }
         }
     }
-    
+
     // Make filterDocuments globally accessible
     window.filterDocuments = filterDocuments;
-    
+
     // Function to show/hide search box based on document count
     function toggleSearchBox(documentCount) {
         const searchSection = document.querySelector('.search-section');
@@ -177,18 +199,18 @@
             }
         }
     }
-    
+
     // Function to select a document
     function selectDocument(documentName) {
         console.log('[selectDocument] Selecting document:', documentName);
-        
+
         // Update current state
         currentFolder = documentName;
         currentPage = '';
-        
+
         // Update browser URL
         updateBrowserURL(documentName, '');
-        
+
         // Update sidebar selection
         document.querySelectorAll('.document-item').forEach(item => {
             item.classList.remove('selected');
@@ -197,7 +219,7 @@
         if (selectedItem) {
             selectedItem.classList.add('selected');
         }
-        
+
         // Update main content
         if (currentDocumentName) {
             currentDocumentName.textContent = documentName;
@@ -205,7 +227,7 @@
         if (selectedDocumentInfo) {
             selectedDocumentInfo.style.display = 'block';
         }
-        
+
         // Clear any existing page data and show placeholder
         const documentDisplayContainer = document.getElementById('document-display-container');
         if (documentDisplayContainer) {
@@ -215,26 +237,26 @@
                 </div>
             `;
         }
-        
+
         // Hide OCR controls until a page is selected
         hideOCRControls();
         clearSegmentData();
-        
+
         // Load document pages via AJAX
         loadDocumentPages(documentName);
     }
-    
+
     // Function to setup page selection event listener
     function setupPageSelectionListener() {
         const pngSelect = document.getElementById('png-select');
         if (pngSelect && !pngSelect.hasAttribute('data-listener-added')) {
-            pngSelect.addEventListener('change', function(event) {
+            pngSelect.addEventListener('change', function (event) {
                 const selectedPage = this.value;
                 currentPage = selectedPage;
-                
+
                 // Update browser URL without page reload
                 updateBrowserURL(currentFolder, selectedPage);
-                
+
                 if (selectedPage && currentFolder) {
                     // Load page via AJAX instead of page reload
                     loadPage(currentFolder, selectedPage);
@@ -270,21 +292,21 @@
     // AJAX function to load document pages
     function loadDocumentPages(documentName) {
         console.log('[loadDocumentPages] Loading pages for document:', documentName);
-        
+
         // Show loading state
         const pageSelectionContainer = document.getElementById('page-selection-container');
         const pngSelect = document.getElementById('png-select');
-        
+
         if (pageSelectionContainer) {
             pageSelectionContainer.style.display = 'block';
             setTimeout(() => pageSelectionContainer.classList.add('show'), 10);
         }
-        
+
         if (pngSelect) {
             pngSelect.disabled = true;
             pngSelect.innerHTML = '<option value="">Loading pages...</option>';
         }
-        
+
         // Make AJAX call to get document images
         const userId = '{{ session.get("user_id", "anonymous") }}';
         // Construct the API URL properly
@@ -292,7 +314,7 @@
         const apiUrl = baseUrl
             .replace('PLACEHOLDER_USER', encodeURIComponent(userId))
             .replace('PLACEHOLDER_DOC', encodeURIComponent(documentName));
-        
+
         fetch(apiUrl)
             .then(response => {
                 if (!response.ok) {
@@ -302,16 +324,16 @@
             })
             .then(data => {
                 console.log('[loadDocumentPages] Received data:', data);
-                
+
                 if (data.success && data.images && Array.isArray(data.images)) {
                     // Populate the dropdown
                     if (pngSelect) {
                         pngSelect.innerHTML = '<option value="">-- Select Page --</option>';
-                        
+
                         data.images.forEach(image => {
                             const option = document.createElement('option');
                             option.value = image.filename;
-                            
+
                             if (image.filename.includes('crop')) {
                                 option.textContent = image.filename.split('.')[0]; // Show full name for crops
                             } else {
@@ -323,21 +345,21 @@
                                     option.textContent = image.filename;
                                 }
                             }
-                            
+
                             pngSelect.appendChild(option);
                         });
-                        
+
                         pngSelect.disabled = false;
-                        
+
                         // Re-setup event listener for the page selection dropdown
                         setupPageSelectionListener();
                     }
-                    
+
                     // Update document info display
                     if (selectedDocumentInfo) {
                         selectedDocumentInfo.style.display = 'block';
                     }
-                    
+
                     showAlert('success', `Loaded ${data.images.length} pages for ${documentName}`);
                     console.log('[loadDocumentPages] Successfully loaded', data.images.length, 'pages');
                 } else {
@@ -346,12 +368,12 @@
             })
             .catch(error => {
                 console.error('[loadDocumentPages] Error:', error);
-                
+
                 if (pngSelect) {
                     pngSelect.innerHTML = '<option value="">Error loading pages</option>';
                     pngSelect.disabled = true;
                 }
-                
+
                 // Show error message
                 showAlert('error', `Failed to load document pages: ${error.message}`);
             });
@@ -360,24 +382,24 @@
     // Function to load and display a page
     function loadPage(documentName, pageName) {
         console.log('[loadPage] Loading page:', { documentName, pageName });
-        
+
         // Update browser URL without page reload
         updateBrowserURL(documentName, pageName);
-        
+
         // Use a retry mechanism to find the document display container
         function tryLoadPage(retryCount = 0) {
             const maxRetries = 5;
             const documentDisplayContainer = document.getElementById('document-display-container');
-            
+
             // Debug: Log what we found
             console.log(`[loadPage] Attempt ${retryCount + 1}/${maxRetries + 1} - Element check:`, {
                 documentDisplayContainer: !!documentDisplayContainer,
                 documentDisplayContainerDisplay: documentDisplayContainer ? documentDisplayContainer.style.display : 'N/A'
             });
-            
+
             if (documentDisplayContainer) {
                 console.log('[loadPage] Container found, proceeding with page load');
-                
+
                 const userId = '{{ session.get("user_id", "anonymous") }}';
                 // Construct the image URL properly
                 const baseImageUrl = '{{ url_for("app.serve_completed_document_png_file", user_id="PLACEHOLDER_USER", document_folder_name="PLACEHOLDER_FOLDER", image_filename="PLACEHOLDER_FILENAME") }}';
@@ -385,11 +407,11 @@
                     .replace('PLACEHOLDER_USER', encodeURIComponent(userId))
                     .replace('PLACEHOLDER_FOLDER', encodeURIComponent(documentName))
                     .replace('PLACEHOLDER_FILENAME', encodeURIComponent(pageName));
-                
+
                 // Update image preview area to show the selected page
                 documentDisplayContainer.innerHTML = `
                  
-                    <div class="gradio-display-area" style="min-height: 40vh; padding:0; border: none; background: #fff;">
+                    <div class="gradio-display-area" style="height: 70vh; min-height: 320px; max-height: 900px; padding: 0; border: none; background: #fff; overflow-y: auto; align-items: flex-start;">
                         <div id="image-container" style="position: relative; display: inline-block;">
                             <img id="preview-image"
                                 src="${imageUrl}"
@@ -401,37 +423,37 @@
                         </div>
                     </div>
                 `;
-                
+
                 // Show the document display container
                 showDocumentDisplay();
-                
+
                 // Show the OCR controls in the right column
                 showOCRControls(documentName, pageName);
-                
+
                 // Clear any existing segments and OCR results
                 clearSegmentData();
-                
+
                 // Initialize canvas after image loads
                 setTimeout(() => {
                     console.log('[loadPage] Initializing canvas for dynamically loaded image');
                     initializeBoundingBoxCanvas();
                 }, 100); // Small delay to ensure DOM is updated
-                
+
                 // Load and display segments coordinates in debug info
                 setTimeout(() => {
                     loadAndDisplaySegmentsCoordinates(documentName, pageName);
                 }, 200); // Small delay to ensure image is loaded
-                
+
                 // Check for existing segments for this page (after OCR controls are ready)
                 const pageId = pageName.split('.')[0];
-                
+
                 // Use a more robust retry mechanism
                 function waitForElementsAndCheckSegments(retryCount = 0) {
                     const maxRetries = 10; // Maximum 10 attempts
                     const lineSegmentsContainer = document.getElementById('line-segments-container');
                     const selectedLineImageEl = document.getElementById('sidebar-segment-image');
                     const selectedLineTextEl = document.getElementById('sidebar-segment-text');
-                    
+
                     if (lineSegmentsContainer && selectedLineImageEl && selectedLineTextEl) {
                         console.log('[loadPage] Required elements found, checking for existing segments');
                         checkForExistingSegments(documentName, pageId);
@@ -442,13 +464,13 @@
                         console.error('[loadPage] Failed to find required elements after maximum retries');
                     }
                 }
-                
+
                 // Start the retry mechanism
                 setTimeout(() => waitForElementsAndCheckSegments(), 50);
-                
+
                 showAlert('info', `Loaded page: ${pageName}`);
                 console.log('[loadPage] Page loaded successfully');
-                
+
             } else if (retryCount < maxRetries) {
                 console.warn(`[loadPage] Document display container not found, retrying in 50ms (attempt ${retryCount + 1}/${maxRetries + 1})`);
                 setTimeout(() => tryLoadPage(retryCount + 1), 50);
@@ -457,7 +479,7 @@
                 showAlert('error', 'Failed to load page: Document display container not found');
             }
         }
-        
+
         // Start the load attempt
         tryLoadPage();
     }
@@ -469,12 +491,12 @@
             console.error('[showOCRControls] Right column not found');
             return;
         }
-        
+
         rightColumn.innerHTML = `
             
-              <!-- Vowel Table Section -->
-                <div id="vowel-table-container" class="gradio-component-group" style="background-color: #f0f8ff; padding: 1rem; margin-bottom: 0.75rem; border: 1px solid #d1e7dd;">
-                    <h4 style="margin-bottom: 0.5rem; color: #2d5016;">Polytonic character table</h4>
+                            <!-- Vowel Table Section -->
+                                <details id="vowel-table-container" class="gradio-component-group" style="background-color: #f0f8ff; padding: 1rem; margin-bottom: 0.75rem; border: 1px solid #d1e7dd;">
+                                        <summary style="color: #2d5016; cursor: pointer; font-size: 1.1em; font-weight: 600;">Polytonic character table</summary>
                     <div style="font-family: 'Times New Roman', serif; font-size: 1.1em; line-height: 1.6; color: #333; background-color: white; padding: 0.75rem; border-radius: 6px; border: 1px solid #e9ecef;">
                         <div style="margin-bottom: 0.1rem;">
                             <strong>α vowels:</strong> ἀ ἁ ὰ ᾶ ἄ ἅ ἂ ἃ ἆ ἇ ᾳ ᾀ ᾁ ᾄ ᾅ ᾂ ᾃ ᾷ ᾆ ᾇ
@@ -513,17 +535,16 @@
                             <strong>Punctuation:</strong> · « »
                         </div>
                     </div>
-                </div>
+                </details>
             
             <!-- Line Segments Navigation - Initially hidden -->
-            <div id="line-segments-container" class="gradio-component-group" style="display: none; background-color: #f9fafb; padding: 1rem;">
-                <h4>Segment Navigation</h4>
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                    <button id="prev-segment-btn" class="gradio-button gradio-button-secondary" style="padding: 5px 10px; font-size:0.9em;">&lt; Prev</button>
-                    <div style="text-align: center; flex-grow: 1; font-size: 0.9em; color: #666;">
+            <div id="line-segments-container" class="gradio-component-group" role="navigation" aria-label="Segment Navigation" style="display: none; background-color: #f9fafb; padding: 0.375rem 0.5rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <button id="prev-segment-btn" class="gradio-button gradio-button-secondary" style="min-height: 30px; padding: 2px 8px; border-radius: 6px; font-size: 0.8rem; line-height: 1;">&lt; Prev</button>
+                    <div style="text-align: center; flex-grow: 1; font-size: 0.85rem; line-height: 1; color: #666;">
                         <span id="segment-counter">Segment 0 of 0</span>
                     </div>
-                    <button id="next-segment-btn" class="gradio-button gradio-button-secondary" style="padding: 5px 10px; font-size:0.9em;">Next &gt;</button>
+                    <button id="next-segment-btn" class="gradio-button gradio-button-secondary" style="min-height: 30px; padding: 2px 8px; border-radius: 6px; font-size: 0.8rem; line-height: 1;">Next &gt;</button>
                 </div>
 
                 <!-- Single preview container that will be used for all segment displays -->
@@ -570,7 +591,7 @@
                     <div id="segment-ocr-status-message"></div>
                 </div>
 
-                <div id="ocr-result" contenteditable="false" data-placeholder="Extracted text will appear here..." style="height: 200px; width: 100%; font-family: monospace; border: 1px solid #ccc; padding: 8px; overflow-y: auto; background-color: white; border-radius: 4px;" role="textbox" aria-multiline="true"></div>
+                <div id="ocr-result" contenteditable="false" data-placeholder="Extracted text will appear here..." style="position: relative; height: clamp(300px, 45vh, 420px); width: 100%; box-sizing: border-box; font-family: monospace; font-size: 0.8rem; line-height: 1.3; white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid #ccc; padding: 8px; overflow-y: auto; background-color: white; border-radius: 4px;" role="textbox" aria-multiline="true"></div>
             </div>
                 
                 <!-- Single preview container that will be used for all segment displays -->
@@ -587,10 +608,10 @@
                 <pre id="segment-json-content" style="white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; background-color: #fff; padding:10px; border-radius: 3px; margin-bottom: 0;"></pre>
             </div>
         `;
-        
+
         // Re-setup event listeners for the newly created elements
         setupOCRControlEventListeners();
-        
+
         console.log('[showOCRControls] OCR controls shown for page:', pageName);
     }
 
@@ -614,38 +635,38 @@
             segmentSelect.addEventListener('change', handleSegmentSelection);
             segmentSelect.setAttribute('data-listener-added', 'true');
         }
-        
+
         // Setup Alt+Enter functionality for segment text area
         setupSegmentTextAreaEventListeners();
-        
+
         // Setup prev/next button event listeners
         const prevBtn = document.getElementById('prev-segment-btn');
         const nextBtn = document.getElementById('next-segment-btn');
         if (prevBtn) {
-            prevBtn.onclick = function() {
+            prevBtn.onclick = function () {
                 if (currentSegmentDisplayIndex > 0) {
                     displaySegmentByIndex(currentSegmentDisplayIndex - 1);
                 }
             };
         }
         if (nextBtn) {
-            nextBtn.onclick = function() {
+            nextBtn.onclick = function () {
                 if (currentSegmentDisplayIndex < currentSegmentsList.length - 1) {
                     displaySegmentByIndex(currentSegmentDisplayIndex + 1);
                 }
             };
         }
-        
+
         // Setup JSON viewer event listeners
         const viewJsonBtn = document.getElementById('view-segment-json-btn');
         const closeJsonBtn = document.getElementById('close-segment-json-btn');
         if (viewJsonBtn) {
-            viewJsonBtn.onclick = function() {
+            viewJsonBtn.onclick = function () {
                 toggleSegmentJson(true);
             };
         }
         if (closeJsonBtn) {
-            closeJsonBtn.onclick = function() {
+            closeJsonBtn.onclick = function () {
                 toggleSegmentJson(false);
             };
         }
@@ -659,7 +680,7 @@
             let hasUnsavedChanges = false;
 
             // Track changes to show unsaved indicator
-            segmentTextArea.addEventListener('input', function() {
+            segmentTextArea.addEventListener('input', function () {
                 const saveHint = document.getElementById('save-hint');
                 if (this.value !== originalText) {
                     if (!hasUnsavedChanges) {
@@ -681,7 +702,7 @@
             });
 
             // Store original text when segment is loaded
-            window.setOriginalSegmentText = function(text) {
+            window.setOriginalSegmentText = function (text) {
                 originalText = text;
                 hasUnsavedChanges = false;
                 const textArea = document.getElementById('sidebar-segment-text');
@@ -695,7 +716,7 @@
                 }
             };
 
-            segmentTextArea.addEventListener('keydown', function(event) {
+            segmentTextArea.addEventListener('keydown', function (event) {
                 if (event.altKey && event.key === 'Enter') {
                     event.preventDefault();
                     saveFinalSegmentText();
@@ -715,21 +736,21 @@
             setTimeout(() => pageSelectionContainer.classList.add('show'), 10);
         }
     }
-    
+
     function hidePageSelection() {
         if (pageSelectionContainer) {
             pageSelectionContainer.classList.remove('show');
             setTimeout(() => pageSelectionContainer.style.display = 'none', 300);
         }
     }
-    
+
     function showDocumentDisplay() {
         if (documentDisplayContainer) {
             documentDisplayContainer.style.display = 'block';
             setTimeout(() => documentDisplayContainer.classList.add('show'), 10);
         }
     }
-    
+
     function hideDocumentDisplay() {
         if (documentDisplayContainer) {
             documentDisplayContainer.classList.remove('show');
@@ -738,7 +759,7 @@
     }
 
     // Navigation function
-    window.navigateToEdit = function() {
+    window.navigateToEdit = function () {
         window.location.href = '{{ url_for("app.crop_image") }}';
     };
 
@@ -752,74 +773,74 @@
         if (ocrResult) {
             ocrResult.innerHTML = '';
         }
-        
+
         // Clear segment dropdown
         const segmentSelect = document.getElementById('segment-select');
         const segmentLoading = document.getElementById('segment-loading');
-        
+
         if (segmentSelect) {
             segmentSelect.innerHTML = '<option value="">-- Select Segment --</option>';
             segmentSelect.disabled = true;
         }
-        
+
         if (segmentLoading) {
             segmentLoading.textContent = 'Run "Segment & OCR" to detect segments';
             segmentLoading.style.color = '#6c757d';
         }
-        
+
         // Hide segment navigation
         const lineSegmentsContainer = document.getElementById('line-segments-container');
         if (lineSegmentsContainer) {
             lineSegmentsContainer.style.display = 'none';
         }
-        
+
         // Hide segment preview
         const segmentPreview = document.getElementById('sidebar-selected-segment-preview');
         if (segmentPreview) {
             segmentPreview.style.display = 'none';
         }
-        
+
         // Clear bounding boxes
         clearBoundingBoxes();
-        
+
         // Reset segment variables
         currentSegmentsList = [];
         currentSegmentDisplayIndex = -1;
         currentSegmentFolderGlobal = '';
         currentSegmentPageIdGlobal = '';
-        
+
         console.log('[clearSegmentData] Segment data cleared');
     }
 
     // Helper function to show alerts/notifications
     function showAlert(type, message, duration = 5000) {
         console.log(`[${type.toUpperCase()}]`, message);
-        
+
         // Create notification element
         const notification = document.createElement('div');
         notification.className = `notification notification-${type}`;
-        
+
         const icon = getNotificationIcon(type);
         const messageText = document.createElement('span');
         messageText.textContent = message;
-        
+
         const closeButton = document.createElement('button');
         closeButton.className = 'notification-close';
         closeButton.innerHTML = '×';
         closeButton.onclick = () => removeNotification(notification);
-        
+
         notification.appendChild(icon);
         notification.appendChild(messageText);
         notification.appendChild(closeButton);
-        
+
         // Add to container
         const container = document.getElementById('notification-container');
         if (container) {
             container.appendChild(notification);
-            
+
             // Trigger animation
             setTimeout(() => notification.classList.add('show'), 10);
-            
+
             // Auto-remove after duration
             if (duration > 0) {
                 setTimeout(() => removeNotification(notification), duration);
@@ -833,11 +854,11 @@
             }
         }
     }
-    
+
     function getNotificationIcon(type) {
         const icon = document.createElement('span');
         icon.style.fontSize = '16px';
-        
+
         switch (type) {
             case 'success':
                 icon.innerHTML = '✓';
@@ -851,10 +872,10 @@
             default:
                 icon.innerHTML = '•';
         }
-        
+
         return icon;
     }
-    
+
     function removeNotification(notification) {
         if (notification && notification.parentNode) {
             notification.classList.remove('show');
@@ -867,33 +888,33 @@
     }
 
     // Initialize sidebar selection
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         setupSidebarDocumentSelection();
-        
+
         // Setup page selection event listener
         setupPageSelectionListener();
-        
+
         // Load user documents dynamically if not already populated
         const documentsList = document.getElementById('sidebar-documents-list');
         const documentsContainer = documentsList ? documentsList.children : [];
-        
+
         // Check if documents are already populated from server-side rendering
-        const hasDocuments = Array.from(documentsContainer).some(child => 
+        const hasDocuments = Array.from(documentsContainer).some(child =>
             child.classList && child.classList.contains('document-item')
         );
-        
+
         if (!hasDocuments) {
             console.log('[DOMContentLoaded] No documents found, loading via AJAX');
             loadUserDocuments();
         } else {
             console.log('[DOMContentLoaded] Documents already loaded from server');
             // Set search box visibility based on existing documents
-            const existingDocuments = Array.from(documentsContainer).filter(child => 
+            const existingDocuments = Array.from(documentsContainer).filter(child =>
                 child.classList && child.classList.contains('document-item')
             );
             toggleSearchBox(existingDocuments.length);
         }
-        
+
         // Set initial browser history state
         if (currentFolder || currentPage) {
             window.history.replaceState({
@@ -901,7 +922,7 @@
                 page: currentPage
             }, '', window.location.href);
         }
-        
+
         // Show/hide elements based on current state
         if (currentFolder) {
             if (selectedDocumentInfo) {
@@ -912,7 +933,7 @@
                 pageSelectionContainer.classList.add('show');
             }
         }
-        
+
         // Initialize download button state
         // (No longer needed as download is per-document now)
     });
@@ -920,20 +941,20 @@
     // Function to load user documents via AJAX
     function loadUserDocuments() {
         console.log('[loadUserDocuments] Loading user documents via AJAX');
-        
+
         const sidebarLoading = document.getElementById('sidebar-loading');
         const documentsList = document.getElementById('sidebar-documents-list');
-        
+
         // Show loading state
         if (sidebarLoading) {
             sidebarLoading.style.display = 'block';
         }
-        
+
         const userId = '{{ session.get("user_id", "anonymous") }}';
         // Construct the API URL properly
         const baseUrl = '{{ url_for("app.api_get_user_documents", user_id="PLACEHOLDER_USER") }}';
         const apiUrl = baseUrl.replace('PLACEHOLDER_USER', encodeURIComponent(userId));
-        
+
         fetch(apiUrl)
             .then(response => {
                 if (!response.ok) {
@@ -943,21 +964,21 @@
             })
             .then(data => {
                 console.log('[loadUserDocuments] Received data:', data);
-                
+
                 // Hide loading state
                 if (sidebarLoading) {
                     sidebarLoading.style.display = 'none';
                 }
-                
+
                 if (data.success && data.documents && Array.isArray(data.documents)) {
                     // Clear existing content
                     if (documentsList) {
                         documentsList.innerHTML = '';
                     }
-                    
+
                     // Filter completed documents only
                     const completedDocuments = data.documents.filter(doc => doc.is_completed);
-                    
+
                     if (completedDocuments.length > 0) {
                         // Populate with documents
                         completedDocuments.forEach(doc => {
@@ -966,16 +987,16 @@
                                 documentsList.appendChild(documentItem);
                             }
                         });
-                        
+
                         // Show/hide search box based on document count
                         toggleSearchBox(completedDocuments.length);
-                        
+
                         // Re-setup event listeners
                         setupSidebarDocumentSelection();
                     } else {
                         // Hide search box when no documents
                         toggleSearchBox(0);
-                        
+
                         // Show no documents message
                         if (documentsList) {
                             documentsList.innerHTML = `
@@ -993,15 +1014,15 @@
             })
             .catch(error => {
                 console.error('[loadUserDocuments] Error:', error);
-                
+
                 // Hide loading state
                 if (sidebarLoading) {
                     sidebarLoading.style.display = 'none';
                 }
-                
+
                 // Hide search box on error
                 toggleSearchBox(0);
-                
+
                 // Show error message
                 if (documentsList) {
                     documentsList.innerHTML = `
@@ -1019,7 +1040,7 @@
         const documentItem = document.createElement('div');
         documentItem.className = `document-item ${doc.name === currentFolder ? 'selected' : ''}`;
         documentItem.setAttribute('data-document-name', doc.name);
-        
+
         documentItem.innerHTML = `
             <div class="document-header">
                 <div class="document-name-section">
@@ -1042,7 +1063,7 @@
                 </div>
             </div>
         `;
-        
+
         return documentItem;
     }
 
@@ -1052,12 +1073,12 @@
             console.error('[checkForExistingSegments] Missing required parameters:', { folder, pageFilename });
             return Promise.reject(new Error('Missing parameters for checkForExistingSegments'));
         }
-        
+
         // Pre-check that required elements exist
         const lineSegmentsContainer = document.getElementById('line-segments-container');
         const selectedLineImageEl = document.getElementById('sidebar-segment-image');
         const selectedLineTextEl = document.getElementById('sidebar-segment-text');
-        
+
         if (!lineSegmentsContainer || !selectedLineImageEl || !selectedLineTextEl) {
             console.warn('[checkForExistingSegments] Required DOM elements not available, skipping segment check');
             console.log('[checkForExistingSegments] Elements present:', {
@@ -1067,7 +1088,7 @@
             });
             return Promise.resolve(); // Resolve gracefully instead of rejecting
         }
-        
+
         const pageId = pageFilename.split('.')[0];
         console.log('[checkForExistingSegments] Checking segments for:', { folder, pageId, originalFilename: pageFilename });
         try {
@@ -1084,20 +1105,20 @@
     let currentSegmentPageIdGlobal = '';
     let currentSegmentDisplayIndex = -1;
 
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         console.log('OCR page ready');
-        
+
         const selectedPng = "{{ request.args.get('selected_png') }}";
         const selectedFolder = "{{ selected_folder }}";
-        
+
         if (selectedPng && selectedFolder) {
             const pageId = selectedPng.split('.')[0];
-            
+
             // Check if the required elements exist before calling checkForExistingSegments
             const lineSegmentsContainer = document.getElementById('line-segments-container');
             const selectedLineImageEl = document.getElementById('sidebar-segment-image');
             const selectedLineTextEl = document.getElementById('sidebar-segment-text');
-            
+
             if (lineSegmentsContainer && selectedLineImageEl && selectedLineTextEl) {
                 console.log('[DOMContentLoaded] Required elements found, checking for existing segments');
                 checkForExistingSegments(selectedFolder, pageId);
@@ -1119,14 +1140,14 @@
         const jsonDisplayContainer = document.getElementById('segment-json-display-container');
 
         if (prevBtn) {
-            prevBtn.onclick = function() {
+            prevBtn.onclick = function () {
                 if (currentSegmentDisplayIndex > 0) {
                     displaySegmentByIndex(currentSegmentDisplayIndex - 1);
                 }
             };
         }
         if (nextBtn) {
-            nextBtn.onclick = function() {
+            nextBtn.onclick = function () {
                 if (currentSegmentDisplayIndex < currentSegmentsList.length - 1) {
                     displaySegmentByIndex(currentSegmentDisplayIndex + 1);
                 }
@@ -1134,13 +1155,13 @@
         }
         // Update the view JSON button handler
         if (viewJsonBtn) {
-            viewJsonBtn.onclick = function() {
+            viewJsonBtn.onclick = function () {
                 toggleSegmentJson(true); // true to show
             };
         }
-        
+
         if (closeJsonBtn) {
-            closeJsonBtn.onclick = function() {
+            closeJsonBtn.onclick = function () {
                 toggleSegmentJson(false); // false to hide
             };
         }
@@ -1150,12 +1171,12 @@
         const container = document.getElementById('segment-json-display-container');
         const loadingEl = document.getElementById('segment-json-loading');
         const contentEl = document.getElementById('segment-json-content');
-        
+
         if (!container || !loadingEl || !contentEl) {
             console.error('[toggleSegmentJson] Required elements not found');
             return;
         }
-        
+
         if (show) {
             container.style.display = 'block';
             loadingEl.style.display = 'block';
@@ -1170,12 +1191,12 @@
     function fetchSegmentJson() {
         const loadingEl = document.getElementById('segment-json-loading');
         const contentEl = document.getElementById('segment-json-content');
-        
+
         if (!loadingEl || !contentEl) {
             console.error('[fetchSegmentJson] Required elements not found');
             return;
         }
-        
+
         // Debug logging
         console.log('[fetchSegmentJson] Current state:', {
             index: currentSegmentDisplayIndex,
@@ -1193,10 +1214,10 @@
             contentEl.style.display = 'block';
             return;
         }
-        
+
         // Get current segment
         const segment = currentSegmentsList[currentSegmentDisplayIndex];
-        
+
         // Debug logging
         console.log('[fetchSegmentJson] Selected segment:', segment);
 
@@ -1211,9 +1232,9 @@
         }
 
         // Get segment ID (handle both string and number types)
-        const segmentId = segment.id !== undefined ? String(segment.id) : 
-                            currentSegmentDisplayIndex.toString().padStart(3, '0');
-        
+        const segmentId = segment.id !== undefined ? String(segment.id) :
+            currentSegmentDisplayIndex.toString().padStart(3, '0');
+
         if (!segmentId) {
             const error = 'Unable to determine segment ID.';
             console.error('[fetchSegmentJson]', error);
@@ -1226,7 +1247,7 @@
         const userId = '{{ session.get("user_id", "anonymous") }}';
         const folder = currentSegmentFolderGlobal;
         const pageId = currentSegmentPageIdGlobal;
-        
+
         if (!userId || !folder || !pageId) {
             const error = 'Missing required information to fetch JSON data.';
             console.error('[fetchSegmentJson]', error, { userId, folder, pageId });
@@ -1235,20 +1256,20 @@
             contentEl.style.display = 'block';
             return;
         }
-        
+
         // Construct URL with proper encoding using url_for pattern
         const jsonUrl = '{{ url_for("app.get_segment_json", user_id="PLACEHOLDER_USER", document_folder_name="PLACEHOLDER_FOLDER", page_image_filename_base="PLACEHOLDER_PAGE", segment_id_str="PLACEHOLDER_SEGMENT") }}'
             .replace('PLACEHOLDER_USER', encodeURIComponent(userId))
             .replace('PLACEHOLDER_FOLDER', encodeURIComponent(folder))
             .replace('PLACEHOLDER_PAGE', encodeURIComponent(pageId))
             .replace('PLACEHOLDER_SEGMENT', encodeURIComponent(segmentId));
-        
+
         console.log('[fetchSegmentJson] Fetching JSON from:', jsonUrl);
-        
+
         // Show loading state
         loadingEl.style.display = 'block';
         contentEl.style.display = 'none';
-        
+
         fetch(jsonUrl)
             .then(response => {
                 if (!response.ok) {
@@ -1284,19 +1305,37 @@
         nextBtn.style.opacity = nextBtn.disabled ? 0.6 : 1;
     }
 
+    function highlightOCRLine(index) {
+        const ocrResult = document.getElementById('ocr-result');
+        if (!ocrResult) return;
+
+        ocrResult.querySelectorAll('.ocr-active-line').forEach(line => {
+            line.classList.remove('ocr-active-line');
+        });
+
+        const activeLine = ocrResult.querySelector(`[data-segment-index="${index}"]`);
+        if (!activeLine) return;
+
+        activeLine.classList.add('ocr-active-line');
+        requestAnimationFrame(() => {
+            const targetScrollTop = activeLine.offsetTop - ocrResult.clientHeight / 3;
+            ocrResult.scrollTop = Math.max(0, targetScrollTop);
+        });
+    }
+
     // Update the displaySegmentByIndex function
     function displaySegmentByIndex(index, updateUrl = true) {
         console.log('[DEBUG] displaySegmentByIndex called with index:', index);
         console.log('[DEBUG] currentSegmentsList:', currentSegmentsList);
-        
+
         if (index >= 0 && index < currentSegmentsList.length) {
             currentSegmentDisplayIndex = index;
             const segment = currentSegmentsList[index];
             console.log('[DEBUG] Displaying segment:', segment);
-            
+
             // Clear existing highlight
             clearBoundingBoxes();
-            
+
             // Draw bounding box if segment has bbox coordinates
             if (segment.bbox) {
                 console.log('[DEBUG] Drawing bounding box from displaySegmentByIndex');
@@ -1304,7 +1343,7 @@
             } else {
                 console.log('[DEBUG] No bbox found in segment:', segment);
             }
-            
+
             // Update navigation buttons state
             updateNavigationButtons();
 
@@ -1313,6 +1352,8 @@
             if (segmentCounter) {
                 segmentCounter.textContent = `Segment ${index + 1} of ${currentSegmentsList.length}`;
             }
+
+            highlightOCRLine(index);
 
             // Update dropdown without triggering form submit
             const segmentSelect = document.getElementById('segment-select');
@@ -1338,9 +1379,9 @@
                 titleEl.textContent = `Preview of Segment ${index + 1}`;
 
                 // Construct segment image URL
-                const segmentId = segment.id !== undefined ? String(segment.id) : 
-                                index.toString().padStart(3, '0');
-        
+                const segmentId = segment.id !== undefined ? String(segment.id) :
+                    index.toString().padStart(3, '0');
+
                 const imageUrl = '{{ url_for("app.get_segment_image", user_id="PLACEHOLDER_USER", document_folder_name="PLACEHOLDER_FOLDER", page_image_filename_base="PLACEHOLDER_PAGE", segment_id_str="PLACEHOLDER_SEGMENT") }}'
                     .replace('PLACEHOLDER_USER', encodeURIComponent("{{ session.get('user_id', 'anonymous') }}"))
                     .replace('PLACEHOLDER_FOLDER', encodeURIComponent(currentSegmentFolderGlobal))
@@ -1350,7 +1391,7 @@
                 // Update image
                 imageEl.src = imageUrl;
                 imageEl.alt = `Segment ${index + 1}`;
-                imageEl.onerror = function() {
+                imageEl.onerror = function () {
                     this.onerror = null;
                     this.src = '';
                     this.alt = 'Error loading image';
@@ -1359,7 +1400,7 @@
                 // Update text - use final text if available, otherwise original text
                 let displayText = '(No text available)';
                 let isSegmentFinal = false;
-                
+
                 if (segment.is_final && segment.final_text) {
                     displayText = segment.final_text;
                     isSegmentFinal = true;
@@ -1375,16 +1416,16 @@
                         displayText = JSON.stringify(segment.text);
                     }
                 }
-                
+
                 // Update textarea with the text
                 textEl.value = displayText;
-                
+
                 // Update title and styling based on whether segment is final
                 if (isSegmentFinal) {
                     titleEl.textContent = `Preview of Segment ${index + 1} ✏️ (Edited)`;
                     titleEl.style.color = '#28a745';
                     titleEl.style.fontWeight = 'bold';
-                    
+
                     // Add visual indicator to the textarea
                     textEl.style.backgroundColor = '#f8fff8';
                     textEl.style.borderLeftColor = '#28a745';
@@ -1397,7 +1438,7 @@
                     textEl.style.borderLeftColor = '';
                     textEl.style.borderLeftWidth = '';
                 }
-                
+
                 // Set original text for change tracking (use final text as baseline if available)
                 if (typeof window.setOriginalSegmentText === 'function') {
                     window.setOriginalSegmentText(displayText);
@@ -1418,7 +1459,7 @@
             console.warn('[displaySegmentByIndex] Invalid segment index:', index);
             // Clear bounding boxes if index is invalid
             clearBoundingBoxes();
-            
+
             // Hide preview container
             const previewContainer = document.getElementById('sidebar-selected-segment-preview');
             if (previewContainer) {
@@ -1433,14 +1474,14 @@
         const selectedLineImageEl = document.getElementById('sidebar-segment-image');
         const selectedLineTextEl = document.getElementById('sidebar-segment-text');
         const segmentCounter = document.getElementById('segment-counter');
-        
+
         console.log('[loadLineSegments] Element check:', {
             lineSegmentsContainer: !!lineSegmentsContainer,
             selectedLineImageEl: !!selectedLineImageEl,
             selectedLineTextEl: !!selectedLineTextEl,
             segmentCounter: !!segmentCounter
         });
-        
+
         if (!lineSegmentsContainer) {
             console.error("[loadLineSegments] Missing element: line-segments-container");
             return Promise.reject(new Error("Missing element: line-segments-container"));
@@ -1460,7 +1501,7 @@
         }
         selectedLineTextEl.textContent = '';
         if (segmentCounter) segmentCounter.textContent = 'Loading segments...';
-        
+
         lineSegmentsContainer.style.display = 'block';
         currentSegmentsList = [];
         currentSegmentDisplayIndex = -1;
@@ -1472,7 +1513,7 @@
             .replace('PLACEHOLDER_USER', '{{ session.get("user_id", "anonymous") }}')
             .replace('PLACEHOLDER_FOLDER', encodeURIComponent(folder))
             .replace('PLACEHOLDER_PAGE', encodeURIComponent(pageId));
-        
+
         // Return the fetch promise chain
         return fetch(segmentsUrl)
             .then(response => {
@@ -1486,17 +1527,17 @@
             .then(data => {
                 if (data && data.success === true && data.segments && Array.isArray(data.segments) && data.segments.length > 0) {
                     currentSegmentsList = data.segments;
-                    
+
                     // Update OCR result div with all segment text (with highlighting for final segments)
                     const ocrResult = document.getElementById('ocr-result');
                     if (ocrResult) {
                         const htmlLines = [];
-                        
+
                         data.segments.forEach((segment, index) => {
                             if (segment.text) {
                                 let segmentText = '';
                                 let isFinal = false;
-                                
+
                                 // Use final text if available, otherwise use original text
                                 if (segment.is_final && segment.final_text) {
                                     segmentText = segment.final_text;
@@ -1508,52 +1549,50 @@
                                 } else {
                                     segmentText = String(segment.text);
                                 }
-                                
+
                                 segmentText = segmentText.trim();
                                 if (segmentText) {
                                     // Escape HTML to prevent XSS
                                     const escapedText = segmentText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                                    
-                                    if (isFinal) {
-                                        htmlLines.push(`<span class="ocr-final-line">★ ${escapedText} </span>`);
-                                    } else {
-                                        htmlLines.push(escapedText);
-                                    }
+
+                                    const lineClasses = isFinal ? 'ocr-result-line ocr-final-line' : 'ocr-result-line';
+                                    const linePrefix = isFinal ? '★ ' : '';
+                                    htmlLines.push(`<span class="${lineClasses}" data-segment-index="${index}">${linePrefix}${escapedText}</span>`);
                                 }
                             }
                         });
-                        
-                        ocrResult.innerHTML = htmlLines.join('<br>');
+
+                        ocrResult.innerHTML = htmlLines.join('');
                     }
-                    
+
                     // Populate the dropdown
                     const segmentSelect = document.getElementById('segment-select');
                     const segmentLoading = document.getElementById('segment-loading');
-                    
+
                     if (segmentSelect) {
                         // Clear existing options except the first one
                         while (segmentSelect.options.length > 1) {
                             segmentSelect.remove(1);
                         }
-                        
+
                         // Add new options
                         data.segments.forEach((segment, index) => {
                             const option = document.createElement('option');
                             option.value = index;
-                            
+
                             let displayText = `Segment ${index + 1}`;
                             if (segment.text) {
                                 const textPreview = Array.isArray(segment.text) ? segment.text[0] : segment.text;
                                 displayText += `: ${String(textPreview).substring(0, 30)}...`;
                             }
-                            
+
                             // Add edit indicator if segment has a final file
                             if (segment.is_final) {
                                 displayText = `✏️ ${displayText}`;
                                 option.style.color = '#28a745';
                                 option.style.fontWeight = 'bold';
                             }
-                            
+
                             option.textContent = displayText;
                             segmentSelect.appendChild(option);
                         });
@@ -1562,7 +1601,7 @@
                             segmentLoading.textContent = `${data.segments.length} segments available`;
                         }
                     }
-                    
+
                     // Display initial segment
                     const urlParams = new URLSearchParams(window.location.search);
                     const segmentIndexFromUrl = urlParams.get('selected_segment');
@@ -1574,7 +1613,7 @@
                             initialIndex = parsedIndex;
                         }
                     }
-                    
+
                     // Initialize canvas and display first segment
                     setTimeout(() => {
                         initializeBoundingBoxCanvas();
@@ -1584,11 +1623,11 @@
                     // No segments found
                     const segmentLoading = document.getElementById('segment-loading');
                     const segmentSelect = document.getElementById('segment-select');
-                    
+
                     if (segmentLoading) {
                         segmentLoading.textContent = 'No segments available';
                     }
-                    
+
                     if (segmentSelect) {
                         while (segmentSelect.options.length > 1) {
                             segmentSelect.remove(1);
@@ -1609,11 +1648,11 @@
                 // Handle errors
                 const segmentLoading = document.getElementById('segment-loading');
                 const segmentSelect = document.getElementById('segment-select');
-                
+
                 if (segmentLoading) {
                     segmentLoading.innerHTML = '<span style="color:red;">Error loading segments</span>';
                 }
-                
+
                 if (segmentSelect) {
                     while (segmentSelect.options.length > 1) {
                         segmentSelect.remove(1);
@@ -1636,12 +1675,12 @@
     function showSelectedSegment(folder, pageId, segment) {
         const selectedLineImageContainer = document.getElementById('sidebar-segment-image');
         const selectedLineTextContainer = document.getElementById('sidebar-segment-text');
-        
+
         if (!selectedLineImageContainer || !selectedLineTextContainer) {
             console.error('[showSelectedSegment] HTML elements for displaying selected segment not found!');
             return;
         }
-        
+
         if (!segment || typeof segment !== 'object') {
             console.error('[showSelectedSegment] Invalid segment data provided:', segment);
             if (selectedLineImageContainer.tagName === 'IMG') {
@@ -1653,30 +1692,30 @@
             selectedLineTextContainer.textContent = 'Error: Invalid segment data.';
             return;
         }
-        
+
         console.log('[showSelectedSegment] Displaying segment:', JSON.stringify(segment));
 
         if (segment.has_image === true && (segment.id !== null && segment.id !== undefined)) {
-            const segmentIdStr = String(segment.id); 
+            const segmentIdStr = String(segment.id);
             const imageUrl = '{{ url_for("app.get_segment_image", user_id="PLACEHOLDER_USER", document_folder_name="PLACEHOLDER_FOLDER", page_image_filename_base="PLACEHOLDER_PAGE", segment_id_str="PLACEHOLDER_SEGMENT") }}'
                 .replace('PLACEHOLDER_USER', encodeURIComponent("{{ session.get('user_id', 'anonymous') }}"))
                 .replace('PLACEHOLDER_FOLDER', encodeURIComponent(folder))
                 .replace('PLACEHOLDER_PAGE', encodeURIComponent(pageId))
                 .replace('PLACEHOLDER_SEGMENT', encodeURIComponent(segmentIdStr));
-                
+
             console.log('[showSelectedSegment] Image URL:', imageUrl);
-            
+
             if (selectedLineImageContainer.tagName === 'IMG') {
                 selectedLineImageContainer.src = imageUrl;
                 selectedLineImageContainer.alt = `Line segment ${segmentIdStr}`;
-                selectedLineImageContainer.onerror = function() {
-                    this.onerror = null; 
-                    this.alt = 'Image not found or error loading.'; 
-                    this.src = ''; 
+                selectedLineImageContainer.onerror = function () {
+                    this.onerror = null;
+                    this.alt = 'Image not found or error loading.';
+                    this.src = '';
                     console.error(`Image not found: ${segmentIdStr}.png (Path: ${imageUrl})`);
                 };
             } else {
-                    selectedLineImageContainer.innerHTML = `
+                selectedLineImageContainer.innerHTML = `
                     <img src="${imageUrl}" alt="Line segment ${segmentIdStr}" style="max-width: 100%; max-height:150px; border: 1px solid #dee2e6; object-fit: contain; background-color: #fff;"
                             onerror="this.onerror=null; this.alt='Image not found or error loading.'; this.src=''; this.parentElement.innerHTML='<p style=\\'font-size:0.9em; color:red;\\'>Image not found: ${segmentIdStr}.png</p>';">`;
             }
@@ -1689,7 +1728,7 @@
                 selectedLineImageContainer.innerHTML = `<p style="font-size:0.9em; color:#6c757d; padding: 10px 0;">(No image available for this segment)</p>`;
             }
         }
-        
+
         let displayText = '(No text recognized for this segment)';
         if (segment.text) {
             if (typeof segment.text === 'string') displayText = segment.text;
@@ -1698,11 +1737,11 @@
                 if (segment.text.length > 1 && typeof segment.text[1] === 'number') {
                     displayText += ` (Confidence: ${segment.text[1].toFixed(3)})`;
                 }
-            } else displayText = JSON.stringify(segment.text); 
+            } else displayText = JSON.stringify(segment.text);
         } else if (segment.coords && Array.isArray(segment.coords)) {
-                displayText = `Coordinates: [${segment.coords.join(', ')}] (No text recognized)`;
+            displayText = `Coordinates: [${segment.coords.join(', ')}] (No text recognized)`;
         }
-        
+
         selectedLineTextContainer.textContent = displayText;
         console.log('[showSelectedSegment] Displayed text:', displayText);
     }
@@ -1730,7 +1769,7 @@
             folder: currentFolder,
             filename: currentPage
         };
-        
+
         fetch('/process_ocr', {
             method: 'POST',
             headers: {
@@ -1747,25 +1786,25 @@
             })
             .then(data => {
                 showSegmentOCRLoading(false);
-                
+
                 if (data.success) {
                     showSegmentOCRStatus('success', 'OCR processing completed successfully!');
                     showAlert('success', 'OCR processing completed successfully!');
-                    
+
                     // Collect all text lines from segments and concatenate with highlighting for final segments
                     const ocrResult = document.getElementById('ocr-result');
                     if (ocrResult) {
                         let htmlContent = '';
-                        
+
                         // First try to get text from data.segments if available
                         if (data.segments && Array.isArray(data.segments) && data.segments.length > 0) {
                             const htmlLines = [];
-                            
+
                             data.segments.forEach((segment, index) => {
                                 if (segment.text) {
                                     let segmentText = '';
                                     let isFinal = segment.is_final && segment.final_text;
-                                    
+
                                     if (isFinal) {
                                         segmentText = segment.final_text;
                                     } else if (typeof segment.text === 'string') {
@@ -1777,36 +1816,33 @@
                                         // Fallback: convert to string
                                         segmentText = String(segment.text);
                                     }
-                                    
+
                                     // Clean and add the text if not empty
                                     segmentText = segmentText.trim();
                                     if (segmentText) {
                                         // Escape HTML to prevent XSS
                                         const escapedText = segmentText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                                        
-                                        if (isFinal) {
-                                            htmlLines.push(`<span class="ocr-final-line">★ ${escapedText}  </span>`);
-                                        } else {
-                                            htmlLines.push(escapedText);
-                                        }
+
+                                        const lineClasses = isFinal ? 'ocr-result-line ocr-final-line' : 'ocr-result-line';
+                                        const linePrefix = isFinal ? '★ ' : '';
+                                        htmlLines.push(`<span class="${lineClasses}" data-segment-index="${index}">${linePrefix}${escapedText}</span>`);
                                     }
                                 }
                             });
-                            
-                            // Join all text lines with line breaks
-                            htmlContent = htmlLines.join('<br>');
+
+                            htmlContent = htmlLines.join('');
                         }
-                        
+
                         // Fallback to data.text if no segments text was found
                         if (!htmlContent && data.text) {
                             // Escape HTML for fallback text as well
                             htmlContent = data.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
                         }
-                        
+
                         // Set the HTML content in the div
                         ocrResult.innerHTML = htmlContent;
                     }
-                    
+
                     // Populate the segment dropdown with the new segments
                     if (data.segments && data.segments.length > 0) {
                         populateSegmentDropdown(data.segments);
@@ -1815,7 +1851,7 @@
                         populateSegmentDropdown([]);
                         showSegmentStatus('No segments detected');
                     }
-                    
+
                     // Also reload segments to show in the navigation
                     if (currentFolder && currentPage) {
                         const pageId = currentPage.split('.')[0];
@@ -1839,7 +1875,7 @@
         const textElement = document.getElementById('segment-ocr-text');
         const loadingElement = document.getElementById('segment-ocr-loading');
         const buttonElement = document.getElementById('segment-ocr-btn');
-        
+
         if (textElement && loadingElement && buttonElement) {
             if (show) {
                 textElement.style.display = 'none';
@@ -1852,16 +1888,16 @@
             }
         }
     }
-    
+
     function showSegmentOCRStatus(type, message) {
         const statusElement = document.getElementById('segment-ocr-status');
         const messageElement = document.getElementById('segment-ocr-status-message');
-        
+
         if (statusElement && messageElement) {
             statusElement.className = `segment-ocr-status-${type}`;
             messageElement.textContent = message;
             statusElement.style.display = 'block';
-            
+
             // Auto-hide success messages after 5 seconds
             if (type === 'success') {
                 setTimeout(() => {
@@ -1870,62 +1906,62 @@
             }
         }
     }
-    
+
     function hideSegmentOCRStatus() {
         const statusElement = document.getElementById('segment-ocr-status');
         if (statusElement) {
             statusElement.style.display = 'none';
         }
     }
-    
+
     // Function to populate the segment dropdown
     function populateSegmentDropdown(segments) {
         const segmentSelect = document.getElementById('segment-select');
         if (!segmentSelect) return;
-        
+
         // Clear existing options except the default
         segmentSelect.innerHTML = '<option value="">-- Select Segment --</option>';
-        
+
         // Add segments to dropdown
         segments.forEach((segment, index) => {
             const option = document.createElement('option');
             option.value = index;  // Use index to match existing loadLineSegments behavior
-            
+
             // Create display text
             let displayText = `Segment ${index + 1}`;
             if (segment.text) {
                 const textPreview = String(segment.text).substring(0, 30);
                 displayText += `: ${textPreview}...`;
             }
-            
+
             option.textContent = displayText;
             segmentSelect.appendChild(option);
         });
-        
+
         // Check for final files and mark edited segments
         checkAndMarkEditedSegments(segments);
-        
+
         // Enable the dropdown
         segmentSelect.disabled = false;
-        
+
         // Add event listener for segment selection if not already added
         if (!segmentSelect.hasAttribute('data-listener-added')) {
             segmentSelect.addEventListener('change', handleSegmentSelection);
             segmentSelect.setAttribute('data-listener-added', 'true');
         }
     }
-    
+
     // Function to check which segments have final files and mark them as edited
     function checkAndMarkEditedSegments(segments) {
         const segmentSelect = document.getElementById('segment-select');
         if (!segmentSelect) return;
-        
+
         const pageImageFilenameBase = currentPage.replace('.png', '');
-        
+
         segments.forEach((segment, index) => {
-            const segmentId = segment.id !== undefined ? String(segment.id) : 
-                             index.toString().padStart(3, '0');
-            
+            const segmentId = segment.id !== undefined ? String(segment.id) :
+                index.toString().padStart(3, '0');
+
             // Check if this segment has a final file
             const apiUrl = '/api/get_final_segment_text?' + new URLSearchParams({
                 user_id: userId,
@@ -1933,7 +1969,7 @@
                 page_image_filename_base: pageImageFilenameBase,
                 segment_id_str: segmentId
             });
-            
+
             fetch(apiUrl)
                 .then(response => response.json())
                 .then(data => {
@@ -1952,7 +1988,7 @@
                 });
         });
     }
-    
+
     // Function to show segment status
     function showSegmentStatus(message) {
         const statusElement = document.getElementById('segment-loading');
@@ -1961,84 +1997,82 @@
             statusElement.style.color = '#059669';
         }
     }
-    
+
     // Function to handle segment selection from dropdown
     function handleSegmentSelection(event) {
         const selectedSegmentIndex = event.target.value;
         console.log('[DEBUG] Segment selected from dropdown:', selectedSegmentIndex);
-        
+
         if (selectedSegmentIndex === '' || !currentFolder || !currentPage) {
             console.log('[DEBUG] Clearing bounding boxes - no segment selected');
             clearBoundingBoxes();
             return;
         }
-        
+
         // Draw bounding box for selected segment
         const segmentIndex = parseInt(selectedSegmentIndex);
         console.log('[DEBUG] Parsed segment index:', segmentIndex);
         console.log('[DEBUG] Current segments list:', currentSegmentsList);
-        
+
         if (currentSegmentsList && segmentIndex >= 0 && segmentIndex < currentSegmentsList.length) {
-            const segment = currentSegmentsList[segmentIndex];
-            console.log('[DEBUG] Drawing bounding box for segment:', segment);
-            drawSegmentBoundingBox(segment);
+            displaySegmentByIndex(segmentIndex);
         } else {
             console.error('[DEBUG] Invalid segment index or no segments list');
         }
-            
+
     }
-    
+
     // Function to initialize the bounding box canvas
     function initializeBoundingBoxCanvas() {
         console.log('[DEBUG] Initializing bounding box canvas...');
         const previewImage = document.getElementById('preview-image');
         const canvas = document.getElementById('bounding-box-overlay');
-        
+
         console.log('[DEBUG] Elements found:', { previewImage: !!previewImage, canvas: !!canvas });
-        
+
         if (!previewImage || !canvas) {
             console.error('[DEBUG] Missing elements for bounding box canvas');
             return false;
         }
-        
+
         function resizeCanvas() {
             // Set canvas size to match image display size exactly
             const imageDisplayWidth = previewImage.offsetWidth;
             const imageDisplayHeight = previewImage.offsetHeight;
-            
+
             // Set canvas internal dimensions (affects coordinate system)
             canvas.width = imageDisplayWidth;
             canvas.height = imageDisplayHeight;
-            
+
             // Set canvas display size (affects visual size)
             canvas.style.width = imageDisplayWidth + 'px';
             canvas.style.height = imageDisplayHeight + 'px';
-            
+
             console.log('[DEBUG] Canvas resized to match image:', {
                 canvasInternalSize: { width: canvas.width, height: canvas.height },
                 canvasDisplaySize: { width: canvas.style.width, height: canvas.style.height },
                 imageDisplaySize: { width: imageDisplayWidth, height: imageDisplayHeight },
                 imageNaturalSize: { width: previewImage.naturalWidth, height: previewImage.naturalHeight }
             });
-            
+
             // Clear any existing drawings when resizing
             const ctx = canvas.getContext('2d');
             if (ctx) {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
             }
         }
-        
+
         // Wait for image to load to get correct dimensions
         if (previewImage.complete && previewImage.naturalWidth > 0) {
             console.log('[DEBUG] Image already loaded, resizing canvas immediately');
             resizeCanvas();
         } else {
             console.log('[DEBUG] Waiting for image to load...');
-            previewImage.onload = function() {
+            previewImage.onload = function () {
                 console.log('[DEBUG] Image loaded, now resizing canvas');
                 resizeCanvas();
             };
-            
+
             // Fallback: try to resize after a delay even if onload doesn't fire
             setTimeout(() => {
                 if (previewImage.naturalWidth > 0) {
@@ -2047,38 +2081,38 @@
                 }
             }, 500);
         }
-        
+
         // Resize canvas when window resizes
         window.addEventListener('resize', resizeCanvas);
         return true;
     }
-    
+
     // Function to draw bounding box for a segment
     function drawSegmentBoundingBox(segment) {
         console.log('[DEBUG] Drawing bounding box for segment:', segment);
         const canvas = document.getElementById('bounding-box-overlay');
         const previewImage = document.getElementById('preview-image');
-        
+
         if (!canvas || !previewImage) {
             console.error('[DEBUG] Missing canvas or preview image');
             return;
         }
-        
+
         if (!segment.bbox) {
             console.warn('[DEBUG] Segment has no bbox:', segment);
             return;
         }
-        
+
         const ctx = canvas.getContext('2d');
-        
+
         if (!ctx) {
             console.error('[DEBUG] Could not get canvas 2D context');
             return;
         }
-        
+
         // Clear previous drawings
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
+
         // Calculate scale factors to convert from original coords to display coords
         const imageDisplayWidth = previewImage.offsetWidth;
         const imageDisplayHeight = previewImage.offsetHeight;
@@ -2086,25 +2120,25 @@
         const imageActualHeight = previewImage.naturalHeight;
         const scaleX = imageDisplayWidth / imageActualWidth;
         const scaleY = imageDisplayHeight / imageActualHeight;
-        
+
         // Extract bounding box coordinates
         let x, y, width, height;
-        
+
         if (Array.isArray(segment.bbox) && segment.bbox.length === 4) {
             const [x1_original, y1_original, x2_original, y2_original] = segment.bbox;
-            
+
             // Scale to display coordinates
             const x1_display = x1_original * scaleX;
             const y1_display = y1_original * scaleY;
             const x2_display = x2_original * scaleX;
             const y2_display = y2_original * scaleY;
-            
+
             // Calculate final rectangle coordinates
             x = Math.min(x1_display, x2_display);
             y = Math.min(y1_display, y2_display);
             width = Math.abs(x2_display - x1_display);
             height = Math.abs(y2_display - y1_display);
-            
+
         } else if (typeof segment.bbox === 'object' && segment.bbox.x !== undefined) {
             // Format: {x, y, width, height} object in original coordinates
             x = segment.bbox.x * scaleX;
@@ -2115,29 +2149,43 @@
             console.warn('[DEBUG] Unsupported bbox format:', segment.bbox);
             return;
         }
-        
+
         // Validate coordinates
         if (x < 0 || y < 0 || width <= 0 || height <= 0) {
             console.warn('[DEBUG] Invalid coordinates calculated:', { x, y, width, height });
             return;
         }
-        
+
         // Draw red bounding box
         ctx.strokeStyle = '#dc2626';
         ctx.lineWidth = 3;
         ctx.setLineDash([]);
         ctx.strokeRect(x, y, width, height);
-        
+
         // Add semi-transparent fill
         ctx.fillStyle = 'rgba(220, 38, 38, 0.1)';
         ctx.fillRect(x, y, width, height);
-        
+
+        const imageViewport = previewImage.closest('.gradio-display-area');
+        if (imageViewport && imageViewport.scrollHeight > imageViewport.clientHeight) {
+            const viewportRect = imageViewport.getBoundingClientRect();
+            const imageRect = previewImage.getBoundingClientRect();
+            const selectedLineCenter = imageViewport.scrollTop
+                + imageRect.top
+                - viewportRect.top
+                + y
+                + height / 2;
+            const targetScrollTop = selectedLineCenter - imageViewport.clientHeight / 2;
+
+            imageViewport.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'smooth' });
+        }
+
         console.log('[DEBUG] Successfully drew bounding box');
-        
+
         // Mark that canvas has been drawn to
         canvas.setAttribute('data-has-drawing', 'true');
     }
-    
+
     // Function to clear all bounding boxes
     function clearBoundingBoxes() {
         const canvas = document.getElementById('bounding-box-overlay');
@@ -2150,51 +2198,51 @@
             console.log('[DEBUG] No canvas found to clear');
         }
     }
-    
+
 
 
     // Add to DOMContentLoaded event listener
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         console.log('[DEBUG] DOM content loaded - Canvas initialization handled by image onload events');
     });
-    
+
     // Function to confirm document deletion from OCR page
     function confirmDeleteDocumentFromOCR(documentName) {
         const modal = document.getElementById('delete-confirmation-modal');
         const title = document.getElementById('delete-modal-title');
         const message = document.getElementById('delete-modal-message');
         const confirmButton = document.getElementById('confirm-delete-button');
-        
+
         title.textContent = 'Delete Document';
         message.textContent = `Are you sure you want to delete "${documentName}" and all its OCR data? This action cannot be undone.`;
-        
+
         // Set up confirmation button
-        confirmButton.onclick = function() {
+        confirmButton.onclick = function () {
             closeDeleteConfirmationModal();
             deleteDocumentFromOCR(documentName);
         };
-        
+
         modal.style.display = 'block';
     }
-    
+
     // Function to close the delete confirmation modal
     function closeDeleteConfirmationModal() {
         document.getElementById('delete-confirmation-modal').style.display = 'none';
     }
-    
+
     // Function to delete document from OCR page
     function deleteDocumentFromOCR(documentName) {
         console.log('Deleting OCR document:', documentName);
         showSidebarAlert('processing', 'Deleting document...');
-        
+
         const userId = '{{ session.get("user_id", "anonymous") }}';
         const formData = new FormData();
         formData.append('user_id', userId);
         formData.append('document_name', documentName);
-        
+
         // Get CSRF token
         const csrfToken = document.querySelector('meta[name=csrf-token]').getAttribute('content');
-        
+
         fetch('/api/admin/delete_document', {
             method: 'POST',
             headers: {
@@ -2202,62 +2250,62 @@
             },
             body: formData
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showSidebarAlert('success', data.message);
-                
-                // Remove document from sidebar
-                const documentElement = document.querySelector(`[data-document-name="${documentName}"]`);
-                if (documentElement) {
-                    documentElement.style.transition = 'all 0.3s ease';
-                    documentElement.style.opacity = '0';
-                    documentElement.style.transform = 'translateX(-20px)';
-                    
-                    setTimeout(() => {
-                        documentElement.remove();
-                        
-                        // Update search box visibility based on remaining documents
-                        const remainingDocs = document.querySelectorAll('.document-item').length;
-                        toggleSearchBox(remainingDocs);
-                        
-                        // Check if this was the selected document
-                        if (currentFolder === documentName) {
-                            // Clear current selection and reset main content
-                            currentFolder = '';
-                            currentPage = '';
-                            hidePageSelection();
-                            hideDocumentDisplay();
-                            clearSegmentData();
-                            
-                            if (selectedDocumentInfo) {
-                                selectedDocumentInfo.style.display = 'none';
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showSidebarAlert('success', data.message);
+
+                    // Remove document from sidebar
+                    const documentElement = document.querySelector(`[data-document-name="${documentName}"]`);
+                    if (documentElement) {
+                        documentElement.style.transition = 'all 0.3s ease';
+                        documentElement.style.opacity = '0';
+                        documentElement.style.transform = 'translateX(-20px)';
+
+                        setTimeout(() => {
+                            documentElement.remove();
+
+                            // Update search box visibility based on remaining documents
+                            const remainingDocs = document.querySelectorAll('.document-item').length;
+                            toggleSearchBox(remainingDocs);
+
+                            // Check if this was the selected document
+                            if (currentFolder === documentName) {
+                                // Clear current selection and reset main content
+                                currentFolder = '';
+                                currentPage = '';
+                                hidePageSelection();
+                                hideDocumentDisplay();
+                                clearSegmentData();
+
+                                if (selectedDocumentInfo) {
+                                    selectedDocumentInfo.style.display = 'none';
+                                }
                             }
-                        }
-                        
-                        // Check if no documents left
-                        if (remainingDocs === 0) {
-                            const documentsList = document.getElementById('sidebar-documents-list');
-                            documentsList.innerHTML = `
+
+                            // Check if no documents left
+                            if (remainingDocs === 0) {
+                                const documentsList = document.getElementById('sidebar-documents-list');
+                                documentsList.innerHTML = `
                                 <div style="text-align: center; padding: 1rem; color: #666; font-size: 0.875rem;">
                                     <p>No OCR-ready documents found.</p>
                                     <p style="margin-top: 0.5rem; font-size: 0.8em;">Documents become OCR-ready after using the "Move to OCR" button in the Image Cropping Tool.</p>
                                     <button onclick="navigateToEdit()" class="gradio-button gradio-button-primary" style="display: inline-block; margin-top: 0.5rem; font-size: 0.75rem; padding: 0.5rem 0.75rem; border: none; cursor: pointer;">Go to Image Cropping Tool</button>
                                 </div>
                             `;
-                        }
-                    }, 300);
+                            }
+                        }, 300);
+                    }
+                } else {
+                    showSidebarAlert('error', data.message || 'Failed to delete document');
                 }
-            } else {
-                showSidebarAlert('error', data.message || 'Failed to delete document');
-            }
-        })
-        .catch(error => {
-            console.error('Error deleting document:', error);
-            showSidebarAlert('error', 'Network error occurred while deleting document');
-        });
+            })
+            .catch(error => {
+                console.error('Error deleting document:', error);
+                showSidebarAlert('error', 'Network error occurred while deleting document');
+            });
     }
-    
+
     // Function to show sidebar alerts
     function showSidebarAlert(type, message) {
         const sidebarAlertArea = document.getElementById('sidebar-alert-area');
@@ -2265,21 +2313,21 @@
             console.warn('Sidebar alert area not found');
             return;
         }
-        
+
         let alertClass = 'sidebar-alert-error';
         if (type === 'success') {
             alertClass = 'sidebar-alert-success';
         } else if (type === 'processing') {
             alertClass = 'sidebar-alert-success';
         }
-        
+
         sidebarAlertArea.innerHTML = `
             <div class="sidebar-alert ${alertClass}">
                 ${type === 'processing' ? '<span class="loading-spinner"></span>' : ''}
                 ${message}
             </div>
         `;
-        
+
         // Auto-hide success and processing alerts
         if (type === 'success') {
             setTimeout(() => {
@@ -2289,37 +2337,37 @@
             // Processing alerts are hidden when the operation completes
         }
     }
-    
+
     // Function to navigate to edit page
     function navigateToEdit() {
         window.location.href = "{{ url_for('app.crop_image') }}";
     }
-    
+
     // Function to load and display segments coordinates in debug info
     function loadAndDisplaySegmentsCoordinates(documentName, pageName) {
         console.log('[DEBUG] Loading segments coordinates for:', { documentName, pageName });
-        
+
         const debugPathInfo = document.getElementById('debug-path-info');
         if (!debugPathInfo) {
             console.warn('[DEBUG] Debug path info element not found');
             return;
         }
-        
+
         // Extract base filename (remove .png extension)
         const pageImageFilenameBase = pageName.split('.')[0];
         const userId = '{{ session.get("user_id", "anonymous") }}';
-        
+
         // Make API call to get segments data
         const segmentsUrl = '{{ url_for("app.get_segments", user_id="PLACEHOLDER_USER", document_folder_name="PLACEHOLDER_FOLDER", page_image_filename_base="PLACEHOLDER_PAGE") }}'
             .replace('PLACEHOLDER_USER', encodeURIComponent(userId))
             .replace('PLACEHOLDER_FOLDER', encodeURIComponent(documentName))
             .replace('PLACEHOLDER_PAGE', encodeURIComponent(pageImageFilenameBase));
-        
+
         fetch(segmentsUrl)
             .then(response => response.json())
             .then(data => {
                 console.log('[DEBUG] Segments data received:', data);
-                
+
                 // Find or create the segments coordinates section
                 let segmentsSection = debugPathInfo.querySelector('.segments-coordinates-section');
                 if (!segmentsSection) {
@@ -2327,15 +2375,15 @@
                     segmentsSection.className = 'segments-coordinates-section';
                     debugPathInfo.appendChild(segmentsSection);
                 }
-                
+
                 if (data.success && data.segments && data.segments.length > 0) {
                     let segmentsHtml = '<br><strong>Segments Coordinates:</strong>';
                     segmentsHtml += '<div style="font-family: monospace; font-size: 12px; max-height: 150px; overflow-y: auto; margin-top: 5px; padding: 5px; background-color: #f9f9f9; border: 1px solid #ccc;">';
-                    
+
                     data.segments.forEach(segment => {
                         segmentsHtml += '<div style="margin-bottom: 3px;">';
                         segmentsHtml += `<span style="color: #666;">Segment ${segment.id}:</span> `;
-                        
+
                         if (segment.bbox && segment.bbox.length >= 4) {
                             segmentsHtml += `<span style="color: #2563eb;">bbox=[${segment.bbox[0]}, ${segment.bbox[1]}, ${segment.bbox[2]}, ${segment.bbox[3]}]</span>`;
                             if (segment.confidence) {
@@ -2344,10 +2392,10 @@
                         } else {
                             segmentsHtml += '<span style="color: #dc2626;">No coordinates</span>';
                         }
-                        
+
                         segmentsHtml += '</div>';
                     });
-                    
+
                     segmentsHtml += '</div>';
                     //segmentsSection.innerHTML = segmentsHtml;
                 } else {
@@ -2365,7 +2413,7 @@
                 //segmentsSection.innerHTML = '<br><strong>Segments Coordinates:</strong> <span style="color: #dc2626; font-style: italic;">Error loading segments</span>';
             });
     }
-    
+
     // Handle image load success
     function handleImageLoaded() {
         console.log('[DEBUG] Image loaded successfully');
@@ -2374,7 +2422,7 @@
             initializeBoundingBoxCanvas();
         }, 100);
     }
-    
+
     // Handle image load error
     function handleImageError() {
         console.error('[DEBUG] Image failed to load');
@@ -2383,12 +2431,12 @@
             console.error('[DEBUG] Image src:', img.src);
         }
     }
-    
+
     // Close modal when clicking outside
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         const modal = document.getElementById('delete-confirmation-modal');
         if (modal) {
-            modal.addEventListener('click', function(e) {
+            modal.addEventListener('click', function (e) {
                 if (e.target === this) {
                     closeDeleteConfirmationModal();
                 }
@@ -2402,7 +2450,7 @@
     // Function to load final segment text if it exists
     function loadFinalSegmentText(segmentId, originalText, textEl, titleEl) {
         const pageImageFilenameBase = currentPage.replace('.png', '');
-        
+
         // Construct API URL to get final text
         const apiUrl = '/api/get_final_segment_text?' + new URLSearchParams({
             user_id: userId,
@@ -2410,20 +2458,20 @@
             page_image_filename_base: pageImageFilenameBase,
             segment_id_str: segmentId
         });
-        
+
         fetch(apiUrl)
             .then(response => response.json())
             .then(data => {
                 if (data.success && data.has_final) {
                     // Use final text instead of original
                     textEl.value = data.final_text;
-                    
+
                     // Update title to indicate this segment has been edited
                     if (data.is_different) {
                         const segmentNumber = currentSegmentDisplayIndex + 1;
                         titleEl.textContent = `Preview of Segment ${segmentNumber} ✏️ (Edited)`;
                         titleEl.style.color = '#28a745';
-                        
+
                         // Add visual indicator to the textarea
                         textEl.style.backgroundColor = '#f8fff8';
                         textEl.style.borderLeftColor = '#28a745';
@@ -2437,12 +2485,12 @@
                         textEl.style.borderLeftColor = '';
                         textEl.style.borderLeftWidth = '';
                     }
-                    
+
                     // Set original text for change tracking (use final text as the baseline)
                     if (typeof window.setOriginalSegmentText === 'function') {
                         window.setOriginalSegmentText(data.final_text);
                     }
-                    
+
                     console.log('[loadFinalSegmentText] Loaded final text for segment:', segmentId, {
                         hasFinal: data.has_final,
                         isDifferent: data.is_different,
@@ -2451,7 +2499,7 @@
                 } else {
                     // No final file exists, use original text
                     textEl.value = originalText;
-                    
+
                     // Reset title styling
                     const segmentNumber = currentSegmentDisplayIndex + 1;
                     titleEl.textContent = `Preview of Segment ${segmentNumber}`;
@@ -2459,12 +2507,12 @@
                     textEl.style.backgroundColor = '';
                     textEl.style.borderLeftColor = '';
                     textEl.style.borderLeftWidth = '';
-                    
+
                     // Set original text for change tracking
                     if (typeof window.setOriginalSegmentText === 'function') {
                         window.setOriginalSegmentText(originalText);
                     }
-                    
+
                     console.log('[loadFinalSegmentText] No final text for segment:', segmentId, 'using original');
                 }
             })
@@ -2472,7 +2520,7 @@
                 console.error('[loadFinalSegmentText] Error loading final text:', error);
                 // Fall back to original text
                 textEl.value = originalText;
-                
+
                 // Reset title styling
                 const segmentNumber = currentSegmentDisplayIndex + 1;
                 titleEl.textContent = `Preview of Segment ${segmentNumber}`;
@@ -2480,7 +2528,7 @@
                 textEl.style.backgroundColor = '';
                 textEl.style.borderLeftColor = '';
                 textEl.style.borderLeftWidth = '';
-                
+
                 // Set original text for change tracking
                 if (typeof window.setOriginalSegmentText === 'function') {
                     window.setOriginalSegmentText(originalText);
@@ -2506,9 +2554,9 @@
 
         // Get current segment data
         const currentSegment = currentSegmentsList[currentSegmentDisplayIndex];
-        const segmentId = currentSegment.id !== undefined ? String(currentSegment.id) : 
-                         currentSegmentDisplayIndex.toString().padStart(3, '0');
-        
+        const segmentId = currentSegment.id !== undefined ? String(currentSegment.id) :
+            currentSegmentDisplayIndex.toString().padStart(3, '0');
+
         // Get the text from the textarea
         const finalText = segmentTextArea.value;
 
@@ -2540,81 +2588,81 @@
             },
             body: JSON.stringify(requestData)
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                console.log('Final segment text saved successfully:', data);
-                showAlert('success', 'Segment text saved successfully');
-                
-                // Visual feedback - brief green background
-                segmentTextArea.style.backgroundColor = '#d4edda';
-                segmentTextArea.style.borderColor = '#28a745';
-                
-                // Reset unsaved changes tracking
-                if (typeof window.setOriginalSegmentText === 'function') {
-                    window.setOriginalSegmentText(finalText);
-                }
-                
-                // Update visual indicators to show this segment is now edited
-                const titleEl = document.getElementById('sidebar-segment-title');
-                if (titleEl) {
-                    const segmentNumber = currentSegmentDisplayIndex + 1;
-                    titleEl.textContent = `Preview of Segment ${segmentNumber} ✏️ (Edited)`;
-                    titleEl.style.color = '#28a745';
-                    titleEl.style.fontWeight = 'bold';
-                    
-                    // Update textarea styling to show it's been edited
-                    segmentTextArea.style.backgroundColor = '#f8fff8';
-                    segmentTextArea.style.borderLeftColor = '#28a745';
-                    segmentTextArea.style.borderLeftWidth = '3px';
-                }
-                
-                // Update dropdown to show edit indicator
-                const segmentSelect = document.getElementById('segment-select');
-                if (segmentSelect && segmentSelect.options[currentSegmentDisplayIndex + 1]) {
-                    const option = segmentSelect.options[currentSegmentDisplayIndex + 1];
-                    if (!option.textContent.includes('✏️')) {
-                        // Remove any existing   or other indicators first
-                        let cleanText = option.textContent.replace(/\s*\[FINAL\]\s*|\s*✏️\s*/g, '');
-                        option.textContent = `✏️ ${cleanText}`;
-                        option.style.color = '#28a745';
-                        option.style.fontWeight = 'bold';
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('Final segment text saved successfully:', data);
+                    showAlert('success', 'Segment text saved successfully');
+
+                    // Visual feedback - brief green background
+                    segmentTextArea.style.backgroundColor = '#d4edda';
+                    segmentTextArea.style.borderColor = '#28a745';
+
+                    // Reset unsaved changes tracking
+                    if (typeof window.setOriginalSegmentText === 'function') {
+                        window.setOriginalSegmentText(finalText);
                     }
-                }
-                
-                // Reload segments to pick up the .final file and update OCR results
-                setTimeout(() => {
-                    if (currentSegmentFolderGlobal && currentSegmentPageIdGlobal) {
-                        console.log('Reloading segments after save to pick up .final file');
-                        loadLineSegments(currentSegmentFolderGlobal, currentSegmentPageIdGlobal)
-                            .then(() => {
-                                // After reload, re-select the same segment to show the updated state
-                                if (currentSegmentDisplayIndex >= 0 && currentSegmentDisplayIndex < currentSegmentsList.length) {
-                                    displaySegmentByIndex(currentSegmentDisplayIndex, false);
-                                }
-                            })
-                            .catch(err => console.error('Error reloading segments:', err));
+
+                    // Update visual indicators to show this segment is now edited
+                    const titleEl = document.getElementById('sidebar-segment-title');
+                    if (titleEl) {
+                        const segmentNumber = currentSegmentDisplayIndex + 1;
+                        titleEl.textContent = `Preview of Segment ${segmentNumber} ✏️ (Edited)`;
+                        titleEl.style.color = '#28a745';
+                        titleEl.style.fontWeight = 'bold';
+
+                        // Update textarea styling to show it's been edited
+                        segmentTextArea.style.backgroundColor = '#f8fff8';
+                        segmentTextArea.style.borderLeftColor = '#28a745';
+                        segmentTextArea.style.borderLeftWidth = '3px';
                     }
-                }, 500);
-                
-                setTimeout(() => {
-                    segmentTextArea.style.backgroundColor = '#fff3c4'; // Keep final segment background
-                    segmentTextArea.style.borderColor = '#ffa726';
-                }, 1000);
-            } else {
-                console.error('Failed to save final segment text:', data.message);
-                showAlert('error', `Failed to save: ${data.message}`);
+
+                    // Update dropdown to show edit indicator
+                    const segmentSelect = document.getElementById('segment-select');
+                    if (segmentSelect && segmentSelect.options[currentSegmentDisplayIndex + 1]) {
+                        const option = segmentSelect.options[currentSegmentDisplayIndex + 1];
+                        if (!option.textContent.includes('✏️')) {
+                            // Remove any existing   or other indicators first
+                            let cleanText = option.textContent.replace(/\s*\[FINAL\]\s*|\s*✏️\s*/g, '');
+                            option.textContent = `✏️ ${cleanText}`;
+                            option.style.color = '#28a745';
+                            option.style.fontWeight = 'bold';
+                        }
+                    }
+
+                    // Reload segments to pick up the .final file and update OCR results
+                    setTimeout(() => {
+                        if (currentSegmentFolderGlobal && currentSegmentPageIdGlobal) {
+                            console.log('Reloading segments after save to pick up .final file');
+                            loadLineSegments(currentSegmentFolderGlobal, currentSegmentPageIdGlobal)
+                                .then(() => {
+                                    // After reload, re-select the same segment to show the updated state
+                                    if (currentSegmentDisplayIndex >= 0 && currentSegmentDisplayIndex < currentSegmentsList.length) {
+                                        displaySegmentByIndex(currentSegmentDisplayIndex, false);
+                                    }
+                                })
+                                .catch(err => console.error('Error reloading segments:', err));
+                        }
+                    }, 500);
+
+                    setTimeout(() => {
+                        segmentTextArea.style.backgroundColor = '#fff3c4'; // Keep final segment background
+                        segmentTextArea.style.borderColor = '#ffa726';
+                    }, 1000);
+                } else {
+                    console.error('Failed to save final segment text:', data.message);
+                    showAlert('error', `Failed to save: ${data.message}`);
+                    segmentTextArea.style.backgroundColor = originalText;
+                }
+            })
+            .catch(error => {
+                console.error('Error saving final segment text:', error);
+                showAlert('error', 'Error saving segment text. Please try again.');
                 segmentTextArea.style.backgroundColor = originalText;
-            }
-        })
-        .catch(error => {
-            console.error('Error saving final segment text:', error);
-            showAlert('error', 'Error saving segment text. Please try again.');
-            segmentTextArea.style.backgroundColor = originalText;
-        })
-        .finally(() => {
-            segmentTextArea.disabled = false;
-        });
+            })
+            .finally(() => {
+                segmentTextArea.disabled = false;
+            });
     }
 
     // Download OCR Text functionality for documents
@@ -2633,19 +2681,19 @@
         }
 
         const userId = '{{ session.get("user_id", "anonymous") }}';
-        
+
         // Always try to download ALL pages for the document first
         // This ensures we get the complete document, not just the current page
         let downloadPromise;
-        
+
         // Try multiple approaches to discover and download all pages
         // 1. First try API to get pages list
         // 2. If that fails, try comprehensive page discovery
         // 3. If no pages found, create empty document
-        
+
         const pagesApiUrl = '{{ url_for("app.api_get_user_documents", user_id="PLACEHOLDER_USER") }}'
             .replace('PLACEHOLDER_USER', encodeURIComponent(userId));
-        
+
         downloadPromise = fetch(pagesApiUrl)
             .then(response => {
                 console.log(`API request for documents made to: ${pagesApiUrl}`);
@@ -2666,7 +2714,7 @@
                         console.log(`Document "${documentName}" found in API but no pages:`, document);
                     }
                 }
-                
+
                 // If API didn't provide pages or document not found, try comprehensive page discovery
                 console.log('API did not provide pages, trying comprehensive page discovery...');
                 return downloadWithComprehensivePageDiscovery(documentName);
@@ -2676,7 +2724,7 @@
                 console.log('API failed completely, trying page discovery as fallback...', apiError);
                 return downloadWithComprehensivePageDiscovery(documentName);
             });
-        
+
         downloadPromise
             .catch(error => {
                 console.error('Download document OCR error:', error);
@@ -2696,7 +2744,7 @@
     function downloadCurrentPageOCR(documentName, pageFilename) {
         const userId = '{{ session.get("user_id", "anonymous") }}';
         const pageId = pageFilename.split('.')[0]; // Remove file extension
-        
+
         const apiUrl = '{{ url_for("app.get_complete_ocr_text", user_id="PLACEHOLDER_USER", document_folder_name="PLACEHOLDER_FOLDER", page_image_filename_base="PLACEHOLDER_PAGE") }}'
             .replace('PLACEHOLDER_USER', encodeURIComponent(userId))
             .replace('PLACEHOLDER_FOLDER', encodeURIComponent(documentName))
@@ -2714,7 +2762,7 @@
                     // Create filename with document, page, and timestamp
                     const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
                     const filename = `${documentName}_${pageId}_OCR_${timestamp}.txt`;
-                    
+
                     // Prepare download content with metadata
                     let downloadContent = '';
                     downloadContent += `OCR Text Export\n`;
@@ -2728,7 +2776,7 @@
                     downloadContent += `Text Content:\n`;
                     downloadContent += `=============\n`;
                     downloadContent += `${data.complete_text || '(No text content available)'}\n`;
-                    
+
                     // Add segment details if available
                     if (data.segments_used && data.segments_used.length > 0) {
                         downloadContent += `\n`;
@@ -2742,7 +2790,7 @@
                             downloadContent += `Final=${segment.has_final ? 'Yes' : 'No'}\n`;
                         });
                     }
-                    
+
                     // Create and trigger download
                     const blob = new Blob([downloadContent], { type: 'text/plain;charset=utf-8' });
                     const url = window.URL.createObjectURL(blob);
@@ -2753,7 +2801,7 @@
                     a.click();
                     document.body.removeChild(a);
                     window.URL.revokeObjectURL(url);
-                    
+
                     // Show success message
                     const finalCount = data.final_segments_count || 0;
                     const totalCount = data.total_segments || 0;
@@ -2771,9 +2819,9 @@
     // Helper function to download OCR text for multiple pages
     function downloadMultiplePages(documentName, pages) {
         const userId = '{{ session.get("user_id", "anonymous") }}';
-        
+
         console.log(`downloadMultiplePages called for "${documentName}" with ${pages.length} pages:`, pages);
-        
+
         // Collect OCR text from all pages - handle cases where pages exist but have no OCR
         return Promise.all(pages.map(page => {
             const pageId = page.replace('.png', ''); // Remove extension
@@ -2781,9 +2829,9 @@
                 .replace('PLACEHOLDER_USER', encodeURIComponent(userId))
                 .replace('PLACEHOLDER_FOLDER', encodeURIComponent(documentName))
                 .replace('PLACEHOLDER_PAGE', encodeURIComponent(pageId));
-            
+
             console.log(`Fetching OCR for page "${page}" (pageId: "${pageId}") from:`, pageApiUrl);
-            
+
             return fetch(pageApiUrl)
                 .then(response => {
                     if (!response.ok) {
@@ -2827,117 +2875,117 @@
                     };
                 });
         }))
-        .then(allPagesData => {
-            // Create comprehensive download content
-            const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
-            const filename = `${documentName}_Complete_OCR_${timestamp}.txt`;
-            
-            let downloadContent = '';
-            downloadContent += `Complete OCR Text Export\n`;
-            downloadContent += `========================\n`;
-            downloadContent += `Document: ${documentName}\n`;
-            downloadContent += `Export Date: ${new Date().toLocaleString()}\n`;
-            downloadContent += `Total Pages: ${allPagesData.length}\n`;
-            
-            let totalSegments = 0;
-            let totalFinalSegments = 0;
-            
-            allPagesData.forEach(pageData => {
-                totalSegments += pageData.totalSegments;
-                totalFinalSegments += pageData.finalSegments;
-            });
-            
-            downloadContent += `Total Segments: ${totalSegments}\n`;
-            downloadContent += `Edited Segments: ${totalFinalSegments}\n`;
-            downloadContent += `\n`;
-            
-            // Add content for each page
-            allPagesData.forEach((pageData, index) => {
-                downloadContent += `Page ${index + 1} (${pageData.page})\n`;
-                downloadContent += `${'='.repeat(30)}\n`;
-                
-                if (pageData.success && pageData.text) {
-                    downloadContent += `${pageData.text}\n`;
-                } else {
-                    downloadContent += `(No OCR text available for this page)\n`;
-                }
-                
+            .then(allPagesData => {
+                // Create comprehensive download content
+                const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+                const filename = `${documentName}_Complete_OCR_${timestamp}.txt`;
+
+                let downloadContent = '';
+                downloadContent += `Complete OCR Text Export\n`;
+                downloadContent += `========================\n`;
+                downloadContent += `Document: ${documentName}\n`;
+                downloadContent += `Export Date: ${new Date().toLocaleString()}\n`;
+                downloadContent += `Total Pages: ${allPagesData.length}\n`;
+
+                let totalSegments = 0;
+                let totalFinalSegments = 0;
+
+                allPagesData.forEach(pageData => {
+                    totalSegments += pageData.totalSegments;
+                    totalFinalSegments += pageData.finalSegments;
+                });
+
+                downloadContent += `Total Segments: ${totalSegments}\n`;
+                downloadContent += `Edited Segments: ${totalFinalSegments}\n`;
                 downloadContent += `\n`;
-            });
-            
-            // Add summary
-            downloadContent += `Summary\n`;
-            downloadContent += `=======\n`;
-            allPagesData.forEach((pageData, index) => {
-                downloadContent += `Page ${index + 1}: ${pageData.totalSegments} segments`;
-                if (pageData.finalSegments > 0) {
-                    downloadContent += ` (${pageData.finalSegments} edited)`;
-                }
-                downloadContent += `\n`;
-            });
-            
-            // Create and trigger download
-            const blob = new Blob([downloadContent], { type: 'text/plain;charset=utf-8' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-            
-            // Show success message with detailed feedback
-            const pagesWithOCR = allPagesData.filter(p => p.success && p.totalSegments > 0).length;
-            const pagesWithoutOCR = allPagesData.length - pagesWithOCR;
-            
-            let successMessage = `Downloaded document "${documentName}" (${allPagesData.length} pages total)`;
-            
-            if (pagesWithOCR > 0) {
-                successMessage += ` - ${pagesWithOCR} pages with OCR content (${totalSegments} segments)`;
-                if (totalFinalSegments > 0) {
-                    successMessage += `, ${totalFinalSegments} edited segments prioritized`;
-                }
-            }
-            
-            if (pagesWithoutOCR > 0) {
+
+                // Add content for each page
+                allPagesData.forEach((pageData, index) => {
+                    downloadContent += `Page ${index + 1} (${pageData.page})\n`;
+                    downloadContent += `${'='.repeat(30)}\n`;
+
+                    if (pageData.success && pageData.text) {
+                        downloadContent += `${pageData.text}\n`;
+                    } else {
+                        downloadContent += `(No OCR text available for this page)\n`;
+                    }
+
+                    downloadContent += `\n`;
+                });
+
+                // Add summary
+                downloadContent += `Summary\n`;
+                downloadContent += `=======\n`;
+                allPagesData.forEach((pageData, index) => {
+                    downloadContent += `Page ${index + 1}: ${pageData.totalSegments} segments`;
+                    if (pageData.finalSegments > 0) {
+                        downloadContent += ` (${pageData.finalSegments} edited)`;
+                    }
+                    downloadContent += `\n`;
+                });
+
+                // Create and trigger download
+                const blob = new Blob([downloadContent], { type: 'text/plain;charset=utf-8' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+
+                // Show success message with detailed feedback
+                const pagesWithOCR = allPagesData.filter(p => p.success && p.totalSegments > 0).length;
+                const pagesWithoutOCR = allPagesData.length - pagesWithOCR;
+
+                let successMessage = `Downloaded document "${documentName}" (${allPagesData.length} pages total)`;
+
                 if (pagesWithOCR > 0) {
-                    successMessage += `, ${pagesWithoutOCR} pages need OCR processing`;
-                } else {
-                    successMessage += ` - All pages need OCR processing`;
+                    successMessage += ` - ${pagesWithOCR} pages with OCR content (${totalSegments} segments)`;
+                    if (totalFinalSegments > 0) {
+                        successMessage += `, ${totalFinalSegments} edited segments prioritized`;
+                    }
                 }
-            }
-            
-            const alertType = (pagesWithOCR > 0) ? 'success' : 'info';
-            showAlert(alertType, successMessage);
-        });
+
+                if (pagesWithoutOCR > 0) {
+                    if (pagesWithOCR > 0) {
+                        successMessage += `, ${pagesWithoutOCR} pages need OCR processing`;
+                    } else {
+                        successMessage += ` - All pages need OCR processing`;
+                    }
+                }
+
+                const alertType = (pagesWithOCR > 0) ? 'success' : 'info';
+                showAlert(alertType, successMessage);
+            });
     }
 
     // Enhanced page discovery function that handles empty documents gracefully
     function downloadWithComprehensivePageDiscovery(documentName) {
         const userId = '{{ session.get("user_id", "anonymous") }}';
-        
+
         // Try to discover pages by attempting to fetch OCR for comprehensive page patterns
         const pagesToTry = [];
-        
+
         // Try page_001.png, page_002.png, etc. up to page_100 for very large documents
         for (let i = 1; i <= 100; i++) {
             const pageId = `page_${i.toString().padStart(3, '0')}`;
             pagesToTry.push(pageId);
-            
+
             // Also try crop patterns for each page: page_001_crop_001, page_001_crop_002, etc.
             for (let j = 1; j <= 20; j++) {
                 const cropId = `page_${i.toString().padStart(3, '0')}_crop_${j.toString().padStart(3, '0')}`;
                 pagesToTry.push(cropId);
             }
         }
-        
+
         // Also try other common patterns like page1, page2, etc.
         for (let i = 1; i <= 50; i++) {
             pagesToTry.push(`page${i}`);
             pagesToTry.push(`page_${i}`);
             pagesToTry.push(`p${i}`);
-            
+
             // Add crop patterns for these too
             for (let j = 1; j <= 10; j++) {
                 pagesToTry.push(`page${i}_crop${j}`);
@@ -2946,20 +2994,20 @@
                 pagesToTry.push(`page_${i}_crop_${j.toString().padStart(3, '0')}`);
             }
         }
-        
+
         console.log(`Attempting comprehensive page discovery for "${documentName}" using ${pagesToTry.length} patterns...`);
-        
+
         // Test which pages actually exist by making API calls with timeout
         const pageTests = pagesToTry.map(pageId => {
             const pageApiUrl = '{{ url_for("app.get_complete_ocr_text", user_id="PLACEHOLDER_USER", document_folder_name="PLACEHOLDER_FOLDER", page_image_filename_base="PLACEHOLDER_PAGE") }}'
                 .replace('PLACEHOLDER_USER', encodeURIComponent(userId))
                 .replace('PLACEHOLDER_FOLDER', encodeURIComponent(documentName))
                 .replace('PLACEHOLDER_PAGE', encodeURIComponent(pageId));
-            
+
             // Add timeout to prevent hanging
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout per page
-            
+
             return fetch(pageApiUrl, { signal: controller.signal })
                 .then(response => {
                     clearTimeout(timeoutId);
@@ -2989,60 +3037,60 @@
                     return null; // Page doesn't exist or error
                 });
         });
-        
+
         return Promise.all(pageTests)
             .then(results => {
                 // Filter out null results (pages that don't exist)
                 const validPages = results.filter(result => result !== null && result !== undefined);
-                
+
                 console.log(`Page discovery complete: found ${validPages.length} pages with OCR content for "${documentName}"`);
-                
+
                 if (validPages.length === 0) {
                     // No OCR content found - create empty document
                     console.log(`No OCR content found for "${documentName}", creating empty document download...`);
                     return downloadEmptyDocument(documentName);
                 }
-                
+
                 // Sort pages by pageId to maintain order
                 validPages.sort((a, b) => a.pageId.localeCompare(b.pageId));
-                
+
                 // Create comprehensive download content
                 const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
                 const filename = `${documentName}_OCR_${timestamp}.txt`;
-                
+
                 let downloadContent = '';
                 downloadContent += `OCR Text Export\n`;
                 downloadContent += `================\n`;
                 downloadContent += `Document: ${documentName}\n`;
                 downloadContent += `Export Date: ${new Date().toLocaleString()}\n`;
                 downloadContent += `Total Pages: ${validPages.length}\n`;
-                
+
                 let totalSegments = 0;
                 let totalFinalSegments = 0;
-                
+
                 validPages.forEach(pageData => {
                     totalSegments += pageData.totalSegments;
                     totalFinalSegments += pageData.finalSegments;
                 });
-                
+
                 downloadContent += `Total Segments: ${totalSegments}\n`;
                 downloadContent += `Edited Segments: ${totalFinalSegments}\n`;
                 downloadContent += `\n`;
-                
+
                 // Add content for each page
                 validPages.forEach((pageData, index) => {
                     downloadContent += `Page ${index + 1} (${pageData.pageId})\n`;
                     downloadContent += `${'='.repeat(30)}\n`;
-                    
+
                     if (pageData.text) {
                         downloadContent += `${pageData.text}\n`;
                     } else {
                         downloadContent += `(No OCR text available for this page)\n`;
                     }
-                    
+
                     downloadContent += `\n`;
                 });
-                
+
                 // Add summary
                 downloadContent += `Summary\n`;
                 downloadContent += `=======\n`;
@@ -3053,7 +3101,7 @@
                     }
                     downloadContent += `\n`;
                 });
-                
+
                 // Create and trigger download
                 const blob = new Blob([downloadContent], { type: 'text/plain;charset=utf-8' });
                 const url = window.URL.createObjectURL(blob);
@@ -3064,7 +3112,7 @@
                 a.click();
                 document.body.removeChild(a);
                 window.URL.revokeObjectURL(url);
-                
+
                 // Show success message
                 let successMessage = `Downloaded OCR text for ${documentName} (${validPages.length} pages found, ${totalSegments} segments)`;
                 if (totalFinalSegments > 0) {
@@ -3078,7 +3126,7 @@
     function downloadEmptyDocument(documentName) {
         const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
         const filename = `${documentName}_Empty_OCR_${timestamp}.txt`;
-        
+
         let downloadContent = '';
         downloadContent += `OCR Text Export (Empty Document)\n`;
         downloadContent += `================================\n`;
@@ -3097,7 +3145,7 @@
         downloadContent += `2. Click "Segment & OCR" to process the page\n`;
         downloadContent += `3. Repeat for all pages in the document\n`;
         downloadContent += `4. Download again to get the complete OCR text\n`;
-        
+
         // Create and trigger download
         const blob = new Blob([downloadContent], { type: 'text/plain;charset=utf-8' });
         const url = window.URL.createObjectURL(blob);
@@ -3108,10 +3156,10 @@
         a.click();
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
-        
+
         // Show informative message
         showAlert('info', `Downloaded empty document template for "${documentName}". No OCR content found - please process pages with OCR first.`);
-        
+
         return Promise.resolve(); // Return resolved promise to maintain chain
     }
 </script>
