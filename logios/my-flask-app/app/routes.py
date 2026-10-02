@@ -44,140 +44,9 @@ def index():
     return render_template("index.html")
 
 
-# Add exemption for upload routes from CSRF to fix upload issues
-from app import csrf
-
-
-# Exempt the upload route to resolve the 400 error
-@csrf.exempt
-@app.route("/show_upload_page", methods=["POST", "GET"])
+@app.route("/show_upload_page", methods=["GET"])
 @login_required
 def show_upload_page():
-    if request.method == "POST":
-        if "file" not in request.files:
-            flash("No file part in the request.", "danger")
-            return redirect(request.url)
-
-        uploaded_file_storage = request.files["file"]
-        if uploaded_file_storage.filename == "":
-            flash("No selected file.", "warning")
-            return redirect(request.url)
-
-        if uploaded_file_storage and allowed_file(uploaded_file_storage.filename):
-            from app.models import UploadedFile, db
-            from datetime import datetime
-
-            user_id = current_user.get_user_folder_name()
-            original_filename = uploaded_file_storage.filename  # No sanitization
-
-            # Task 1: Handle PDF Upload and Folder Creation with automatic folder name
-            doc_folder_path, saved_pdf_path, doc_folder_name = (
-                file_operations.handle_pdf_upload_with_auto_folder_no_sanitize(
-                    current_app.config,
-                    user_id,
-                    uploaded_file_storage,
-                )
-            )
-
-            if not doc_folder_path:
-                flash(
-                    "Error saving uploaded file or creating document folder.", "danger"
-                )
-                return redirect(request.url)
-
-            current_app.logger.info(
-                f"File uploaded to {saved_pdf_path} in document folder {doc_folder_name}"
-            )
-
-            # Get file information for database
-            file_size = os.path.getsize(saved_pdf_path)
-            file_type = "pdf" if original_filename.lower().endswith(".pdf") else "image"
-            mime_type, _ = mimetypes.guess_type(original_filename)
-            stored_filename = os.path.basename(saved_pdf_path)
-            relative_file_path = os.path.relpath(
-                saved_pdf_path, current_app.config["UPLOAD_FOLDER"]
-            )
-
-            # Create database record for uploaded file
-            try:
-                uploaded_file_record = UploadedFile(
-                    user_id=current_user.id,
-                    original_filename=original_filename,
-                    stored_filename=stored_filename,
-                    file_type=file_type,
-                    file_size=file_size,
-                    mime_type=mime_type,
-                    document_folder=doc_folder_name,
-                    file_path=relative_file_path,
-                    processing_status="in_progress",
-                )
-                db.session.add(uploaded_file_record)
-                db.session.commit()
-                current_app.logger.info(
-                    f"Created database record for uploaded file: {original_filename}"
-                )
-            except Exception as e:
-                current_app.logger.error(f"Error creating database record: {e}")
-                flash("File uploaded but database record creation failed.", "warning")
-
-            # Task 2: PDF to PNG Conversion (if it's a PDF)
-            if original_filename.lower().endswith(".pdf"):
-                current_app.logger.info(
-                    f"Starting PDF to PNG conversion for: {saved_pdf_path}"
-                )
-
-                # Keep status as "in_progress" during PDF conversion (don't change to "under_ocr")
-                # The status will only change to "under_ocr" when user clicks "Move to OCR"
-
-                success_conversion, png_message_or_paths = (
-                    file_operations.convert_pdf_to_png_pages(
-                        current_app.config, user_id, doc_folder_name, saved_pdf_path
-                    )
-                )
-                if success_conversion:
-                    current_app.logger.info(
-                        f"Successfully converted PDF to {len(png_message_or_paths)} PNGs for document {doc_folder_name}."
-                    )
-
-                    # Update page count but keep status as "in_progress"
-                    try:
-                        uploaded_file_record.page_count = len(png_message_or_paths)
-                        db.session.commit()
-                    except:
-                        pass
-
-                    flash(
-                        f"'{original_filename}' uploaded and converted to PNGs successfully!",
-                        "success",
-                    )
-                else:
-                    current_app.logger.error(
-                        f"Error converting PDF to PNG for {doc_folder_name}: {png_message_or_paths}"
-                    )
-
-                    # Update processing status to failed only if conversion fails
-                    try:
-                        uploaded_file_record.update_processing_status("failed")
-                    except:
-                        pass
-
-                    flash(
-                        f"File uploaded, but error during PDF to PNG conversion: {png_message_or_paths}",
-                        "danger",
-                    )
-                    return redirect(request.url)
-            else:
-                # For images, keep status as "uploaded" (will change to "processing" when moved to OCR)
-                flash(
-                    f"Image '{original_filename}' uploaded successfully!",
-                    "success",
-                )
-
-            return redirect(url_for("app.crop_image", selected_folder=doc_folder_name))
-        else:
-            flash("File type not allowed.", "warning")
-            return redirect(request.url)
-
     return render_template("show_upload_page.html")
 
 
@@ -1848,7 +1717,6 @@ cleanup_thread = threading.Thread(target=periodic_cleanup, daemon=True)
 cleanup_thread.start()
 
 
-@csrf.exempt
 @app.route("/api/upload_with_progress", methods=["POST"])
 @login_required
 def api_upload_with_progress():
@@ -1879,22 +1747,51 @@ def api_upload_with_progress():
         # Initialize progress tracking
         import time
 
+        user_folder_name = current_user.get_user_folder_name()
+        user_database_id = current_user.id
+        original_filename = uploaded_file_storage.filename
+
         upload_progress_store[upload_id] = {
-            "status": "uploading",
+            "status": "processing",
             "total_pages": 0,
             "converted_pages": 0,
-            "current_message": "File uploaded, starting processing...",
+            "current_message": "Saving uploaded file...",
             "document_folder": None,
             "error_message": None,
-            "user_id": current_user.get_user_folder_name(),
-            "filename": uploaded_file_storage.filename,
+            "user_id": user_folder_name,
+            "filename": original_filename,
             "timestamp": time.time(),
         }
 
-        # Start upload processing in background thread
+        doc_folder_path, saved_file_path, doc_folder_name = (
+            file_operations.handle_pdf_upload_with_auto_folder_no_sanitize(
+                current_app.config, user_folder_name, uploaded_file_storage
+            )
+        )
+        if not doc_folder_path:
+            progress = upload_progress_store[upload_id]
+            progress["status"] = "failed"
+            progress["error_message"] = (
+                "Error saving uploaded file or creating document folder"
+            )
+            return jsonify({"success": False, "message": progress["error_message"]}), 500
+
+        progress = upload_progress_store[upload_id]
+        progress["document_folder"] = doc_folder_name
+        progress["current_message"] = "File saved, starting document processing..."
+
+        flask_app = current_app._get_current_object()
         thread = threading.Thread(
             target=process_upload_with_progress,
-            args=(upload_id, uploaded_file_storage, current_user, current_app.config),
+            args=(
+                flask_app,
+                upload_id,
+                user_database_id,
+                user_folder_name,
+                original_filename,
+                saved_file_path,
+                doc_folder_name,
+            ),
         )
         thread.daemon = True
         thread.start()
@@ -1944,59 +1841,39 @@ def api_get_upload_progress(upload_id):
         )
 
 
-def process_upload_with_progress(upload_id, uploaded_file_storage, user, app_config):
+def process_upload_with_progress(
+    app,
+    upload_id,
+    user_database_id,
+    user_folder_name,
+    original_filename,
+    saved_file_path,
+    doc_folder_name,
+):
     """
-    Background function to process file upload with progress tracking.
+    Background function to process a saved upload with progress tracking.
     Updates progress in upload_progress_store.
     """
     from app.models import UploadedFile, db
-    from app import create_app
-
-    # Create app context for background thread
-    app = create_app()
 
     with app.app_context():
         try:
-            # Get progress tracker
             progress = upload_progress_store[upload_id]
-
-            user_id = user.get_user_folder_name()
-            original_filename = uploaded_file_storage.filename
-
-            progress["current_message"] = "Creating document folder..."
-
-            # Handle PDF Upload and Folder Creation
-            doc_folder_path, saved_pdf_path, doc_folder_name = (
-                file_operations.handle_pdf_upload_with_auto_folder_no_sanitize(
-                    app_config, user_id, uploaded_file_storage
-                )
-            )
-
-            if not doc_folder_path:
-                progress["status"] = "failed"
-                progress["error_message"] = (
-                    "Error saving uploaded file or creating document folder"
-                )
-                return
-
-            progress["document_folder"] = doc_folder_name
-            progress["current_message"] = (
-                f"File saved to document folder: {doc_folder_name}"
-            )
+            app_config = app.config
 
             # Get file information for database
-            file_size = os.path.getsize(saved_pdf_path)
+            file_size = os.path.getsize(saved_file_path)
             file_type = "pdf" if original_filename.lower().endswith(".pdf") else "image"
             mime_type, _ = mimetypes.guess_type(original_filename)
-            stored_filename = os.path.basename(saved_pdf_path)
+            stored_filename = os.path.basename(saved_file_path)
             relative_file_path = os.path.relpath(
-                saved_pdf_path, app_config["UPLOAD_FOLDER"]
+                saved_file_path, app_config["UPLOAD_FOLDER"]
             )
 
             # Create database record for uploaded file
             try:
                 uploaded_file_record = UploadedFile(
-                    user_id=user.id,
+                    user_id=user_database_id,
                     original_filename=original_filename,
                     stored_filename=stored_filename,
                     file_type=file_type,
@@ -2025,7 +1902,11 @@ def process_upload_with_progress(upload_id, uploaded_file_storage, user, app_con
                 # Custom PDF conversion with progress tracking
                 success_conversion, png_paths_or_message = (
                     convert_pdf_with_progress_tracking(
-                        app_config, user_id, doc_folder_name, saved_pdf_path, upload_id
+                        app_config,
+                        user_folder_name,
+                        doc_folder_name,
+                        saved_file_path,
+                        upload_id,
                     )
                 )
 
