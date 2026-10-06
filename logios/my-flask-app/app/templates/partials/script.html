@@ -42,10 +42,11 @@
     const currentDocumentName = document.getElementById('current-document-name');
     const pageSelectionContainer = document.getElementById('page-selection-container');
     const documentDisplayContainer = document.getElementById('document-display-container');
+    const initialPageParams = new URLSearchParams(window.location.search);
     const initialPageState = {
-        folder: {{ selected_folder | tojson }},
-    page: { { selected_png | tojson } },
-    segmentIndex: { { selected_segment | tojson } }
+        folder: initialPageParams.get('selected_folder'),
+        page: initialPageParams.get('selected_png'),
+        segmentIndex: initialPageParams.get('selected_segment')
     };
 
     // Current state

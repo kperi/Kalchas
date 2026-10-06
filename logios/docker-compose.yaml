@@ -29,6 +29,29 @@ services:
     ports:
       - "8000:8000"  # Add this to expose OCR service port
 
+  vlm_ocr:
+    build: ./vlm_ocr
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities:
+                - gpu
+    environment:
+      - OCR_IMAGE_ROOT=/app/uploads
+      - VLM_MODEL_ID=Qwen/Qwen2.5-VL-3B-Instruct
+      - HF_HOME=/models/huggingface
+    volumes:
+      - ./uploads:/app/uploads:ro
+      - vlm_model_cache:/models/huggingface
+    networks:
+      - logios-network
+    ports:
+      - "8001:8000"
+
   flaskui:
     build:
       context: ./my-flask-app
@@ -47,6 +70,7 @@ services:
       - FLASK_DEBUG=true
       - FLASK_ENV=development
       - OCR_SERVICE_URL=http://ocr:8000
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY must be configured in .env}
     develop:
       watch:
         - action: sync
@@ -62,6 +86,7 @@ services:
 volumes:
   upload_data:
   app:
+  vlm_model_cache:
 
 networks:
   logios-network:

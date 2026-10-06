@@ -1,9 +1,19 @@
     <div class="sidebar">
             <div class="sidebar-section">
                 <h3>User Workspace</h3>
-                <p style="font-family: monospace; background-color: #ffffff; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; margin: 0; word-break: break-all; font-size: 0.75rem;">
+                <p class="workspace-user">
                     User: {{ session.get('user_id', 'anonymous') }}
                 </p>
+                <div class="workspace-language-field">
+                    <label for="workspace-language">Language</label>
+                    <select id="workspace-language" class="workspace-language-select" name="workspace_language">
+                        <option value="greek-polytonic" selected>Greek Polytonic</option>
+                        <option value="coptic" disabled>Coptic</option>
+                        <option value="old-english" disabled>Old English</option>
+                        <option value="latin" disabled>Latin</option>
+                        <option value="catalan" disabled>Catalan</option>
+                    </select>
+                </div>
             </div>
             
             <div class="sidebar-section">

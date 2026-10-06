@@ -29,3 +29,9 @@ services:
       - ./ocr:/app
     environment:
       - PYTHONUNBUFFERED=1
+
+  vlm_ocr:
+    volumes:
+      - ./vlm_ocr/app:/app/app
+    environment:
+      - PYTHONUNBUFFERED=1

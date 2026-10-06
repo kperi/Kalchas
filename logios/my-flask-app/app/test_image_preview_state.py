@@ -72,11 +72,10 @@ class ImagePreviewStateTestCase(unittest.TestCase):
         html = response.get_data(as_text=True)
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn('folder: "document"', html)
-        self.assertIn('page: "page_021.png"', html)
-        self.assertIn('segmentIndex: "12"', html)
-        self.assertNotIn("{ { selected_png", html)
-        self.assertNotIn("{ { selected_segment", html)
+        self.assertIn("const initialPageParams = new URLSearchParams", html)
+        self.assertIn("folder: initialPageParams.get('selected_folder')", html)
+        self.assertIn("page: initialPageParams.get('selected_png')", html)
+        self.assertIn("segmentIndex: initialPageParams.get('selected_segment')", html)
         self.assertLess(
             html.index("showOCRControls(selectedFolder, selectedPng);"),
             html.index("checkForExistingSegments(selectedFolder, selectedPng);"),
@@ -98,11 +97,30 @@ class ImagePreviewStateTestCase(unittest.TestCase):
         html = response.get_data(as_text=True)
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("folder: null", html)
-        self.assertIn("page: null", html)
-        self.assertIn("segmentIndex: null", html)
+        self.assertNotIn("{ { selected_png", html)
+        self.assertNotIn("{ { selected_segment", html)
         self.assertNotIn('const selectedPng = "None"', html)
         fetch_segments.assert_not_called()
+
+    def test_workspace_language_selector_defaults_to_greek_polytonic(self):
+        response, _ = self.render_preview()
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            '<option value="greek-polytonic" selected>Greek Polytonic</option>',
+            html,
+        )
+        for value, label in (
+            ("coptic", "Coptic"),
+            ("old-english", "Old English"),
+            ("latin", "Latin"),
+            ("catalan", "Catalan"),
+        ):
+            self.assertIn(
+                f'<option value="{value}" disabled>{label}</option>',
+                html,
+            )
 
 
 if __name__ == "__main__":
