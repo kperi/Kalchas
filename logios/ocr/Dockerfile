@@ -6,12 +6,12 @@ RUN  mkdir -p /app
 RUN apt-get update && apt-get install -y \
   build-essential \
   curl \
-  software-properties-common \
   git \
-  libxext6 \  
+  libxext6 \
   && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir torch==2.0.1 torchvision==0.15.2  --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir typing-extensions==4.15.0 \
+  && pip install --no-cache-dir torch==2.0.1 torchvision==0.15.2 --index-url https://download.pytorch.org/whl/cpu
 
 COPY requirements.txt /app
 RUN pip install --no-cache-dir -r /app/requirements.txt 

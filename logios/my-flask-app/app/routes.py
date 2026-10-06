@@ -516,6 +516,24 @@ def move_to_ocr():
         return redirect(url_for("app.crop_image", selected_folder=folder))
 
 
+POLYTONIC_GREEK_LANGUAGE = "greek-polytonic"
+SUPPORTED_OCR_LANGUAGES = {
+    POLYTONIC_GREEK_LANGUAGE,
+    "coptic",
+    "old-english",
+    "latin",
+    "catalan",
+}
+
+
+def _get_ocr_service_url(app_config, language):
+    if language not in SUPPORTED_OCR_LANGUAGES:
+        raise ValueError(f"Unsupported OCR language: {language}")
+    if language == POLYTONIC_GREEK_LANGUAGE:
+        return app_config.get("OCR_SERVICE_URL", "http://ocr:8000")
+    return app_config.get("VLM_OCR_SERVICE_URL", "http://vlm_ocr:8000")
+
+
 @app.route("/process_ocr", methods=["POST"])
 @login_required
 def process_ocr():
@@ -530,6 +548,11 @@ def process_ocr():
     page_image_to_ocr = data.get(
         "filename"
     )  # e.g., page_001.png or page_001_crop_001.png
+    language = data.get("language", POLYTONIC_GREEK_LANGUAGE)
+    try:
+        ocr_service_url = _get_ocr_service_url(current_app.config, language)
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
 
     # Image for OCR is from the "completed" structure: /<user_id>/<doc_folder_name>/TOOCR/PNG/
     # The `is_completed` flag for path helpers should be True.
@@ -541,7 +564,7 @@ def process_ocr():
     )
 
     current_app.logger.info(
-        f"Processing OCR request for file: {full_image_path_for_ocr_service}"
+        f"Processing {language} OCR request for file: {full_image_path_for_ocr_service}"
     )
     if not os.path.exists(full_image_path_for_ocr_service):
         current_app.logger.error(
@@ -550,7 +573,6 @@ def process_ocr():
         return jsonify({"success": False, "error": "OCR source image not found"}), 404
 
     try:
-        ocr_service_url = current_app.config.get("OCR_SERVICE_URL", "http://ocr:8000")
         response = requests.post(
             f"{ocr_service_url}/process_image/",
             json={"value": full_image_path_for_ocr_service},

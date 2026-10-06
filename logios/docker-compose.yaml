@@ -42,10 +42,12 @@ services:
                 - gpu
     environment:
       - OCR_IMAGE_ROOT=/app/uploads
-      - VLM_MODEL_ID=Qwen/Qwen2.5-VL-3B-Instruct
+      - VLM_MODEL_ID=Qwen/Qwen3-VL-2B-Instruct
+      - VLM_MODEL_PATH=/models/finetuned
       - HF_HOME=/models/huggingface
     volumes:
       - ./uploads:/app/uploads:ro
+      - ${HOME}/code/projects/datasets-master/vlm/multiple_langs:/models/finetuned:ro
       - vlm_model_cache:/models/huggingface
     networks:
       - logios-network
@@ -70,6 +72,7 @@ services:
       - FLASK_DEBUG=true
       - FLASK_ENV=development
       - OCR_SERVICE_URL=http://ocr:8000
+      - VLM_OCR_SERVICE_URL=http://vlm_ocr:8000
       - SECRET_KEY=${SECRET_KEY:?SECRET_KEY must be configured in .env}
     develop:
       watch:

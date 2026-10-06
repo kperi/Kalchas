@@ -160,10 +160,15 @@
                                 <!-- DEBUG: We have {{ png_files | length }} PNG files -->
                                 {% for png in png_files %}
                                     <option value="{{ png }}" {% if png == request.args.get('selected_png') %}selected{% endif %}>
-                                        {% if 'crop' in png %}
-                                            {{ png.split('.')[0] }} <!-- Show full name for crops -->
+                                        {% set png_base = png.rsplit('.', 1)[0] %}
+                                        {% if '_crop_' in png_base %}
+                                            {{ png_base }}
+                                        {% elif png_base.startswith('page_') and png_base[5:].isdigit() %}
+                                            Page {{ png_base[5:] | int }}
+                                        {% elif png_base.isdigit() %}
+                                            Page {{ png_base | int }}
                                         {% else %}
-                                            Page {{ png.split('_')[1].split('.')[0] | int }} <!-- Extract page number for regular pages -->
+                                            {{ png_base }}
                                         {% endif %}
                                     </option>
                                 {% endfor %}

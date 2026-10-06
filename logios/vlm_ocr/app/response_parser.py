@@ -2,6 +2,8 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from json_repair import repair_json
+
 
 class InvalidModelResponse(ValueError):
     pass
@@ -25,9 +27,17 @@ def _extract_json(value: str) -> Any:
     try:
         return json.loads(content)
     except json.JSONDecodeError as exc:
-        raise InvalidModelResponse(
-            f"Model response is not valid JSON: {exc.msg}"
-        ) from exc
+        try:
+            repaired_payload = json.loads(repair_json(content))
+        except (json.JSONDecodeError, ValueError, TypeError) as repair_exc:
+            raise InvalidModelResponse(
+                f"Model response is not valid JSON: {exc.msg}"
+            ) from repair_exc
+        if not isinstance(repaired_payload, (dict, list)):
+            raise InvalidModelResponse(
+                f"Model response is not valid JSON: {exc.msg}"
+            ) from exc
+        return repaired_payload
 
 
 def _validate_bbox(value: Any, image_size: ImageSize, index: int) -> list[int]:
@@ -76,3 +86,16 @@ def parse_segments(value: str, image_size: ImageSize) -> list[dict[str, Any]]:
         )
     return segments
 
+
+def parse_ocr_response(value: str, image_size: ImageSize) -> list[dict[str, Any]]:
+    content = value.strip()
+    if not content:
+        raise InvalidModelResponse("Model response contains no recognized text")
+    if content.startswith(("{", "[", "```")):
+        return parse_segments(content, image_size)
+    return [
+        {
+            "text": content,
+            "bbox": [0, 0, image_size.width, image_size.height],
+        }
+    ]

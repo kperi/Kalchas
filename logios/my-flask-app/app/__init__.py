@@ -27,6 +27,9 @@ def create_app(config_name=None):
 
     # OCR service URL - adjust based on your Docker Compose setup
     app.config["OCR_SERVICE_URL"] = os.environ.get("OCR_SERVICE_URL", "http://ocr:8000")
+    app.config["VLM_OCR_SERVICE_URL"] = os.environ.get(
+        "VLM_OCR_SERVICE_URL", "http://vlm_ocr:8000"
+    )
 
     config[config_name].init_app(app)
     db.init_app(app)

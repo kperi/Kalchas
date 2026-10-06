@@ -586,11 +586,17 @@ function performOCR() {
     const urlParams = new URLSearchParams(window.location.search);
     const selectedPng = urlParams.get('selected_png');
     const selectedFolder = urlParams.get('selected_folder');
+    const languageSelect = document.getElementById('workspace-language');
+    const language = languageSelect ? languageSelect.value : 'greek-polytonic';
 
     fetch('/process_ocr', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ folder: selectedFolder, filename: selectedPng })
+        body: JSON.stringify({
+            folder: selectedFolder,
+            filename: selectedPng,
+            language: language
+        })
     })
     .then(response => {
         resultArea.value = "Analyzing page content, please wait...";

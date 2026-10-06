@@ -31,7 +31,9 @@ class ImagePreviewStateTestCase(unittest.TestCase):
             get_user_folder_name=lambda: "alice",
         )
 
-    def render_preview(self, query_string=None):
+    def render_preview(self, query_string=None, png_files=None):
+        if png_files is None:
+            png_files = ["page_021.png"]
         with (
             patch.object(routes, "current_user", self.user),
             patch.object(
@@ -55,7 +57,7 @@ class ImagePreviewStateTestCase(unittest.TestCase):
                 return_value=[{"id": "012", "text": "Selected line"}],
             ) as fetch_segments,
             patch.object(routes.os.path, "exists", return_value=True),
-            patch.object(routes.os, "listdir", return_value=["page_021.png"]),
+            patch.object(routes.os, "listdir", return_value=png_files),
         ):
             response = self.client.get("/image_preview", query_string=query_string)
 
@@ -111,8 +113,8 @@ class ImagePreviewStateTestCase(unittest.TestCase):
             '<option value="greek-polytonic" selected>Greek Polytonic</option>',
             html,
         )
+        self.assertIn('<option value="coptic">Coptic</option>', html)
         for value, label in (
-            ("coptic", "Coptic"),
             ("old-english", "Old English"),
             ("latin", "Latin"),
             ("catalan", "Catalan"),
@@ -121,6 +123,45 @@ class ImagePreviewStateTestCase(unittest.TestCase):
                 f'<option value="{value}" disabled>{label}</option>',
                 html,
             )
+
+    def test_single_page_numeric_filename_renders_without_underscore(self):
+        response, _ = self.render_preview(
+            {"selected_folder": "document"},
+            png_files=["001.png"],
+        )
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('<option value="001.png"', html)
+        self.assertIn("Page 1", html)
+
+    def test_polytonic_greek_uses_specialized_ocr_service(self):
+        config = {
+            "OCR_SERVICE_URL": "http://ocr:8000",
+            "VLM_OCR_SERVICE_URL": "http://vlm_ocr:8000",
+        }
+
+        self.assertEqual(
+            routes._get_ocr_service_url(config, "greek-polytonic"),
+            "http://ocr:8000",
+        )
+
+    def test_non_greek_languages_use_vlm_ocr_service(self):
+        config = {
+            "OCR_SERVICE_URL": "http://ocr:8000",
+            "VLM_OCR_SERVICE_URL": "http://vlm_ocr:8000",
+        }
+
+        for language in ("coptic", "old-english", "latin", "catalan"):
+            with self.subTest(language=language):
+                self.assertEqual(
+                    routes._get_ocr_service_url(config, language),
+                    "http://vlm_ocr:8000",
+                )
+
+    def test_unsupported_language_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "Unsupported OCR language"):
+            routes._get_ocr_service_url({}, "unknown")
 
 
 if __name__ == "__main__":

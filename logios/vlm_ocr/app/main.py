@@ -48,6 +48,7 @@ async def health():
     return {
         "status": "ok" if model is not None else "loading",
         "model": model.model_id if model is not None else None,
+        "adapter": str(model.model_path) if model is not None else None,
     }
 
 
@@ -82,4 +83,3 @@ async def process_image(request: StringRequest):
             "segments": segments,
         },
     }
-

@@ -1,6 +1,11 @@
 import unittest
 
-from app.response_parser import ImageSize, InvalidModelResponse, parse_segments
+from app.response_parser import (
+    ImageSize,
+    InvalidModelResponse,
+    parse_ocr_response,
+    parse_segments,
+)
 
 
 class ParseSegmentsTestCase(unittest.TestCase):
@@ -37,7 +42,28 @@ class ParseSegmentsTestCase(unittest.TestCase):
         with self.assertRaisesRegex(InvalidModelResponse, "not valid JSON"):
             parse_segments("recognized text", ImageSize(width=100, height=50))
 
+    def test_repairs_nearly_valid_model_json(self):
+        result = parse_segments(
+            '{"segments":[{"text":"ⲁⲛⲟⲕ","bbox":[1,2,80,20]},'
+            '{"text":"ⲛⲟⲩϯ","bbox":[1,22,80,40]}',
+            ImageSize(width=100, height=50),
+        )
+
+        self.assertEqual([segment["text"] for segment in result], ["ⲁⲛⲟⲕ", "ⲛⲟⲩϯ"])
+
+    def test_wraps_finetuned_plain_text_response(self):
+        result = parse_ocr_response(
+            "ⲁⲛⲟⲕ ⲡⲉ\nδεύτερη γραμμή",
+            ImageSize(width=800, height=1200),
+        )
+
+        self.assertEqual(result[0]["text"], "ⲁⲛⲟⲕ ⲡⲉ\nδεύτερη γραμμή")
+        self.assertEqual(result[0]["bbox"], [0, 0, 800, 1200])
+
+    def test_rejects_empty_finetuned_response(self):
+        with self.assertRaisesRegex(InvalidModelResponse, "no recognized text"):
+            parse_ocr_response("  ", ImageSize(width=100, height=50))
+
 
 if __name__ == "__main__":
     unittest.main()
-

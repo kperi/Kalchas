@@ -1755,9 +1755,11 @@
             .replace('PLACEHOLDER_FILENAME', encodeURIComponent(currentPage));
 
         // Call the Flask OCR processing endpoint
+        const languageSelect = document.getElementById('workspace-language');
         const ocrData = {
             folder: currentFolder,
-            filename: currentPage
+            filename: currentPage,
+            language: languageSelect ? languageSelect.value : 'greek-polytonic'
         };
 
         fetch('/process_ocr', {
