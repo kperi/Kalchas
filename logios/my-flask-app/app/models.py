@@ -25,9 +25,14 @@ class User(UserMixin, db.Model):
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
     )
     last_login = db.Column(db.DateTime, nullable=True)
+    deleted_at = db.Column(db.DateTime, nullable=True)
 
     def __repr__(self):
         return f"<User {self.username}>"
+
+    @property
+    def is_deleted(self):
+        return self.deleted_at is not None
 
     def get_id(self):
         """Return the user ID as a string (required by Flask-Login)"""
@@ -87,6 +92,17 @@ class UserSession(db.Model):
 def init_db():
     """Initialize the database with tables"""
     db.create_all()
+    ensure_user_schema()
+
+
+def ensure_user_schema():
+    """Add columns introduced after the user table was first created."""
+    from sqlalchemy import inspect, text
+
+    columns = {column["name"] for column in inspect(db.engine).get_columns("user")}
+    if "deleted_at" not in columns:
+        with db.engine.begin() as connection:
+            connection.execute(text('ALTER TABLE "user" ADD COLUMN deleted_at DATETIME'))
 
 
 import secrets

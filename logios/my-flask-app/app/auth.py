@@ -21,7 +21,11 @@ def login():
     if form.validate_on_submit():
         user = User.query.filter_by(username=form.username.data).first()
 
-        if user and check_password_hash(user.password_hash, form.password.data):
+        if (
+            user
+            and not user.is_deleted
+            and check_password_hash(user.password_hash, form.password.data)
+        ):
             if user.is_active:
                 # Update last login time
                 user.last_login = datetime.utcnow()

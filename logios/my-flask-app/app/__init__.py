@@ -12,6 +12,15 @@ login_manager = LoginManager()
 csrf = CSRFProtect()
 
 
+def load_user(user_id):
+    from app.models import User
+
+    user = User.query.get(int(user_id))
+    if user is None or user.is_deleted:
+        return None
+    return user
+
+
 def create_app(config_name=None):
     app = Flask(__name__)
 
@@ -43,12 +52,7 @@ def create_app(config_name=None):
     login_manager.login_message = "Please log in to access this page."
     login_manager.login_message_category = "info"
 
-    # User loader callback
-    @login_manager.user_loader
-    def load_user(user_id):
-        from app.models import User
-
-        return User.query.get(int(user_id))
+    login_manager.user_loader(load_user)
 
     # Add security headers to all responses
     @app.after_request
@@ -89,8 +93,10 @@ def create_app(config_name=None):
     # Initialize database tables
     with app.app_context():
         db.create_all()
+        from app.models import create_admin_user, ensure_user_schema
+
+        ensure_user_schema()
         # Create default admin user
-        from app.models import create_admin_user
 
         create_admin_user()
 

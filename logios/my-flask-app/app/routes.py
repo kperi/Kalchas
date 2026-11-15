@@ -250,8 +250,8 @@ def admin():
 
     from app.models import User
 
-    # Get all users from database
-    db_users = User.query.all()
+    # Get all non-deleted users from database
+    db_users = User.query.filter(User.deleted_at.is_(None)).all()
     upload_root = current_app.config["UPLOAD_FOLDER"]
     users_data = []
     total_storage = 0
@@ -1236,7 +1236,8 @@ def api_admin_delete_document():
 @login_required
 def api_admin_delete_user():
     """
-    AJAX endpoint to delete an entire user and all their documents.
+    AJAX endpoint to soft-delete a user: the account is flagged as deleted and
+    can no longer log in, while the database row and documents are kept.
     Returns JSON data with success/error information.
     """
     # Check admin privileges
@@ -1244,6 +1245,7 @@ def api_admin_delete_user():
         return jsonify({"success": False, "message": "Access denied"}), 403
 
     try:
+        from datetime import datetime
         from app.models import User
         from app import db
 
@@ -1261,8 +1263,9 @@ def api_admin_delete_user():
                 400,
             )
 
-        # Find user in database
-        user_to_delete = User.query.filter_by(username=user_id).first()
+        user_to_delete = User.query.filter(
+            User.username == user_id, User.deleted_at.is_(None)
+        ).first()
         if not user_to_delete:
             return (
                 jsonify(
@@ -1274,53 +1277,18 @@ def api_admin_delete_user():
                 404,
             )
 
-        # Count documents before deletion for logging
-        document_count = 0
-        upload_root = current_app.config["UPLOAD_FOLDER"]
-        user_path = os.path.join(upload_root, user_id)
-
-        if os.path.exists(user_path):
-            try:
-                documents_data = file_operations.get_user_documents_list(
-                    current_app.config,
-                    user_id,
-                    include_completed=True,
-                    include_in_progress=True,
-                )
-                document_count = len(documents_data.get("all", []))
-            except:
-                document_count = "unknown"
-
-            # Delete user folder and all documents
-            shutil.rmtree(user_path)
-            current_app.logger.info(
-                f"Deleted user folder for '{user_id}' with {document_count} documents"
-            )
-
-        # Delete user's uploaded files from database (cascade should handle this, but let's be explicit)
-        from app.models import UploadedFile
-
-        uploaded_files_count = UploadedFile.query.filter_by(
-            user_id=user_to_delete.id
-        ).count()
-        UploadedFile.query.filter_by(user_id=user_to_delete.id).delete()
-
-        # Delete user from database
-        db.session.delete(user_to_delete)
+        user_to_delete.deleted_at = datetime.utcnow()
+        user_to_delete.is_active = False
         db.session.commit()
 
-        current_app.logger.info(
-            f"Deleted {uploaded_files_count} uploaded file records from database for user '{user_id}'"
-        )
-
         current_app.logger.warning(
-            f"Admin '{current_user.username}' deleted user '{user_id}' (DB ID: {user_to_delete.id}) with {document_count} documents"
+            f"Admin '{current_user.username}' soft-deleted user '{user_id}' (DB ID: {user_to_delete.id})"
         )
 
         return jsonify(
             {
                 "success": True,
-                "message": f"User '{user_to_delete.display_name}' deleted successfully from database and filesystem",
+                "message": f"User '{user_to_delete.display_name}' deleted. They can no longer log in; their documents were kept.",
             }
         )
 
@@ -2241,7 +2209,9 @@ def api_admin_edit_user():
             errors["user_id"] = "User ID is required"
 
         # Find the user to edit
-        user_to_edit = User.query.filter_by(id=user_id).first()
+        user_to_edit = User.query.filter(
+            User.id == user_id, User.deleted_at.is_(None)
+        ).first()
         if not user_to_edit:
             return jsonify({"success": False, "message": "User not found"}), 404
 
@@ -2328,7 +2298,9 @@ def api_admin_get_user(user_id):
     try:
         from app.models import User
 
-        user = User.query.filter_by(id=user_id).first()
+        user = User.query.filter(
+            User.id == user_id, User.deleted_at.is_(None)
+        ).first()
         if not user:
             return jsonify({"success": False, "message": "User not found"}), 404
 
