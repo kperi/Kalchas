@@ -164,3 +164,25 @@ cython_debug/
 # 
 .DS_Store
 Thumbs.db
+
+# Local data, secrets and artifacts (not used by the code)
+# Core dumps
+/logios/dlayout/core
+/logios/my-flask-app/core
+/logios/ocr/core
+# SQLite databases and user uploads
+/logios/app
+/logios/instance
+/logios/my-flask-app/app/site.db
+/logios/uploads/
+# Certificates and credentials
+/logioscerts/
+/logios/phasher.py
+/logios/streamlitsrv/phasher.py
+/logios/streamlitsrv/st_app/_config.yaml
+# Scratch files
+/logios/RobotoMono.zip
+/logios/setup.sh
+/logios/ocr/test_img.png
+/logios/ocr/test_img/
+/notebooks/
