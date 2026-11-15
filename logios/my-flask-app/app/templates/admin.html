@@ -163,6 +163,26 @@
         color: #92400e;
     }
 
+    .user-badge-deleted {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .user-item-deleted .user-avatar {
+        background: #e5e7eb;
+        color: #6b7280;
+    }
+
+    .user-actions .gradio-button.restore-btn {
+        color: #047857;
+        border-color: #a7f3d0;
+    }
+
+    .user-actions .gradio-button.restore-btn:hover {
+        background: #ecfdf5;
+        border-color: #6ee7b7;
+    }
+
     .user-actions {
         display: flex;
         flex-wrap: wrap;
@@ -1074,6 +1094,9 @@
                     <button class="gradio-button gradio-button-secondary tab-btn" data-tab="user-management" role="tab" aria-selected="false" aria-controls="user-management" id="tab-user-management">
                         👥 User Management
                     </button>
+                    <button class="gradio-button gradio-button-secondary tab-btn" data-tab="deleted-users" role="tab" aria-selected="false" aria-controls="deleted-users" id="tab-deleted-users">
+                        🗃️ Deleted Users ({{ deleted_users_data|length }})
+                    </button>
                     <button class="gradio-button gradio-button-secondary tab-btn" data-tab="document-management" role="tab" aria-selected="false" aria-controls="document-management" id="tab-document-management">
                         📄 Document Management
                     </button>
@@ -1347,6 +1370,58 @@
                     <div id="users-management-empty" class="empty-state" role="status" {% if users_data %}hidden{% endif %}>
                         {% if users_data %}No users match your search.{% else %}No users found.{% endif %}
                     </div>
+                </div>
+
+                <!-- Deleted Users Tab -->
+                <div id="deleted-users" class="tab-content" role="tabpanel" aria-labelledby="tab-deleted-users">
+                    <div class="user-management-heading">
+                        <h3>Deleted Users</h3>
+                        <p>These accounts cannot log in. Their documents are kept, and they can be restored.</p>
+                    </div>
+
+                    <div id="deleted-users-list">
+                        {% for user in deleted_users_data %}
+                        <div class="user-item user-item-deleted" data-db-user-id="{{ user.db_user_id }}">
+                            <div class="user-header">
+                                <div class="user-identity">
+                                    <div class="user-avatar" aria-hidden="true">{{ (user.display_name or user.username)[:1] }}</div>
+                                    <div class="user-details">
+                                        <div class="user-id">
+                                            {{ user.display_name or user.username }}
+                                            {% if user.is_admin %}<span class="user-badge">Admin</span>{% endif %}
+                                            <span class="user-badge user-badge-deleted">Deleted</span>
+                                        </div>
+                                        <div class="user-contact">@{{ user.username }} · {{ user.email }}</div>
+                                    </div>
+                                </div>
+                                <div class="user-actions">
+                                    <button type="button" class="gradio-button gradio-button-secondary restore-btn" data-user-id="{{ user.db_user_id }}" data-username="{{ user.username }}" onclick="confirmRestoreUser(this.dataset.userId, this.dataset.username)">
+                                        ♻️ Restore
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="user-stats">
+                                <span>Deleted <strong>{{ user.deleted_at.strftime('%b %d, %Y %H:%M') }} UTC</strong></span>
+                                <span>
+                                    {% if user.has_folder %}
+                                        <strong>{{ user.total_documents }}</strong> docs · <strong>{{ user.storage_size_mb }} MB</strong> kept
+                                    {% else %}
+                                        No uploads folder
+                                    {% endif %}
+                                </span>
+                                <span>Joined <strong>{{ user.created_at.strftime('%b %Y') }}</strong></span>
+                                {% if user.last_login %}
+                                    <span>Last login <strong>{{ user.last_login.strftime('%b %d, %Y') }}</strong></span>
+                                {% else %}
+                                    <span>Never logged in</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% if not deleted_users_data %}
+                    <div class="empty-state" role="status">No deleted users.</div>
+                    {% endif %}
                 </div>
                 
                 <!-- Document Management Tab -->
@@ -2141,6 +2216,44 @@ document.addEventListener('DOMContentLoaded', function() {
         );
     };
     
+    window.confirmRestoreUser = function(userId, username) {
+        showConfirmationModal(
+            'Restore User',
+            `Restore user "${username}"? They will be able to log in again.`,
+            () => restoreUser(userId),
+            'Restore',
+            false
+        );
+    };
+
+    function restoreUser(userId) {
+        const formData = new FormData();
+        formData.append('user_id', userId);
+
+        fetch('/api/admin/restore_user', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('success', data.message);
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                showAlert('error', data.message || 'Failed to restore user');
+            }
+        })
+        .catch(error => {
+            console.error('Error restoring user:', error);
+            showAlert('error', 'Network error occurred while restoring user');
+        });
+    }
+
     function deleteUser(userId) {
         const formData = new FormData();
         formData.append('user_id', userId);
@@ -2198,7 +2311,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    function showConfirmationModal(title, message, confirmCallback) {
+    function showConfirmationModal(title, message, confirmCallback, confirmLabel = 'Confirm', danger = true) {
         console.log('showConfirmationModal called with:', { title, message });
         const modal = document.getElementById('confirmation-modal');
         const modalTitle = document.getElementById('modal-title');
@@ -2216,6 +2329,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         modalTitle.textContent = title;
         modalMessage.textContent = message;
+        confirmButton.textContent = confirmLabel;
+        confirmButton.classList.toggle('gradio-button-danger', danger);
+        confirmButton.classList.toggle('gradio-button-primary', !danger);
         
         // Show modal with class-based approach
         modal.classList.add('show');

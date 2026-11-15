@@ -60,7 +60,7 @@ class AdminTemplateTestCase(unittest.TestCase):
     def test_admin_post_requests_send_csrf_token(self):
         html = render_admin(self.app, [self.user])
 
-        self.assertEqual(html.count("'X-CSRFToken':"), 4)
+        self.assertEqual(html.count("'X-CSRFToken':"), 5)
 
     def test_empty_list_and_user_without_uploads(self):
         empty_html = render_admin(self.app, [])

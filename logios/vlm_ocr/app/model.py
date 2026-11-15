@@ -67,8 +67,10 @@ class QwenOCRModel:
     def process(self, image_path: Path) -> list[dict]:
         with Image.open(image_path) as source_image:
             image = source_image.convert("RGB")
-            image_size = ImageSize(*image.size)
+        return self.recognize_image(image)
 
+    def recognize_image(self, image: Image.Image) -> list[dict]:
+        image_size = ImageSize(*image.size)
         messages = [
             {
                 "role": "user",

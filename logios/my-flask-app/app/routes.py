@@ -345,9 +345,56 @@ def admin():
                 }
             )
 
+    deleted_users_data = []
+    deleted_users = (
+        User.query.filter(User.deleted_at.isnot(None))
+        .order_by(User.deleted_at.desc())
+        .all()
+    )
+    for user in deleted_users:
+        user_path = os.path.join(upload_root, user.get_user_folder_name())
+        has_folder = os.path.isdir(user_path)
+        storage_size = 0
+        document_count = 0
+        if has_folder:
+            try:
+                storage_size = sum(
+                    os.path.getsize(os.path.join(dirpath, filename))
+                    for dirpath, _, filenames in os.walk(user_path)
+                    for filename in filenames
+                )
+                document_count = len(
+                    file_operations.get_user_documents_list(
+                        current_app.config,
+                        user.get_user_folder_name(),
+                        include_completed=True,
+                        include_in_progress=True,
+                    ).get("all", [])
+                )
+            except Exception as e:
+                current_app.logger.error(
+                    f"Error reading folder of deleted user {user.username}: {e}"
+                )
+        deleted_users_data.append(
+            {
+                "db_user_id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "display_name": user.display_name,
+                "is_admin": user.is_admin,
+                "created_at": user.created_at,
+                "last_login": user.last_login,
+                "deleted_at": user.deleted_at,
+                "has_folder": has_folder,
+                "total_documents": document_count,
+                "storage_size_mb": round(storage_size / (1024 * 1024), 2),
+            }
+        )
+
     return render_template(
         "admin.html",
         users_data=users_data,
+        deleted_users_data=deleted_users_data,
         total_storage=total_storage,
         total_storage_mb=round(total_storage / (1024 * 1024), 2),
         total_users=len(db_users),  # Total users from database
@@ -573,9 +620,12 @@ def process_ocr():
         return jsonify({"success": False, "error": "OCR source image not found"}), 404
 
     try:
+        ocr_request = {"value": full_image_path_for_ocr_service}
+        if language == "coptic":
+            ocr_request["segmentation"] = "manuscript"
         response = requests.post(
             f"{ocr_service_url}/process_image/",
-            json={"value": full_image_path_for_ocr_service},
+            json=ocr_request,
         )
         response.raise_for_status()  # Raise an exception for HTTP errors
 
@@ -1297,6 +1347,53 @@ def api_admin_delete_user():
         current_app.logger.error(f"Error deleting user: {str(e)}", exc_info=True)
         return (
             jsonify({"success": False, "message": f"Error deleting user: {str(e)}"}),
+            500,
+        )
+
+
+@app.route("/api/admin/restore_user", methods=["POST"])
+@login_required
+def api_admin_restore_user():
+    """AJAX endpoint to restore a soft-deleted user so they can log in again."""
+    if not current_user.is_admin:
+        return jsonify({"success": False, "message": "Access denied"}), 403
+
+    from app.models import User
+    from app import db
+
+    try:
+        user_id = int(request.form.get("user_id", ""))
+    except ValueError:
+        return jsonify({"success": False, "message": "Missing or invalid user_id"}), 400
+
+    try:
+        user = User.query.filter(
+            User.id == user_id, User.deleted_at.isnot(None)
+        ).first()
+        if not user:
+            return (
+                jsonify({"success": False, "message": "Deleted user not found"}),
+                404,
+            )
+
+        user.deleted_at = None
+        user.is_active = True
+        db.session.commit()
+
+        current_app.logger.warning(
+            f"Admin '{current_user.username}' restored user '{user.username}' (DB ID: {user.id})"
+        )
+        return jsonify(
+            {
+                "success": True,
+                "message": f"User '{user.display_name}' restored and can log in again.",
+            }
+        )
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error restoring user: {str(e)}", exc_info=True)
+        return (
+            jsonify({"success": False, "message": f"Error restoring user: {str(e)}"}),
             500,
         )
 

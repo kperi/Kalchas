@@ -46,7 +46,7 @@ services:
       - VLM_MODEL_PATH=/models/finetuned
       - HF_HOME=/models/huggingface
     volumes:
-      - ./uploads:/app/uploads:ro
+      - ./uploads:/app/uploads
       - ${HOME}/code/projects/datasets-master/vlm/multiple_langs:/models/finetuned:ro
       - vlm_model_cache:/models/huggingface
     networks:

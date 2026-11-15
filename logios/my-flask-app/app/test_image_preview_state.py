@@ -1,6 +1,9 @@
 import unittest
+import json
+import tempfile
+from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from flask import Flask
 from flask_login import LoginManager
@@ -162,6 +165,63 @@ class ImagePreviewStateTestCase(unittest.TestCase):
     def test_unsupported_language_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "Unsupported OCR language"):
             routes._get_ocr_service_url({}, "unknown")
+
+    def test_coptic_and_greek_route_requests_and_persisted_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.app.config["UPLOAD_FOLDER"] = directory
+            self.app.config["OCR_SERVICE_URL"] = "http://greek:8000"
+            self.app.config["VLM_OCR_SERVICE_URL"] = "http://vlm:8000"
+            png_dir = Path(directory) / "alice" / "document" / "TOOCR" / "PNG"
+            png_dir.mkdir(parents=True)
+            page = png_dir / "page_001.png"
+            page.touch()
+            crop_dir = png_dir / "page_001"
+            crop_dir.mkdir()
+            (crop_dir / "000.png").touch()
+            (crop_dir / "099.json").write_text('{"text":"stale"}')
+            (crop_dir / "metadata.json").write_text('{"keep":true}')
+            segment = {"text": "line text", "bbox": [10, 20, 100, 40], "coords": [10, 20, 100, 40]}
+            response = Mock()
+            response.json.return_value = {"ret": {"status": "ok", "segments": [segment]}}
+            for language, url, extra in (
+                ("coptic", "http://vlm:8000", {"segmentation": "manuscript"}),
+                ("greek-polytonic", "http://greek:8000", {}),
+                (None, "http://greek:8000", {}),
+            ):
+                with (
+                    self.subTest(language=language),
+                    patch.object(routes, "current_user", self.user),
+                    patch.object(routes.requests, "post", return_value=response) as post,
+                    patch("app.models.UploadedFile") as uploaded_file,
+                    patch("app.models.db"),
+                ):
+                    uploaded_file.query.filter_by.return_value.all.return_value = []
+                    payload = {"folder": "document", "filename": "page_001.png"}
+                    if language is not None:
+                        payload["language"] = language
+                    result = self.client.post("/process_ocr", json=payload)
+                    self.assertEqual(result.status_code, 200)
+                    post.assert_called_once_with(
+                        f"{url}/process_image/",
+                        json={"value": str(page), **extra},
+                    )
+                    self.assertEqual(result.json["segments"][0]["id"], "000")
+                    self.assertEqual(result.json["segments"][0]["bbox"], segment["bbox"])
+                    self.assertEqual(json.loads((crop_dir / "000.json").read_text()), segment)
+                    self.assertEqual((crop_dir / "summary.txt").read_text(), "line text")
+                    self.assertFalse((crop_dir / "099.json").exists())
+                    self.assertTrue((crop_dir / "metadata.json").exists())
+                    reloaded = routes.file_operations.fetch_page_segments_data(
+                        self.app.config, "alice", "document", "page_001",
+                        is_document_completed=True,
+                    )
+                    self.assertEqual(reloaded[0]["bbox"], segment["bbox"])
+                    self.assertEqual(reloaded[0]["text"], segment["text"])
+                    served = self.client.get(
+                        "/get_segment_image/alice/document/page_001/000"
+                    )
+                    self.assertEqual(served.status_code, 200)
+                    served.close()
 
 
 if __name__ == "__main__":

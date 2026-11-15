@@ -9,6 +9,10 @@ class InvalidModelResponse(ValueError):
     pass
 
 
+class NoRecognizedText(InvalidModelResponse):
+    pass
+
+
 @dataclass(frozen=True)
 class ImageSize:
     width: int
@@ -90,7 +94,7 @@ def parse_segments(value: str, image_size: ImageSize) -> list[dict[str, Any]]:
 def parse_ocr_response(value: str, image_size: ImageSize) -> list[dict[str, Any]]:
     content = value.strip()
     if not content:
-        raise InvalidModelResponse("Model response contains no recognized text")
+        raise NoRecognizedText("Model response contains no recognized text")
     if content.startswith(("{", "[", "```")):
         return parse_segments(content, image_size)
     return [

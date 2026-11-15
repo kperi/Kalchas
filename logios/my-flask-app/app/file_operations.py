@@ -858,6 +858,15 @@ def save_ocr_processed_data(
         segments_dir = os.path.join(png_subdir, page_image_filename_base)
         os.makedirs(segments_dir, exist_ok=True)
 
+        for existing_filename in os.listdir(segments_dir):
+            existing_id, extension = os.path.splitext(existing_filename)
+            if (
+                extension.lower() == ".json"
+                and len(existing_id) == 3
+                and existing_id.isdigit()
+            ):
+                os.remove(os.path.join(segments_dir, existing_filename))
+
         segments_data_list = []
         text_summary = ""
 

@@ -3,6 +3,7 @@ import unittest
 from app.response_parser import (
     ImageSize,
     InvalidModelResponse,
+    NoRecognizedText,
     parse_ocr_response,
     parse_segments,
 )
@@ -61,7 +62,7 @@ class ParseSegmentsTestCase(unittest.TestCase):
         self.assertEqual(result[0]["bbox"], [0, 0, 800, 1200])
 
     def test_rejects_empty_finetuned_response(self):
-        with self.assertRaisesRegex(InvalidModelResponse, "no recognized text"):
+        with self.assertRaisesRegex(NoRecognizedText, "no recognized text"):
             parse_ocr_response("  ", ImageSize(width=100, height=50))
 
 

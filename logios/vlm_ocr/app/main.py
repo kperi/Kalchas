@@ -2,12 +2,13 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
-from app.model import QwenOCRModel
+from app.coptic import process_coptic
 from app.response_parser import InvalidModelResponse
 
 
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 class StringRequest(BaseModel):
     value: str
+    segmentation: Literal["page", "manuscript"] = "page"
 
 
 def _resolve_image_path(value: str) -> Path:
@@ -33,6 +35,8 @@ def _resolve_image_path(value: str) -> Path:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from app.model import QwenOCRModel
+
     logger.info("Loading Qwen OCR model")
     app.state.ocr_model = QwenOCRModel()
     logger.info("Qwen OCR model loaded")
@@ -58,10 +62,15 @@ async def process_image(request: StringRequest):
     logger.info("Processing OCR request for %s", image_path)
 
     try:
-        segments = await run_in_threadpool(
-            app.state.ocr_model.process,
-            image_path,
-        )
+        if request.segmentation == "manuscript":
+            segments = await run_in_threadpool(
+                process_coptic, image_path, app.state.ocr_model.recognize_image
+            )
+        else:
+            segments = await run_in_threadpool(
+                app.state.ocr_model.process,
+                image_path,
+            )
     except InvalidModelResponse as exc:
         logger.error("Qwen returned an invalid OCR response for %s: %s", image_path, exc)
         raise HTTPException(
